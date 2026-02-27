@@ -1,0 +1,1 @@
+ALTER TABLE public.rss_feed_items ADD COLUMN full_content text;

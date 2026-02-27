@@ -1,0 +1,1 @@
+ALTER TABLE public.rss_feed_items ADD COLUMN image_url text;

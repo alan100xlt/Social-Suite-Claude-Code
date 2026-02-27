@@ -1,0 +1,1 @@
+ALTER TABLE public.post_approvals ADD COLUMN link_as_comment jsonb DEFAULT '{}'::jsonb;

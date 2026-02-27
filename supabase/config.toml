@@ -1,0 +1,64 @@
+project_id = "uawunmdvbgqasmmnhmll"
+
+[functions.linear-feedback]
+verify_jwt = false
+
+[functions.send-invite-email]
+verify_jwt = false
+
+[functions.admin-set-password]
+verify_jwt = false
+
+[functions.generate-social-post]
+verify_jwt = false
+
+[functions.send-post-approval]
+verify_jwt = false
+
+[functions.approve-posts]
+verify_jwt = false
+
+[functions.send-in-app-notification]
+verify_jwt = false
+
+[functions.send-test-email]
+verify_jwt = false
+
+[functions.dashboard-briefing]
+verify_jwt = false
+
+[functions.impersonate-user]
+verify_jwt = false
+
+[functions.scrape-article]
+verify_jwt = false
+
+[functions.getlate-connect]
+verify_jwt = false
+
+[functions.deep-website-crawl]
+verify_jwt = false
+
+[functions.discover-rss-feeds]
+verify_jwt = false
+
+[functions.provision-superadmins]
+verify_jwt = false
+
+[functions.send-auth-email]
+verify_jwt = false
+
+[functions.create-discovery-company]
+verify_jwt = false
+
+[functions.claim-discovery-company]
+verify_jwt = false
+
+[functions.admin-companies]
+verify_jwt = false
+
+[functions.admin-delete-companies]
+verify_jwt = false
+
+[functions.instant-signup]
+verify_jwt = false

@@ -1,0 +1,1 @@
+ALTER TABLE public.automation_rules ADD COLUMN scheduling text NOT NULL DEFAULT 'immediate';

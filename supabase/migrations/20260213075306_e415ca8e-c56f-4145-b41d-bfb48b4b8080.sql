@@ -1,0 +1,1 @@
+ALTER TABLE public.rss_feeds ADD COLUMN enable_scraping boolean NOT NULL DEFAULT true;
