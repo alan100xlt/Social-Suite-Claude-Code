@@ -22,6 +22,8 @@ import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import FlyoutEditor from './FlyoutEditor';
+import ContextualCardActions from './ContextualCardActions';
+import usePostState from '@/hooks/usePostState';
 
 // --- Platform icon map ---
 const platformIconMap: Record<string, React.ElementType> = {
@@ -402,7 +404,51 @@ export function ArticlesTab() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
+                      {/* Use contextual actions based on post state */}
+                      {(() => {
+                        const postStateData = usePostState(item);
+                        
+                        if (!postStateData.needsAction) {
+                          // Published posts - no action needed
+                          return postStateData.hasAnalytics ? (
+                            <button 
+                              onClick={() => navigate(`/app/analytics?tab=posts&postId=${item.post_id}`)} 
+                              title="View analytics" 
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+                            >
+                              <BarChart3 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null;
+                        }
+                        
+                        // Future/Processing/Draft posts - show contextual actions
+                        return (
+                          <ContextualCardActions
+                            postState={postStateData.state}
+                            postId={item.post_id}
+                            analytics={postAnalytics?.get(item.post_id)?.[0]}
+                            onEdit={() => {
+                              if (postStateData.isEditable) {
+                                setFlyoutOpen(true);
+                              }
+                            }}
+                            onSchedule={() => {
+                              // Handle scheduling logic
+                              toast({ title: 'Scheduling', description: 'Scheduling functionality coming soon!' });
+                            }}
+                            onPublish={() => {
+                              // Handle immediate publishing
+                              toast({ title: 'Publishing', description: 'Publishing functionality coming soon!' });
+                            }}
+                            onViewAnalytics={() => {
+                              if (item.post_id) {
+                                navigate(`/app/analytics?tab=posts&postId=${item.post_id}`);
+                              }
+                            }}
+                          />
+                        );
+                      })()}
                       {isPosted ? (
                         <Badge variant="secondary" className="text-[10px] gap-1 h-6">
                           <CheckCircle2 className="h-3 w-3" />Posted
