@@ -10,6 +10,7 @@ import {
   HeatmapWidget,
   RadarStrengthWidget,
 } from "@/components/analytics-v2/widgets";
+import { OptimalPostingWidget } from "@/components/analytics/OptimalPostingWidget";
 import { useHistoricalAnalytics, useAnalyticsByPlatform } from "@/hooks/useHistoricalAnalytics";
 import { useAnalyticsByPublishDate } from "@/hooks/useAnalyticsByPublishDate";
 import { useAccountGrowth } from "@/hooks/useAccountGrowth";
@@ -232,6 +233,13 @@ export default function AnalyticsV2() {
             />
           )}
         </div>
+
+        {/* Optimal Posting Times */}
+        {company && (
+          <OptimalPostingWidget 
+            companyId={company.id}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

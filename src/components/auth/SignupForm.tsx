@@ -67,8 +67,7 @@ export function SignupForm() {
     // If they have an invite token, they'll be redirected to accept it
     // Otherwise, they go to company setup
     // After signup, redirect to setup-company which auto-detects pending invitations
-    // Navigate to /app — ProtectedRoute will redirect to setup (no company) or wizard (in_progress) as needed
-    navigate('/app');
+    navigate(inviteToken ? '/app/onboarding/wizard' : '/app/onboarding/setup');
 
     setIsLoading(false);
   };

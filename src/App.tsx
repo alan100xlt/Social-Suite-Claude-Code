@@ -39,6 +39,8 @@ import ResetPassword from "./pages/ResetPassword";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import SuperadminCompanies from "./pages/SuperadminCompanies";
 import CronHealth from "./pages/CronHealth";
+import Progress from "./pages/Progress";
+import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +102,10 @@ const App = () => (
               <Route path="/app/admin/companies" element={<ProtectedRoute><SuperadminCompanies /></ProtectedRoute>} />
               <Route path="/app/admin/cron-health" element={<ProtectedRoute><CronHealth /></ProtectedRoute>} />
               <Route path="/app/admin/wizard" element={<ProtectedRoute><WizardVariations /></ProtectedRoute>} />
+              <Route path="/app/admin/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+
+              {/* Media Company Routes */}
+              <Route path="/app/media-company/:mediaCompanyId" element={<ProtectedRoute><MediaCompanyDashboard /></ProtectedRoute>} />
 
               {/* Backward-compatible redirects */}
               <Route path="/landing" element={<Navigate to="/" replace />} />

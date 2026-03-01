@@ -52,6 +52,20 @@ Deno.serve(async (req) => {
 
     userId = createData.user!.id;
 
+    // Send "set your password" email asynchronously (non-blocking)
+    try {
+      await adminClient.functions.invoke('send-auth-email', {
+        body: {
+          email: email.toLowerCase().trim(),
+          type: 'set_password',
+          userId: userId
+        }
+      })
+    } catch (emailError) {
+      // Log but don't fail the signup if email fails
+      console.error('Failed to send set password email:', emailError)
+    }
+
     // Sign in with the temp password to get a session
     const { data: signInData, error: signInError } = await adminClient.auth.signInWithPassword({
       email: email.toLowerCase().trim(),
