@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SelectedCompanyProvider } from "@/contexts/SelectedCompanyContext";
 import { CourierTokenProvider } from "@/contexts/CourierContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Connections from "./pages/Connections";
@@ -41,16 +42,18 @@ import SuperadminCompanies from "./pages/SuperadminCompanies";
 import CronHealth from "./pages/CronHealth";
 import Progress from "./pages/Progress";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
+import ThemeSettings from "./pages/ThemeSettings";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <PlatformProvider>
-    <AuthProvider>
-      <SelectedCompanyProvider>
-        <CourierTokenProvider>
-        <TooltipProvider>
+    <ThemeProvider>
+      <PlatformProvider>
+      <AuthProvider>
+        <SelectedCompanyProvider>
+          <CourierTokenProvider>
+            <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -85,6 +88,7 @@ const App = () => (
               <Route path="/app/analytics-v2" element={<ProtectedRoute><AnalyticsV2 /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/app/theme" element={<ProtectedRoute><ThemeSettings /></ProtectedRoute>} />
 
               {/* Protected: Onboarding */}
               <Route path="/app/onboarding/setup" element={<ProtectedRoute><SetupCompany /></ProtectedRoute>} />
@@ -141,6 +145,7 @@ const App = () => (
       </SelectedCompanyProvider>
     </AuthProvider>
     </PlatformProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

@@ -21,6 +21,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import FlyoutEditor from './FlyoutEditor';
 
 // --- Platform icon map ---
 const platformIconMap: Record<string, React.ElementType> = {
@@ -66,6 +67,7 @@ export function ArticlesTab() {
   const [viewingArticle, setViewingArticle] = useState<RssFeedItem | null>(null);
   const [isScraping, setIsScraping] = useState(false);
   const [automationArticle, setAutomationArticle] = useState<{ id: string; title: string } | null>(null);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
 
   const handleScrapeArticle = async () => {
     if (!viewingArticle?.link) return;
@@ -386,7 +388,11 @@ export function ArticlesTab() {
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>
                         )}
-                        <button onClick={() => setViewingArticle(item)} title="Preview content" className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <button 
+                          onClick={() => setFlyoutOpen(true)} 
+                          title="Preview content with platform tabs" 
+                          className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
                           <Eye className="h-3.5 w-3.5" />
                         </button>
                         {isPosted && item.post_id && (
@@ -503,6 +509,22 @@ export function ArticlesTab() {
         open={!!automationArticle}
         onOpenChange={(open) => { if (!open) setAutomationArticle(null); }}
         onComplete={() => refetchItems()}
+      />
+
+      {/* Flyout Editor */}
+      <FlyoutEditor
+        isOpen={flyoutOpen}
+        onClose={() => setFlyoutOpen(false)}
+        article={{
+          id: viewingArticle?.id || '',
+          title: viewingArticle?.title || '',
+          content: viewingArticle?.full_content || '',
+          media: viewingArticle?.image_url ? [{
+            type: 'image',
+            url: viewingArticle.image_url,
+            alt: viewingArticle.title
+          }] : undefined
+        }}
       />
     </div>
   );
