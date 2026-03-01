@@ -24,6 +24,7 @@ import { toast } from '@/hooks/use-toast';
 import FlyoutEditor from './FlyoutEditor';
 import ContextualCardActions from './ContextualCardActions';
 import usePostState from '@/hooks/usePostState';
+import StatusBadge, { getStatusFromItem } from '@/components/ui/StatusBadge';
 
 // --- Platform icon map ---
 const platformIconMap: Record<string, React.ElementType> = {
@@ -449,23 +450,11 @@ export function ArticlesTab() {
                           />
                         );
                       })()}
-                      {isPosted ? (
-                        <Badge variant="secondary" className="text-[10px] gap-1 h-6">
-                          <CheckCircle2 className="h-3 w-3" />Posted
-                        </Badge>
-                      ) : item.status === 'failed' ? (
-                        <Badge variant="destructive" className="text-[10px] gap-1 h-6">
-                          <XCircle className="h-3 w-3" />Failed
-                        </Badge>
-                      ) : existingDraft ? (
-                        <Button size="sm" variant="secondary" onClick={() => navigate(`/app/posts?tab=compose&draft=${existingDraft.id}`)} className="h-7 text-xs gap-1.5">
-                          <FileText className="h-3 w-3" />View Draft
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => handleCreatePost(item.id, item.title || undefined)} className="h-7 text-xs gap-1.5">
-                          <Send className="h-3 w-3" />Create Post
-                        </Button>
-                      )}
+                      <StatusBadge 
+                        status={getStatusFromItem(item)}
+                        size="sm"
+                        showIcon={true}
+                      />
                     </td>
                   </tr>
                 );
