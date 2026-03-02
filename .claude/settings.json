@@ -1,0 +1,85 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm run test)",
+      "Bash(npm run test:*)",
+      "Bash(npm install)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(gh pr *)",
+      "Bash(gh issue *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)",
+      "Edit(.env*)",
+      "Edit(src/integrations/supabase/types.ts)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(rm *)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/notify.js --event permission_prompt --context \"Risky delete command requested\""
+          },
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/check-approval.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(git push --force*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/notify.js --event permission_prompt --context \"Force push requested\""
+          },
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/check-approval.js"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx eslint --fix $(node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));if(d.tool_input&&d.tool_input.file_path&&d.tool_input.file_path.match(/\\.(tsx?|jsx?)$/))process.stdout.write(d.tool_input.file_path)\" 2>/dev/null) 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));if(d.tool_input&&d.tool_input.file_path&&d.tool_input.file_path.match(/\\.(tsx?|ts)$/))process.exit(1)\" 2>/dev/null && exit 0; npx tsc --noEmit 2>&1 | head -20 || true",
+            "async": true,
+            "statusMessage": "Type-checking..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/notify.js --event session_complete --context \"Claude Code session ended\""
+          }
+        ]
+      }
+    ]
+  }
+}
