@@ -6,7 +6,7 @@
 
 ## Summary
 
-There are **8 major areas** of duplication across the app. Some are clear V1/V2 experiments that should be consolidated; others are features that were split across pages but are functionally identical. The biggest wins come from consolidating pages that share the same underlying components and removing vestigial pages that already redirect elsewhere.
+There are **12 major areas** of duplication across the app (9 frontend, 3 backend). Some are clear V1/V2 experiments that should be consolidated; others are features that were split across pages but are functionally identical. The biggest wins come from consolidating pages that share the same underlying components and removing vestigial pages that already redirect elsewhere.
 
 ---
 
@@ -162,6 +162,57 @@ There are **8 major areas** of duplication across the app. Some are clear V1/V2 
 
 ---
 
+## 10. Duplicated Server Function Helpers (BACKEND — HIGH IMPACT)
+
+**Files:**
+- `supabase/functions/getlate-accounts/index.ts`
+- `supabase/functions/getlate-analytics/index.ts`
+- `supabase/functions/getlate-connect/index.ts`
+- `supabase/functions/getlate-posts/index.ts`
+
+**What's duplicated:**
+- `safeJsonParse()` — identical implementation copy-pasted into all 4 functions
+- `logApiCall()` — identical implementation in all 4 functions
+- Authorization/setup boilerplate (CORS headers, Supabase client init, API key validation, user extraction from auth header) — repeated in all 4 functions
+
+**Recommendation:** Extract to a shared helper module at `supabase/functions/_shared/getlate-helpers.ts`. This would eliminate ~400+ lines of duplicated server code.
+
+---
+
+## 11. Overlapping Analytics Data Hooks (BACKEND — MEDIUM IMPACT)
+
+**10+ hooks query the same tables with overlapping logic:**
+- `useHistoricalAnalytics`, `usePlatformBreakdown`, `useDashboardStats`, `useDashboardTrends`, `useAnalyticsByPublishDate`, `useFollowersByPlatform`, `useDailyPlatformMetrics`, `useViewsByPublishDate`, `useTopPerformingPosts`, `useAccountGrowth`, `useAnalyticsStats`
+
+**What's duplicated:**
+- All filter by `company_id` and active account status
+- 6+ hooks independently re-fetch inactive account IDs (despite `useInactiveAccountIds` hook existing)
+- Identical date-range filtering patterns (`.gte()/.lte()`)
+- Same Map/reduce aggregation patterns for deduplication by `account_id` or `post_id`
+
+**Recommendation:** Create a shared analytics data layer. Centralize inactive account filtering via the existing `useInactiveAccountIds` hook. Consider a single RPC-backed analytics hook that returns multiple metric views from one query.
+
+---
+
+## 12. Duplicated CRUD Mutation Patterns (BACKEND — LOW IMPACT)
+
+**8+ hooks follow identical Create/Update/Delete patterns:**
+- `useRssFeeds` (create/update/delete)
+- `useAutomationRules` (create/update/delete)
+- `useGetLatePosts` (create/update/delete)
+- `usePostDrafts` (save/delete)
+- `useCompany` (create/update)
+- `useProfile` (update)
+- `usePendingInvitations` (revoke)
+
+**What's duplicated:**
+- Same boilerplate: get company context → `useMutation` → `onSuccess: invalidateQueries + toast` → `onError: toast destructive`
+- Settings hooks (`useVoiceSettings`, `useGlobalVoiceDefaults`) both implement identical check-then-upsert patterns
+
+**Recommendation:** Consider a generic mutation factory or shared `useEntityMutation` helper that encapsulates the query-invalidation + toast pattern. Lower priority since the duplication is structural rather than logic.
+
+---
+
 ## Quick-Win Consolidation Roadmap
 
 | Priority | Action | Files to Remove | Impact |
@@ -174,3 +225,5 @@ There are **8 major areas** of duplication across the app. Some are clear V1/V2 
 | 6 | Merge CompanySettings into Settings tab | Remove `pages/CompanySettings.tsx` | Reduce page count |
 | 7 | Consolidate Automations into Content | Remove `pages/Automations.tsx` | Single source of truth |
 | 8 | Pick landing page winner | Remove 3 of 4 landing pages + VersionSwitcher | Reduce bundle, clean public routes |
+| 9 | Extract shared GetLate server helpers | Create `_shared/getlate-helpers.ts` | Eliminate ~400 lines duplicated server code |
+| 10 | Centralize inactive account filtering | Use `useInactiveAccountIds` consistently | Remove 6+ redundant queries |
