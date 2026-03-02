@@ -91,6 +91,16 @@
             "statusMessage": "Type-checking..."
           }
         ]
+      },
+      {
+        "matcher": "Write(docs/plans/*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/notify-plan-saved.js",
+            "async": true
+          }
+        ]
       }
     ],
     "SessionStart": [
