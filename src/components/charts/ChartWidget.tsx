@@ -43,7 +43,7 @@ export function ChartWidget({
 
   if (isLoading || isEmpty || isError) {
     return (
-      <ChartCard title={title} subtitle={subtitle} compact={compact}>
+      <ChartCard title={title} subtitle={subtitle} compact={compact} preset={preset}>
         <ChartEmptyState
           isLoading={isLoading}
           isEmpty={isEmpty}
@@ -60,6 +60,7 @@ export function ChartWidget({
   const typeDefaults: Record<string, Record<string, unknown>> = {
     donut: { innerRadius: 0.6 },
     area: { enableArea: true },
+    'bar-horizontal': { layout: 'horizontal' },
   };
 
   return (
@@ -67,6 +68,7 @@ export function ChartWidget({
       title={title}
       subtitle={subtitle}
       compact={compact}
+      preset={preset}
       footer={legendItems ? <ChartLegend items={legendItems} position={legendPosition} /> : undefined}
     >
       <Component

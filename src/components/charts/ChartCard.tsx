@@ -1,5 +1,7 @@
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { getChartPreset } from '@/lib/charts/theme';
 import type { ReactNode } from 'react';
+import type { ChartPresetId } from '@/lib/charts/types';
 
 interface ChartCardProps {
   title?: string;
@@ -9,13 +11,16 @@ interface ChartCardProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  preset?: ChartPresetId;
 }
 
-export function ChartCard({ title, subtitle, action, compact, children, footer, className }: ChartCardProps) {
+export function ChartCard({ title, subtitle, action, compact, children, footer, className, preset }: ChartCardProps) {
+  const cardPadding = getChartPreset(preset).card.padding;
+
   return (
     <Card className={className}>
       {(title || subtitle || action) && (
-        <CardHeader className={compact ? 'pb-1' : 'pb-2'}>
+        <CardHeader className={compact ? 'pb-1' : 'pb-2'} style={{ padding: cardPadding, paddingBottom: compact ? '4px' : '8px' }}>
           <div className="flex items-center justify-between">
             <div>
               {title && (
@@ -34,14 +39,14 @@ export function ChartCard({ title, subtitle, action, compact, children, footer, 
           </div>
         </CardHeader>
       )}
-      <CardContent className={compact ? 'pt-0' : ''}>
+      <CardContent style={{ padding: cardPadding, paddingTop: (title || subtitle || action) ? '0' : cardPadding }}>
         {children}
+        {footer && (
+          <div className="mt-3">
+            {footer}
+          </div>
+        )}
       </CardContent>
-      {footer && (
-        <div className="px-6 pb-4">
-          {footer}
-        </div>
-      )}
     </Card>
   );
 }
