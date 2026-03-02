@@ -22,6 +22,7 @@ import {
   Wrench,
   Building2,
   HeartPulse,
+  Users,
 } from "lucide-react";
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
@@ -433,6 +434,23 @@ export function Sidebar() {
               />
               {!collapsed && (
                 <span className="font-medium text-sm">Companies</span>
+              )}
+            </Link>
+            <Link
+              to="/app/admin/users"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                location.pathname === "/app/admin/users"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+              )}
+            >
+              <Users
+                size={20}
+                className="flex-shrink-0 transition-transform group-hover:scale-110"
+              />
+              {!collapsed && (
+                <span className="font-medium text-sm">Users</span>
               )}
             </Link>
             <Link

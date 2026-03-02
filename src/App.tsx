@@ -10,6 +10,7 @@ import { CourierTokenProvider } from "@/contexts/CourierContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { SuperAdminRoute } from "@/components/auth/SuperAdminRoute";
 import Index from "./pages/Index";
 import Connections from "./pages/Connections";
 import Content from "./pages/Content";
@@ -40,6 +41,7 @@ import Discover from "./pages/Discover";
 import ResetPassword from "./pages/ResetPassword";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import SuperadminCompanies from "./pages/SuperadminCompanies";
+import AdminUsers from "./pages/AdminUsers";
 import CronHealth from "./pages/CronHealth";
 import Progress from "./pages/Progress";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
@@ -102,14 +104,15 @@ const App = () => (
               <Route path="/app/automations/logs" element={<Navigate to="/app/content?tab=logs" replace />} />
 
               {/* Protected: Admin / Superadmin */}
-              <Route path="/app/admin/api-logs" element={<ProtectedRoute><ApiLogs /></ProtectedRoute>} />
-              <Route path="/app/admin/mapping" element={<ProtectedRoute><GetLateMapping /></ProtectedRoute>} />
-              <Route path="/app/admin/email-branding" element={<ProtectedRoute><EmailBranding /></ProtectedRoute>} />
-              <Route path="/app/admin/platform" element={<ProtectedRoute><PlatformSettings /></ProtectedRoute>} />
-              <Route path="/app/admin/companies" element={<ProtectedRoute><SuperadminCompanies /></ProtectedRoute>} />
-              <Route path="/app/admin/cron-health" element={<ProtectedRoute><CronHealth /></ProtectedRoute>} />
-              <Route path="/app/admin/wizard" element={<ProtectedRoute><WizardVariations /></ProtectedRoute>} />
-              <Route path="/app/admin/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+              <Route path="/app/admin/api-logs" element={<ProtectedRoute><SuperAdminRoute><ApiLogs /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/mapping" element={<ProtectedRoute><SuperAdminRoute><GetLateMapping /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/email-branding" element={<ProtectedRoute><SuperAdminRoute><EmailBranding /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/platform" element={<ProtectedRoute><SuperAdminRoute><PlatformSettings /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/companies" element={<ProtectedRoute><SuperAdminRoute><SuperadminCompanies /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/cron-health" element={<ProtectedRoute><SuperAdminRoute><CronHealth /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/wizard" element={<ProtectedRoute><SuperAdminRoute><WizardVariations /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/users" element={<ProtectedRoute><SuperAdminRoute><AdminUsers /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/progress" element={<ProtectedRoute><SuperAdminRoute><Progress /></SuperAdminRoute></ProtectedRoute>} />
 
               {/* Media Company Routes */}
               <Route path="/app/media-company/:mediaCompanyId" element={<ProtectedRoute><MediaCompanyDashboard /></ProtectedRoute>} />
