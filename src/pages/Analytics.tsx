@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Eye, Heart, Loader2, BarChart3, Users, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowRight, Eye, Heart, Loader2, BarChart3, Users, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { FaInstagram, FaTwitter, FaLinkedin, FaFacebook, FaTiktok } from "react-icons/fa";
 import { useAccounts } from "@/hooks/useGetLateAccounts";
 import { useHistoricalAnalytics, useAnalyticsByPlatform } from "@/hooks/useHistoricalAnalytics";
@@ -15,6 +15,10 @@ import { usePlatformBreakdown } from "@/hooks/usePlatformBreakdown";
 import { useViewsByPublishDate } from "@/hooks/useViewsByPublishDate";
 import { useFollowersByPlatform } from "@/hooks/useFollowersByPlatform";
 import { useCompany } from "@/hooks/useCompany";
+import { useSyncAnalytics } from "@/hooks/useSyncAnalytics";
+import { useLastSyncTime } from "@/hooks/useLastSyncTime";
+import { SyncStatusBadge } from "@/components/analytics/SyncStatusBadge";
+import { SyncingIndicator } from "@/components/analytics/SyncingIndicator";
 import { PlatformBreakdownTable } from "@/components/analytics/PlatformBreakdownTable";
 import { AnalyticsDebugPanel } from "@/components/analytics/AnalyticsDebugPanel";
 import { TopPostCard } from "@/components/analytics/TopPostCard";
@@ -119,6 +123,8 @@ export default function AnalyticsPage() {
   };
 
   const { data: company } = useCompany();
+  const syncAnalytics = useSyncAnalytics();
+  const { data: lastSyncAt, isLoading: syncTimeLoading } = useLastSyncTime();
   const { data: accounts, isLoading: accountsLoading } = useAccounts();
   const { data: analytics, isLoading: analyticsLoading } = useHistoricalAnalytics({ startDate, endDate });
   const { data: platformData } = useAnalyticsByPlatform({ startDate, endDate });
@@ -197,12 +203,25 @@ export default function AnalyticsPage() {
           <h1 className="font-display text-3xl font-bold text-foreground">Analytics</h1>
           <p className="text-muted-foreground mt-1">Track your social media performance and growth</p>
         </div>
-        <DateRangeFilter
-          startDate={startDate}
-          endDate={endDate}
-          onRangeChange={handleRangeChange}
-          companyCreatedAt={company?.created_at}
-        />
+        <div className="flex items-center gap-3">
+          <SyncStatusBadge lastSyncAt={lastSyncAt ?? null} isLoading={syncTimeLoading} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncAnalytics.mutate()}
+            disabled={syncAnalytics.isPending}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("w-4 h-4", syncAnalytics.isPending && "animate-spin")} />
+            {syncAnalytics.isPending ? "Syncing..." : "Sync Now"}
+          </Button>
+          <DateRangeFilter
+            startDate={startDate}
+            endDate={endDate}
+            onRangeChange={handleRangeChange}
+            companyCreatedAt={company?.created_at}
+          />
+        </div>
       </div>
 
       {isLoading ? (
@@ -445,6 +464,11 @@ export default function AnalyticsPage() {
           </div>
         </>
       )}
+
+      <SyncingIndicator
+        isSyncing={syncAnalytics.isPending}
+        lastSyncResult={syncAnalytics.data ?? null}
+      />
     </DashboardLayout>
   );
 }
