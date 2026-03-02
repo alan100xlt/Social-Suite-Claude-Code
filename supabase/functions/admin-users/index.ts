@@ -87,17 +87,26 @@ Deno.serve(async (req) => {
 
       const userIds = authUsers.users.map((u) => u.id);
 
-      const [{ data: profiles }, { data: memberships }, { data: superadmins }, { data: companies }] =
-        await Promise.all([
+      const [
+        { data: profiles },
+        { data: memberships },
+        { data: mediaMembers },
+        { data: superadmins },
+        { data: companies },
+        { data: mediaCompanies },
+      ] = await Promise.all([
           adminClient.from('profiles').select('id, full_name, email, created_at').in('id', userIds),
           adminClient.from('company_memberships').select('user_id, company_id, role').in('user_id', userIds),
+          adminClient.from('media_company_members').select('user_id, media_company_id, role, is_active').in('user_id', userIds),
           adminClient.from('superadmins').select('user_id'),
           adminClient.from('companies').select('id, name'),
+          adminClient.from('media_companies').select('id, name'),
         ]);
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
       const superadminSet = new Set((superadmins || []).map((s: any) => s.user_id));
       const companyMap = new Map((companies || []).map((c: any) => [c.id, c.name]));
+      const mediaMap = new Map((mediaCompanies || []).map((m: any) => [m.id, m.name]));
 
       const membershipsByUser = new Map<string, any[]>();
       for (const m of memberships || []) {
@@ -105,6 +114,15 @@ Deno.serve(async (req) => {
         membershipsByUser.get(m.user_id)!.push({
           ...m,
           company_name: companyMap.get(m.company_id) || m.company_id,
+        });
+      }
+
+      const mediaMembersByUser = new Map<string, any[]>();
+      for (const m of mediaMembers || []) {
+        if (!mediaMembersByUser.has(m.user_id)) mediaMembersByUser.set(m.user_id, []);
+        mediaMembersByUser.get(m.user_id)!.push({
+          ...m,
+          media_company_name: mediaMap.get(m.media_company_id) || m.media_company_id,
         });
       }
 
@@ -118,6 +136,7 @@ Deno.serve(async (req) => {
           last_sign_in_at: u.last_sign_in_at || null,
           is_superadmin: superadminSet.has(u.id),
           company_memberships: membershipsByUser.get(u.id) || [],
+          media_memberships: mediaMembersByUser.get(u.id) || [],
         };
       });
 
@@ -213,6 +232,33 @@ Deno.serve(async (req) => {
         const { error } = await adminClient
           .from('company_memberships')
           .upsert({ user_id, company_id, role: role || 'member' }, { onConflict: 'user_id,company_id' });
+        if (error) throw error;
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // -- update_media_membership ---------------------------------------------
+    if (action === 'update_media_membership') {
+      const { user_id, media_company_id, role, remove } = body;
+      if (!user_id || !media_company_id) throw new Error('user_id and media_company_id are required');
+
+      if (remove) {
+        const { error } = await adminClient
+          .from('media_company_members')
+          .delete()
+          .eq('user_id', user_id)
+          .eq('media_company_id', media_company_id);
+        if (error) throw error;
+      } else {
+        const { error } = await adminClient
+          .from('media_company_members')
+          .upsert(
+            { user_id, media_company_id, role: role || 'member', is_active: true },
+            { onConflict: 'media_company_id,user_id' },
+          );
         if (error) throw error;
       }
 
