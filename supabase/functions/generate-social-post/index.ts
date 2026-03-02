@@ -24,9 +24,8 @@ const platformRules: Record<string, string> = {
 
 // Rough cost per 1M tokens (USD) for supported models
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  "google/gemini-3-flash-preview": { input: 0.10, output: 0.40 },
-  "google/gemini-2.5-flash": { input: 0.15, output: 0.60 },
-  "google/gemini-2.5-pro": { input: 1.25, output: 10.0 },
+  "gemini-2.5-flash": { input: 0.15, output: 0.60 },
+  "gemini-2.5-pro": { input: 1.25, output: 10.0 },
 };
 
 function extractTokenUsage(data: Record<string, unknown>) {
@@ -96,9 +95,9 @@ serve(async (req) => {
     const body = await req.json();
     const { mode = "strategy", title, description, link, imageUrl, objective, platforms, approvedStrategy, chatMessages, posts: postsToCheck, fullContent, companyId, voiceSettings: providedVoiceSettings } = body;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
     // Authenticate: allow anonymous access for onboarding sample posts
@@ -121,7 +120,7 @@ serve(async (req) => {
     );
 
     const objectiveInstruction = objectivePrompts[objective] || objectivePrompts.reach;
-    const model = "google/gemini-2.5-flash";
+    const model = "gemini-2.5-flash";
     const platformList = (platforms as string[]) || [];
 
     // --- Voice Settings Resolution ---
@@ -206,11 +205,11 @@ serve(async (req) => {
     // Helper to call AI and log
     async function callAI(requestBody: Record<string, unknown>, currentMode: string) {
       const response = await fetch(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${GEMINI_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(requestBody),

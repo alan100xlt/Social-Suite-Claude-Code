@@ -57,7 +57,7 @@ function extractImageUrl(itemXml: string): string | null {
  */
 async function crawlArticleContent(url: string, articleTitle: string): Promise<string | null> {
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
-  const lovableKey = Deno.env.get('LOVABLE_API_KEY')
+  const geminiKey = Deno.env.get('GEMINI_API_KEY')
   if (!firecrawlKey || !url) return null
 
   try {
@@ -86,16 +86,16 @@ async function crawlArticleContent(url: string, articleTitle: string): Promise<s
     console.log(`Crawled ${rawMarkdown.length} raw chars from ${url}`)
 
     // Use AI to extract only article content if we have the key
-    if (lovableKey && rawMarkdown.length > 200) {
+    if (geminiKey && rawMarkdown.length > 200) {
       try {
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const aiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${lovableKey}`,
+            'Authorization': `Bearer ${geminiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-lite',
+            model: 'gemini-2.5-flash-lite',
             messages: [
               {
                 role: 'system',
