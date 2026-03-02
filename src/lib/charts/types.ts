@@ -14,7 +14,9 @@ export type ChartType =
   | 'sunburst'
   | 'bump'
   | 'funnel'
-  | 'scatter';
+  | 'scatter'
+  | 'sparkline'
+  | 'bar-horizontal';
 
 /** Theme preset identifier */
 export type ChartPresetId = 'brand' | 'figma-kit' | (string & {});

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ChartWidget } from '@/components/charts/ChartWidget';
 import type { ChartPresetId } from '@/lib/charts/types';
+import { MoreHorizontal } from 'lucide-react';
 import {
   sampleBarData,
   sampleLineData,
@@ -13,6 +14,8 @@ import {
   sampleBumpData,
   sampleFunnelData,
   sampleScatterData,
+  sampleSparklineData,
+  sampleHorizontalBarData,
 } from '@/lib/charts/sample-data';
 
 // Side-effect import to populate the registry
@@ -35,7 +38,7 @@ export default function NivoShowcase() {
             <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
               Chart System Showcase
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">All 12 chart types via ChartWidget + registry</p>
+            <p className="text-sm text-muted-foreground mt-1">All 14 chart types via ChartWidget + registry</p>
           </div>
 
           {/* Preset toggle */}
@@ -68,6 +71,7 @@ export default function NivoShowcase() {
             keys={['2010', '2020']}
             indexBy="country"
             height={260}
+            action={<button className="text-muted-foreground hover:text-foreground"><MoreHorizontal className="w-4 h-4" /></button>}
           />
 
           <ChartWidget
@@ -173,6 +177,26 @@ export default function NivoShowcase() {
             subtitle="Reach vs engagement rate"
             preset={preset}
             data={sampleScatterData}
+            height={260}
+          />
+
+          <ChartWidget
+            type="sparkline"
+            title="Sparkline"
+            subtitle="Pure trend, no axes"
+            preset={preset}
+            data={sampleSparklineData}
+            height={64}
+          />
+
+          <ChartWidget
+            type="bar-horizontal"
+            title="Horizontal Bar"
+            subtitle="Platform reach"
+            preset={preset}
+            data={sampleHorizontalBarData}
+            keys={['Views']}
+            indexBy="platform"
             height={260}
           />
 

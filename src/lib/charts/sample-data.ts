@@ -80,3 +80,19 @@ export const sampleScatterData = [
     { x: 520, y: 6.8 },
   ]},
 ];
+
+export const sampleSparklineData = [
+  { id: 'trend', data: [
+    { x: '1', y: 42 }, { x: '2', y: 58 }, { x: '3', y: 51 },
+    { x: '4', y: 74 }, { x: '5', y: 68 }, { x: '6', y: 92 },
+    { x: '7', y: 87 }, { x: '8', y: 103 },
+  ]},
+];
+
+export const sampleHorizontalBarData = [
+  { platform: 'LinkedIn', Views: 45000 },
+  { platform: 'Instagram', Views: 32000 },
+  { platform: 'Twitter', Views: 28000 },
+  { platform: 'TikTok', Views: 19000 },
+  { platform: 'Facebook', Views: 12000 },
+];

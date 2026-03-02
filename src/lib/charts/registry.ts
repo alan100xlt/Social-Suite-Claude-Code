@@ -25,6 +25,7 @@ import { SunburstChartWrapper } from '@/components/charts/wrappers/SunburstChart
 import { BumpChartWrapper } from '@/components/charts/wrappers/BumpChartWrapper';
 import { FunnelChartWrapper } from '@/components/charts/wrappers/FunnelChartWrapper';
 import { ScatterChartWrapper } from '@/components/charts/wrappers/ScatterChartWrapper';
+import { SparklineWrapper } from '@/components/charts/wrappers/SparklineWrapper';
 
 registerChart({ type: 'bar', component: BarChartWrapper, label: 'Bar Chart', dataShape: 'Record<string, string | number>[] with keys + indexBy' });
 registerChart({ type: 'line', component: LineChartWrapper, label: 'Line Chart', dataShape: '{ id: string; data: { x, y }[] }[]' });
@@ -38,3 +39,5 @@ registerChart({ type: 'sunburst', component: SunburstChartWrapper, label: 'Sunbu
 registerChart({ type: 'bump', component: BumpChartWrapper, label: 'Bump Chart', dataShape: '{ id, data: { x, y }[] }[] (all x-values must match)' });
 registerChart({ type: 'funnel', component: FunnelChartWrapper, label: 'Funnel', dataShape: '{ id, value, label }[] (order = step order)' });
 registerChart({ type: 'scatter', component: ScatterChartWrapper, label: 'Scatter Plot', dataShape: '{ id, data: { x, y }[] }[]' });
+registerChart({ type: 'sparkline', component: SparklineWrapper, label: 'Sparkline', dataShape: '{ id, data: { x, y }[] }[] (no axes, pure trend)' });
+registerChart({ type: 'bar-horizontal', component: BarChartWrapper, label: 'Horizontal Bar', dataShape: 'Same as bar, layout="horizontal" defaulted' });
