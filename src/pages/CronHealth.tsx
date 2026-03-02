@@ -25,7 +25,8 @@ import { AlertTriangle, CheckCircle2, Clock, Loader2, Timer } from "lucide-react
 // Registered cron jobs — add new entries here as they are scheduled
 const REGISTERED_JOBS: { name: string; schedule: string; description: string }[] = [
   { name: "analytics-sync", schedule: "0 * * * *", description: "Syncs GetLate analytics into Supabase snapshots" },
-  { name: "rss-poll", schedule: "Manual / TBD", description: "Polls RSS feeds for new articles" },
+  { name: "rss-poll", schedule: "*/5 * * * *", description: "Polls RSS feeds for new articles every 5 minutes" },
+  { name: "getlate-changelog-monitor", schedule: "0 9 * * *", description: "Monitors GetLate API changelog for breaking changes" },
 ];
 
 interface CronLog {
