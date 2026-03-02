@@ -28,7 +28,13 @@
       "Bash(wc *)",
       "Bash(echo *)",
       "Bash(pwd)",
-      "Bash(node scripts/*)"
+      "Bash(node scripts/*)",
+      "Bash(git push *)",
+      "Bash(git push)",
+      "Bash(git fetch *)",
+      "Bash(git fetch)",
+      "Bash(git pull *)",
+      "Bash(git pull)"
     ],
     "deny": [
       "Bash(rm -rf *)",
