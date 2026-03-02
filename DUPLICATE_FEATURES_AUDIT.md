@@ -1,229 +1,357 @@
 # Duplicate Features & Functions Audit
 
-> Generated 2026-03-02 — Full codebase review of overlapping features
+> Updated 2026-03-02 — Full codebase re-analysis after Windsurf enterprise commits merged to main
 
 ---
 
 ## Summary
 
-There are **12 major areas** of duplication across the app (9 frontend, 3 backend). Some are clear V1/V2 experiments that should be consolidated; others are features that were split across pages but are functionally identical. The biggest wins come from consolidating pages that share the same underlying components and removing vestigial pages that already redirect elsewhere.
+There are **20 duplication areas** across the app — the Windsurf enterprise commits introduced significant new overlap. The most critical issue: **~4,350 lines of new "enterprise" components use mock data and are disconnected from the production system**, duplicating features that already work. Combined with the pre-existing V1/V2/V3 sprawl, the codebase now has 40 pages, 3 analytics versions, 3 automation implementations, 3 content editors, 2 navigation systems, 2 security services, and 3 duplicate migration pairs.
+
+**Total estimated removable code:** ~8,000–10,000 lines
 
 ---
 
-## 1. Analytics V1 vs Analytics V2 (HIGH IMPACT)
+## SECTION A: Page-Level Duplication (Pre-existing + Worsened)
+
+### 1. Analytics V1 / V2 / V3 — THREE versions (CRITICAL)
 
 **Files:**
-- `src/pages/Analytics.tsx` — 450-line page with 5 tabs, 12+ chart components from `components/analytics/`
-- `src/pages/AnalyticsV2.tsx` — 238-line single-view page using 6 Nivo-based widgets from `components/analytics-v2/`
+- `src/pages/Analytics.tsx` — 474 lines, 5 tabs, 12 custom Nivo chart components (`components/analytics/charts/`)
+- `src/pages/AnalyticsV2.tsx` — 246 lines, single-view with 6 Nivo widgets (`components/analytics-v2/widgets/`)
+- `src/pages/AnalyticsV3.tsx` — 193 lines, ChartWidget registry system (`components/charts/`, `lib/charts/`)
 
 **What's duplicated:**
-- Both pages fetch from the **exact same hooks**: `useHistoricalAnalytics`, `useAccountGrowth`, `usePlatformBreakdown`, `useFollowersByPlatform`, `useAnalyticsByPlatform`
-- Both show follower distribution donuts, performance-over-time charts, platform comparison bars, and stat KPI cards
-- Both share the same `DateRangeFilter` component
-- V1 uses Recharts-based components (`components/analytics/charts/`), V2 uses Nivo-based widgets (`components/analytics-v2/widgets/`)
+- All three fetch from the same hooks (`useHistoricalAnalytics`, `useAccountGrowth`, `useAnalyticsByPlatform`)
+- All display the same core metrics: views, engagement, followers, impressions, platform breakdown
+- All use Nivo for rendering (V1 directly, V2 via themed widgets, V3 via registry)
+- V1 has 12 chart components, V2 has 6 widgets, V3 has 11 chart wrappers = **29 chart components** for the same data
 
-**Sidebar links:**
-- "Analytics" → `/app/analytics` (V1)
-- "Insights" → `/app/analytics-v2` (V2)
+**Sidebar/Router status:**
+- V1 "Analytics" → `/app/analytics` — in sidebar
+- V2 "Insights" → `/app/analytics-v2` — in sidebar
+- V3 → `/app/analytics-v3` — **NOT in sidebar, hidden route**
 
-**Recommendation:** Pick one charting library and merge into a single Analytics page. Retire the other. Currently two separate chart libraries (Recharts + Nivo) are bundled, increasing bundle size.
+**Unique per version:** V1 has the All Posts table + 5-tab structure. V2 has heatmap + radar widgets. V3 has Best Time to Post, Content Decay, Posting Frequency widgets and the extensible preset/registry system.
+
+**Recommendation:** Adopt V3's registry architecture as the foundation, port V1's data-heavy tabs and V2's premium widgets into it, retire V1 and V2 pages + their 18 chart components.
 
 ---
 
-## 2. Posts Page vs Content Page (HIGH IMPACT)
+### 2. Posts Page — Dead Code (LOW — quick win)
 
 **Files:**
-- `src/pages/Posts.tsx` — 2 tabs: Compose + Calendar
-- `src/pages/Content.tsx` — 6 tabs: Articles, **Social Posts**, **Calendar**, Feeds, Automations, Logs
+- `src/pages/Posts.tsx` — renders `<ComposeTab />` + `<CalendarTab />`
+- `src/pages/Content.tsx` — renders the same components as tabs
+
+**Status:** Router redirects `/app/posts` → `/app/content?tab=posts`. Not in sidebar.
+
+**Recommendation:** Delete `Posts.tsx`.
+
+---
+
+### 3. Automations: Three Implementations (CRITICAL)
+
+**Files:**
+- `src/pages/Automations.tsx` — 546 lines, production page with rules + logs + wizard
+- `src/components/content/AutomationsContent.tsx` — 248 lines, Content tab version
+- `src/components/automation/EnterpriseAutomationRules.tsx` — **618 lines, NEW, mock data only**
 
 **What's duplicated:**
-- Content's "Social Posts" tab renders `<ComposeTab />` — the **exact same component** used by Posts
-- Content's "Calendar" tab renders `<CalendarTab />` — the **exact same component** used by Posts
-- Posts page is already redirected from `/app/posts` → `/app/content?tab=posts` in the router
+- `Automations.tsx` and `AutomationsContent.tsx` render the same rules table + wizard
+- `EnterpriseAutomationRules.tsx` duplicates all of this with hardcoded mock data, portfolio targeting, and `useSecurityContext` — but is **not connected to any route or real data**
+- Router redirects `/app/automations` → `/app/content?tab=automations`
 
-**Sidebar links:** Only "Content" appears in the sidebar. The Posts page is a dead route accessed only via legacy redirects.
-
-**Recommendation:** Delete `src/pages/Posts.tsx` entirely. It's already fully subsumed by Content. The redirect in the router is already correct.
+**Recommendation:** Delete `EnterpriseAutomationRules.tsx` (mock, unused). Delete `Automations.tsx` (redirected). Keep `AutomationsContent.tsx` as the canonical version inside Content.
 
 ---
 
-## 3. Automations Page vs Content Automations Tab (HIGH IMPACT)
+### 4. Brand Voice V1 vs V2 Settings (MEDIUM)
 
 **Files:**
-- `src/pages/Automations.tsx` — 546-line standalone page with Rules + Logs tabs
-- `src/components/content/AutomationsContent.tsx` — Content page's "Automations" tab
-- `src/components/content/AutomationLogsContent.tsx` — Content page's "Logs" tab
+- `src/components/settings/BrandVoiceTab.tsx` — V1 with ContentPlayground
+- `src/components/settings/BrandVoiceTabV2.tsx` — V2 with live post preview
+
+**Status:** Both exposed as separate tabs in Settings ("Voice V1" and "Voice V2"). Same hooks, same parameters.
+
+**Recommendation:** Keep V2 (more complete), retire V1.
+
+---
+
+### 5. Four Landing Page Variants (MEDIUM)
+
+**Files:** `LandingPage.tsx`, `LandingPageV2.tsx`, `LandingPageV3.tsx`, `LandingPageV4.tsx`, `VersionSwitcher.tsx`
+
+**Status:** All four live with A/B test switcher rendered globally on every route.
+
+**Recommendation:** If A/B testing is over, pick the winner. If active, extract shared constants (platforms, steps, features, testimonials) into one file.
+
+---
+
+### 6. Company Settings — Orphaned Page (LOW — quick win)
+
+**Files:**
+- `src/pages/CompanySettings.tsx` — 598 lines, standalone
+- `src/components/settings/CompanyTab.tsx` — 380 lines, inside Settings
+
+**Status:** `CompanySettings.tsx` has NO route in App.tsx. Completely orphaned.
+
+**Recommendation:** Delete `CompanySettings.tsx`. Merge any GetLate integration features into `CompanyTab.tsx`.
+
+---
+
+### 7. Schedule Page — Dead Code (LOW — quick win)
+
+**Files:** `src/pages/Schedule.tsx` — 254 lines
+
+**Status:** Route redirects to `/app/content?tab=calendar`. Not in sidebar.
+
+**Recommendation:** Delete `Schedule.tsx`.
+
+---
+
+### 8. ClaudeWorkspace — Orphaned Page (LOW)
+
+**Files:** `src/pages/ClaudeWorkspace.tsx` — 495 lines
+
+**Status:** No route in App.tsx. Not in sidebar. Completely unreachable dead code.
+
+**Recommendation:** Delete or wire up if needed.
+
+---
+
+## SECTION B: New "Enterprise" Mock Components (Windsurf — CRITICAL)
+
+These were all generated by Windsurf. They are large, use hardcoded mock data, and duplicate production features. **~4,350 lines of dead code.**
+
+### 9. UnifiedContentEditor — Disconnected (CRITICAL)
+
+**File:** `src/components/content/UnifiedContentEditor.tsx` — 645 lines
+
+**Duplicates:** `src/components/posts/ComposeTab.tsx` (production post composer with real Supabase integration, AI generation, draft saving)
+
+**Status:** Uses `bulkContentService` and `securityContextService` but has mock templates and mock content. Not imported or routed anywhere.
+
+**Recommendation:** Delete. If bulk/enterprise posting is needed, extend `ComposeTab.tsx`.
+
+---
+
+### 10. EnterpriseNavigation — Disconnected (CRITICAL)
+
+**File:** `src/components/navigation/EnterpriseNavigation.tsx` — 664 lines
+
+**Duplicates:** `src/components/layout/Sidebar.tsx` (production nav, 493 lines, actually used)
+
+**Status:** Mock data for companies. Not imported or used anywhere. Reinvents company selection already in Sidebar.
+
+**Recommendation:** Delete. Enhance Sidebar if needed.
+
+---
+
+### 11. AdvancedAdminDashboard — Mock Only (MEDIUM)
+
+**File:** `src/components/admin/AdvancedAdminDashboard.tsx` — 602 lines
+
+**Duplicates:** `src/pages/AdminUsers.tsx` + `src/pages/SuperadminCompanies.tsx` (production admin pages)
+
+**Status:** Full dashboard with system metrics, but all data is mock. Not wired into any admin workflow.
+
+**Recommendation:** Delete or integrate real data from actual admin endpoints.
+
+---
+
+### 12. MobileResponsiveDesign vs ResponsiveLayout (MEDIUM)
+
+**Files:**
+- `src/components/mobile/MobileResponsiveDesign.tsx` — 1,035 lines
+- `src/components/responsive/ResponsiveLayout.tsx` — 582 lines
+
+**What's duplicated:** Both handle device detection (mobile/tablet/desktop), both have performance monitoring, battery/connectivity tracking, and responsive breakpoints. Both import Smartphone/Tablet/Monitor icons.
+
+**Recommendation:** Delete both if unused in production. If responsive features are needed, create a focused `useDeviceDetection` hook and a smaller layout wrapper.
+
+---
+
+### 13. EnterpriseWorkspace vs MediaCompanyDashboard (MEDIUM)
+
+**Files:**
+- `src/components/media-company/EnterpriseWorkspace.tsx` — mock data, uses `useSecurityContext`
+- `src/components/media-company/MediaCompanyDashboard.tsx` — real data, uses `useMediaCompanyHierarchy()`
+
+**Status:** Both show child companies with stats. EnterpriseWorkspace has mock data. MediaCompanyDashboard uses real hooks.
+
+**Recommendation:** Keep `MediaCompanyDashboard`. Delete or rewrite `EnterpriseWorkspace` to use real data.
+
+---
+
+### 14. EnterpriseUserExperience — Kitchen Sink (LOW)
+
+**File:** `src/components/ux/EnterpriseUserExperience.tsx` — 940 lines
+
+**Status:** Massive component with mock data. Overlaps with MobileResponsiveDesign and ResponsiveLayout.
+
+**Recommendation:** Delete.
+
+---
+
+### 15. TeamManagement vs CompanyTab (MEDIUM)
+
+**Files:**
+- `src/components/team/TeamManagement.tsx` — 806 lines (new, mock data)
+- `src/components/settings/CompanyTab.tsx` — 380 lines (production, real data)
+
+**What's duplicated:** Both manage team members, roles, invitations. TeamManagement has fancier UI (bulk invite, role templates, permission management) but mock data. CompanyTab actually works.
+
+**Recommendation:** Keep `CompanyTab`. Port specific useful features from TeamManagement (if any) after connecting to real data.
+
+---
+
+### 16. RealTimeCollaboration — Unused (LOW)
+
+**File:** `src/components/collaboration/RealTimeCollaboration.tsx` — 764 lines
+
+**Status:** Video/audio collaboration component. Mock data. Not imported anywhere.
+
+**Recommendation:** Delete unless collaboration feature is planned.
+
+---
+
+## SECTION C: Code-Level Duplication
+
+### 17. Platform Icon/Color/Config Maps — 19+ copies (HIGH)
+
+`platformIcons` is redefined in **19 files**, `platformColors` in **7 files**, `formatNumber` in **3 files** (central version exists at `lib/charts/formatters.ts` but 2 components define local copies).
+
+**New additions since last audit:**
+- `components/posts/QueueTab.tsx`
+- `components/settings/BrandVoiceTabV2.tsx`
+- `components/settings/ContentPlayground.tsx`
+
+**Recommendation:** Create `src/lib/platform-config.ts` exporting all maps. Replace 19+ inline definitions.
+
+---
+
+### 18. Duplicate SecurityContextService — TWO files (CRITICAL)
+
+**Files:**
+- `src/services/security/SecurityContextService.ts` — 372 lines, Redis + Supabase, enterprise-grade
+- `src/services/securityContextService.ts` — 158 lines, localStorage + memory cache, simpler
+
+**Both export** `const securityContextService = new SecurityContextService()`. Different interfaces, different caching strategies, different capabilities. Importing from the wrong path silently gives you a different service.
+
+**Recommendation:** Delete the simpler `services/securityContextService.ts`. Keep `services/security/SecurityContextService.ts`. Update all imports.
+
+---
+
+### 19. Duplicate Posting-Time Hooks (MEDIUM)
+
+**Files:**
+- `src/hooks/useBestTimeToPost.ts` — calls `getlate-analytics` with `action: 'best-time'`
+- `src/hooks/useOptimalPostingWindows.ts` — calls `get-optimal-windows` edge function
+
+**Both** determine optimal posting times. Different backends, different response structures. `useOptimalPostingWindows` is more complete (timezone support, platform-specific, narrative output).
+
+**Recommendation:** Consolidate to `useOptimalPostingWindows` and retire `useBestTimeToPost`.
+
+---
+
+### 20. Overlapping Media Company Hooks (LOW)
+
+**Files:**
+- `src/hooks/useMediaCompanyHierarchy.ts` — 293 lines, lower-level CRUD
+- `src/hooks/useMediaCompanyManagement.ts` — 296 lines, higher-level business ops
+
+**Overlap:** Both handle member operations and company assignments at different abstraction levels. `useMediaCompanyManagement` has better error handling and toast notifications.
+
+**Recommendation:** Consolidate into `useMediaCompanyManagement`, deprecate hierarchy hook's mutations.
+
+---
+
+## SECTION D: Backend Duplication
+
+### 21. Server Function Helpers — 4 copies (HIGH)
+
+**Files:** `getlate-accounts/index.ts`, `getlate-analytics/index.ts`, `getlate-connect/index.ts`, `getlate-posts/index.ts`
 
 **What's duplicated:**
-- The standalone Automations page has its own full Rules + Logs implementation
-- Content page has separate Automations and Logs tabs that provide the same functionality
-- Router already redirects `/app/automations` → `/app/content?tab=automations`
+- `safeJsonParse()` — 3 different implementations with inconsistent error handling (getlate-connect has the most complete version with token-expiry detection; others lack it)
+- `logApiCall()` — identical in all 4
+- Supabase client init boilerplate — identical in all 4
 
-**Recommendation:** Keep the Content-embedded version (it's the canonical location per the sidebar/router). Delete the standalone `Automations.tsx` page. Ensure the Content tab components have feature parity with the standalone page (the standalone one is more complete with the wizard dialog).
-
----
-
-## 4. Brand Voice V1 vs V2 Settings (MEDIUM IMPACT)
-
-**Files:**
-- `src/components/settings/BrandVoiceTab.tsx` — V1 voice settings with `ContentPlayground`
-- `src/components/settings/BrandVoiceTabV2.tsx` — V2 voice settings with live post preview, feed item picker
-
-**What's duplicated:**
-- Both import from the **same hooks**: `useVoiceSettings`, `useSaveVoiceSettings`, `useGlobalVoiceDefaults`
-- Both configure the same voice parameters: tone, content length, emoji style, hashtag strategy, custom instructions, voice mode
-- Both are visible as separate tabs in Settings ("Voice V1" and "Voice V2")
-
-**Recommendation:** Pick the better UX (V2 appears more complete with live preview) and consolidate into a single "Brand Voice" tab.
+**Recommendation:** Extract to `supabase/functions/_shared/getlate-helpers.ts`.
 
 ---
 
-## 5. Four Landing Page Variants (MEDIUM IMPACT)
+### 22. DUPLICATE DATABASE MIGRATIONS — Conflicting schemas (CRITICAL)
 
-**Files:**
-- `src/pages/LandingPage.tsx` — V1 (default at `/`)
-- `src/pages/LandingPageV2.tsx` — V2: "Editorial / Warm Minimalist" at `/v2`
-- `src/pages/LandingPageV3.tsx` — V3: "Gradient Glass / Aurora" at `/v3`
-- `src/pages/LandingPageV4.tsx` — V4: "Bold Geometric / Neon" at `/v4`
-- `src/components/landing/VersionSwitcher.tsx` — A/B test switcher rendered globally
+Three pairs of migrations with the same names but different timestamps and **incompatible schemas**:
 
-**What's duplicated:**
-- All four pages contain the **same content sections**: hero, platforms list, how-it-works steps, features, testimonials, pricing, CTA, footer
-- All define the same `platforms`, `steps`, and feature constants inline with only cosmetic differences
-- The `VersionSwitcher` is rendered on every route (even protected app routes)
+| Migration Name | File 1 (Earlier) | File 2 (Later) | Status |
+|---|---|---|---|
+| `enterprise_security_schema` | `20260301043000` (320 lines) | `20260301190000` (197 lines) | **CONFLICTING** — different FK references, different access_level constraints (0-5 vs 0-100), different views |
+| `bulk_content_system` | `20260301045000` (487 lines) | `20260301191000` (503 lines) | **CONFLICTING** — both create `content_templates` with different columns, incompatible queue tables |
+| `team_management` | `20260301052000` (641 lines) | `20260301192000` (652 lines) | **CONFLICTING** — `enterprise_teams` (hierarchical) vs `team_members` (flat), incompatible role models |
 
-**Recommendation:** If A/B testing is still active, extract shared data (platforms, steps, features, testimonials) into a single constants file and make the variants theme-only. If testing is complete, pick the winner, delete the others, and remove the `VersionSwitcher`.
+**Impact:** These will cause migration failures. The second copy in each pair attempts to create tables that already exist with incompatible schemas.
+
+**Recommendation:** Delete the second copy in each pair. Merge any unique features (e.g., invitation workflow from team_management v2, platform customizations from bulk_content v2) into the surviving migration.
 
 ---
 
-## 6. Company Settings Page vs Settings Company Tab (MEDIUM IMPACT)
+### 23. Overlapping Analytics Data Hooks (MEDIUM)
 
-**Files:**
-- `src/pages/CompanySettings.tsx` — Standalone page with company info, GetLate integration, team members
-- `src/components/settings/CompanyTab.tsx` — Tab inside the unified Settings page
+10+ hooks query the same `post_analytics_snapshots` and `account_analytics_snapshots` tables. 6+ hooks independently re-fetch inactive account IDs despite `useInactiveAccountIds` hook existing.
 
-**What's duplicated:**
-- Both manage the same company data: company name, team members, invitations
-- The standalone page has additional GetLate profile linking/name editing
-- The standalone page is not linked from the sidebar; only reachable via legacy redirect `/company-settings` → `/app/settings?tab=company`
-
-**Recommendation:** Merge the GetLate integration features from the standalone page into the Settings > Company tab. Delete `CompanySettings.tsx`.
+**Recommendation:** Centralize inactive account filtering. Consider consolidating RPC calls.
 
 ---
 
-## 7. Platform Icon/Color Maps (CODE-LEVEL DUPLICATION)
+## SECTION E: Dev/Preview Pages (LOW)
 
-**Duplicated across 16+ files:**
-
-`platformIcons` maps are redefined in:
-- `pages/Analytics.tsx`, `pages/Automations.tsx`, `pages/Schedule.tsx`, `pages/GetLateMapping.tsx`
-- `components/posts/ComposeTab.tsx`, `components/posts/CalendarTab.tsx`
-- `components/dashboard/RecentPostsTable.tsx`, `components/dashboard/TopPostSpotlight.tsx`, `components/dashboard/UpcomingTimeline.tsx`
-- `components/analytics/TopPostCard.tsx`, `components/analytics/TopPostsTable.tsx`, `components/analytics/SyncExternalPostDialog.tsx`
-- `components/automations/AutomationRuleWizard.tsx`
-- `components/content/AutomationsContent.tsx`
-- `components/onboarding/SamplePostsSidebar.tsx`
-- `components/layout/IntegrationStatusMenu.tsx`
-
-`platformColors` maps are redefined in 7 files.
-
-`formatNumber` utility is redefined in 12 files.
-
-`platformConfig` is defined separately in 4 files.
-
-**Recommendation:** Create a single shared module (e.g., `src/lib/platform-utils.ts`) exporting `platformIcons`, `platformColors`, `platformNames`, `platformConfig`, and `formatNumber`. Import everywhere.
-
----
-
-## 8. Schedule Page vs Calendar Tab (LOW IMPACT)
-
-**Files:**
-- `src/pages/Schedule.tsx` — Standalone weekly schedule view with calendar + upcoming posts sidebar
-- `src/components/posts/CalendarTab.tsx` — Calendar component embedded in Content and (former) Posts pages
-
-**What's duplicated:**
-- Both show a calendar view of scheduled posts
-- Both use the same data sources (`usePosts`, `useAccounts`)
-- The Schedule page has its own `platformIcons`/`platformColors` maps
-- Route `/schedule` already redirects to `/app/content?tab=calendar`
-
-**Recommendation:** Delete `src/pages/Schedule.tsx`. The Content > Calendar tab is the canonical location.
-
----
-
-## 9. Dev/Preview Pages (LOW IMPACT)
-
-**Files:**
 - `src/pages/DesignPreview.tsx` — Design system preview
 - `src/pages/NivoShowcase.tsx` — Nivo chart library showcase
 - `src/pages/WizardVariations.tsx` — Automation wizard variants
+- `src/pages/Progress.tsx` — Development progress tracker
 
-**Recommendation:** These are dev-only pages. Consider gating them behind a `NODE_ENV === 'development'` check or moving to a `/dev/` route prefix so they aren't accessible in production.
-
----
-
-## 10. Duplicated Server Function Helpers (BACKEND — HIGH IMPACT)
-
-**Files:**
-- `supabase/functions/getlate-accounts/index.ts`
-- `supabase/functions/getlate-analytics/index.ts`
-- `supabase/functions/getlate-connect/index.ts`
-- `supabase/functions/getlate-posts/index.ts`
-
-**What's duplicated:**
-- `safeJsonParse()` — identical implementation copy-pasted into all 4 functions
-- `logApiCall()` — identical implementation in all 4 functions
-- Authorization/setup boilerplate (CORS headers, Supabase client init, API key validation, user extraction from auth header) — repeated in all 4 functions
-
-**Recommendation:** Extract to a shared helper module at `supabase/functions/_shared/getlate-helpers.ts`. This would eliminate ~400+ lines of duplicated server code.
+**Recommendation:** Gate behind `NODE_ENV === 'development'` or `/dev/` route prefix.
 
 ---
 
-## 11. Overlapping Analytics Data Hooks (BACKEND — MEDIUM IMPACT)
+## Consolidation Roadmap
 
-**10+ hooks query the same tables with overlapping logic:**
-- `useHistoricalAnalytics`, `usePlatformBreakdown`, `useDashboardStats`, `useDashboardTrends`, `useAnalyticsByPublishDate`, `useFollowersByPlatform`, `useDailyPlatformMetrics`, `useViewsByPublishDate`, `useTopPerformingPosts`, `useAccountGrowth`, `useAnalyticsStats`
+### Phase 1: Delete Dead Code (~3,500 lines, zero risk)
 
-**What's duplicated:**
-- All filter by `company_id` and active account status
-- 6+ hooks independently re-fetch inactive account IDs (despite `useInactiveAccountIds` hook existing)
-- Identical date-range filtering patterns (`.gte()/.lte()`)
-- Same Map/reduce aggregation patterns for deduplication by `account_id` or `post_id`
+| # | Action | Lines Removed |
+|---|--------|---------------|
+| 1 | Delete `pages/Posts.tsx` | ~200 |
+| 2 | Delete `pages/Schedule.tsx` | ~254 |
+| 3 | Delete `pages/CompanySettings.tsx` | ~598 |
+| 4 | Delete `pages/ClaudeWorkspace.tsx` | ~495 |
+| 5 | Delete `pages/Automations.tsx` | ~546 |
+| 6 | Delete duplicate migration files (3 files) | ~1,350 |
 
-**Recommendation:** Create a shared analytics data layer. Centralize inactive account filtering via the existing `useInactiveAccountIds` hook. Consider a single RPC-backed analytics hook that returns multiple metric views from one query.
+### Phase 2: Remove Windsurf Mock Components (~4,350 lines)
 
----
+| # | Action | Lines Removed |
+|---|--------|---------------|
+| 7 | Delete `components/content/UnifiedContentEditor.tsx` | ~645 |
+| 8 | Delete `components/navigation/EnterpriseNavigation.tsx` | ~664 |
+| 9 | Delete `components/automation/EnterpriseAutomationRules.tsx` | ~618 |
+| 10 | Delete `components/admin/AdvancedAdminDashboard.tsx` | ~602 |
+| 11 | Delete `components/ux/EnterpriseUserExperience.tsx` | ~940 |
+| 12 | Delete `components/collaboration/RealTimeCollaboration.tsx` | ~764 |
+| 13 | Delete `services/securityContextService.ts` (keep `security/` version) | ~158 |
 
-## 12. Duplicated CRUD Mutation Patterns (BACKEND — LOW IMPACT)
+### Phase 3: Consolidate Features (requires testing)
 
-**8+ hooks follow identical Create/Update/Delete patterns:**
-- `useRssFeeds` (create/update/delete)
-- `useAutomationRules` (create/update/delete)
-- `useGetLatePosts` (create/update/delete)
-- `usePostDrafts` (save/delete)
-- `useCompany` (create/update)
-- `useProfile` (update)
-- `usePendingInvitations` (revoke)
+| # | Action | Impact |
+|---|--------|--------|
+| 14 | Create `lib/platform-config.ts`, replace 19 inline maps | Reduce ~500 lines |
+| 15 | Merge Analytics V1/V2/V3 → single page on V3 registry | Remove ~700 lines + 18 chart components |
+| 16 | Merge Brand Voice V1/V2 → keep V2 | Remove ~200 lines |
+| 17 | Consolidate posting-time hooks | Remove ~30 lines |
+| 18 | Extract shared GetLate server helpers | Remove ~400 lines |
+| 19 | Pick landing page winner | Remove ~800 lines + 3 pages |
+| 20 | Consolidate MobileResponsiveDesign + ResponsiveLayout | Remove ~1,600 lines |
 
-**What's duplicated:**
-- Same boilerplate: get company context → `useMutation` → `onSuccess: invalidateQueries + toast` → `onError: toast destructive`
-- Settings hooks (`useVoiceSettings`, `useGlobalVoiceDefaults`) both implement identical check-then-upsert patterns
-
-**Recommendation:** Consider a generic mutation factory or shared `useEntityMutation` helper that encapsulates the query-invalidation + toast pattern. Lower priority since the duplication is structural rather than logic.
-
----
-
-## Quick-Win Consolidation Roadmap
-
-| Priority | Action | Files to Remove | Impact |
-|----------|--------|-----------------|--------|
-| 1 | Delete Posts page (already superseded by Content) | `pages/Posts.tsx` | Clean up dead code |
-| 2 | Delete Schedule page (already redirected) | `pages/Schedule.tsx` | Clean up dead code |
-| 3 | Extract shared platform utils | Create `lib/platform-utils.ts` | Reduce ~16 duplicate maps |
-| 4 | Merge Analytics V1 + V2 | Remove one of `analytics/` or `analytics-v2/` | Reduce bundle size, simplify nav |
-| 5 | Merge Brand Voice V1 + V2 | Remove `BrandVoiceTab.tsx` | Simplify settings |
-| 6 | Merge CompanySettings into Settings tab | Remove `pages/CompanySettings.tsx` | Reduce page count |
-| 7 | Consolidate Automations into Content | Remove `pages/Automations.tsx` | Single source of truth |
-| 8 | Pick landing page winner | Remove 3 of 4 landing pages + VersionSwitcher | Reduce bundle, clean public routes |
-| 9 | Extract shared GetLate server helpers | Create `_shared/getlate-helpers.ts` | Eliminate ~400 lines duplicated server code |
-| 10 | Centralize inactive account filtering | Use `useInactiveAccountIds` consistently | Remove 6+ redundant queries |
+**Total estimated cleanup: ~12,000+ lines removable**
