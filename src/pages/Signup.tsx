@@ -13,7 +13,7 @@ export default function Signup() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/app');
+      navigate(inviteToken ? '/app/onboarding/wizard' : '/app');
     }
   }, [user, loading, navigate, inviteToken]);
 

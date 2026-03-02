@@ -1,0 +1,10 @@
+{
+  "status": "answered",
+  "event": "ask",
+  "context": "When a user creates a new child company within a media company, should it be a full company creation flow (name, slug, branding) or a lightweight version (just name, auto-generate slug)?\n  • Lightweight (Recommended) — Just name + auto-slug. They can fill in branding/details later in company settings.\n  • Full creation flow — Name, slug, website, branding — same as the current signup company creation.\n\nWhere should the 'Create Media Company' UI live for superadmins?\n  • Superadmin Companies page (Recommended) — Add a 'Create Media Company' button to the existing /app/admin/companies page\n  • Dedicated admin page — New /app/admin/media-companies page with full CRUD\n  • Both — Superadmin companies page for quick creation, plus a dedicated management page\n\nFor the company profile association — should a company admin be able to CHANGE which media company their company belongs to, or only view it?\n  • View only (Recommended) — Company admins can see their media company but can't change it. Only media company admins or superadmins can reassign.\n  • Editable by company admin — Company admins can request to join a different media company or detach.",
+  "thread_ts": "1772443071.573009",
+  "session_id": "be3fca45-6077-48a5-9b06-e87d899b954f",
+  "timestamp": "2026-03-02T09:20:19.059Z",
+  "message": "1.Offer all of the fields but make only the name required\n\n2. In the companies page. Refactor where needed to have th experience make sesne. Also add ability to assign a company (from the list) to a media company with a searchable dropdown\n\n3. CView only",
+  "respondedBy": "U08LRH6DEBT"
+}

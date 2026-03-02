@@ -9,10 +9,25 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     hmr: {
-      overlay: false,
+      overlay: true,
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  optimizeDeps: {
+    include: [
+      '@nivo/bar',
+      '@nivo/bump',
+      '@nivo/funnel',
+      '@nivo/heatmap',
+      '@nivo/line',
+      '@nivo/pie',
+      '@nivo/radar',
+      '@nivo/scatterplot',
+      '@nivo/sunburst',
+      '@nivo/theming',
+      '@nivo/treemap',
+    ],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -55,7 +55,10 @@ export async function authorize(
   if (options.allowServiceRole) {
     // If there's a service_role key or anon key in the auth header, allow through
     // The anon key check is needed because pg_cron jobs use the anon key
-    if (authHeader?.includes(supabaseServiceKey) || authHeader?.includes(supabaseAnonKey)) {
+    if (
+      (supabaseServiceKey && authHeader?.includes(supabaseServiceKey)) ||
+      (supabaseAnonKey && authHeader?.includes(supabaseAnonKey))
+    ) {
       return {
         userId: "service_role",
         email: "service_role",
@@ -76,18 +79,17 @@ export async function authorize(
     global: { headers: { Authorization: authHeader } },
   });
 
-  const token = authHeader.replace("Bearer ", "");
-  const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+  const { data: userData, error: userError } = await userClient.auth.getUser();
 
-  if (claimsError || !claimsData?.claims) {
+  if (userError || !userData?.user) {
     throw new Response(
       JSON.stringify({ error: "Unauthorized: invalid token" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  const userId = claimsData.claims.sub as string;
-  const email = (claimsData.claims.email as string) || "";
+  const userId = userData.user.id;
+  const email = userData.user.email || "";
 
   // --- Superadmin check ---
   const { data: isSuperAdmin } = await userClient.rpc("is_superadmin");

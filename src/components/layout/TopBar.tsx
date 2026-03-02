@@ -1,4 +1,4 @@
-import { Settings, LogOut, Building2, Check, ChevronsUpDown, Plus, Shield, Loader2 } from "lucide-react";
+import { Settings, LogOut, Building2, Check, ChevronsUpDown, Plus, Shield, Loader2, Palette } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,7 @@ import { IntegrationStatusMenu } from "./IntegrationStatusMenu";
 import { NotificationInbox } from "./NotificationInbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export function TopBar() {
   const { user, signOut, isSuperAdmin, impersonateUser } = useAuth();
@@ -45,6 +46,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { currentTheme, toggleTheme, setTheme } = useTheme();
   const [companyOpen, setCompanyOpen] = useState(false);
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
@@ -210,6 +212,17 @@ export function TopBar() {
             </Popover>
           )}
 
+          {/* Theme Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="h-9 w-9 rounded-full"
+            title="Toggle Theme"
+          >
+            <Palette className="h-4 w-4" />
+          </Button>
+
           {/* Notifications */}
           <NotificationInbox />
 
@@ -235,7 +248,14 @@ export function TopBar() {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+                <Link to="/app/theme" className="flex items-center gap-2 cursor-pointer">
+                  <Palette className="h-4 w-4" />
+                  <span>Theme Settings</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/app/settings" className="flex items-center gap-2 cursor-pointer">
                   <Settings className="h-4 w-4" />
                   <span>Settings</span>
                 </Link>

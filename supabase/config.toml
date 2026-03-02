@@ -1,4 +1,4 @@
-project_id = "uawunmdvbgqasmmnhmll"
+project_id = "yeffbytlvhhzsbrabhgh"
 
 [functions.linear-feedback]
 verify_jwt = false
@@ -58,6 +58,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.admin-delete-companies]
+verify_jwt = false
+
+[functions.admin-users]
 verify_jwt = false
 
 [functions.instant-signup]

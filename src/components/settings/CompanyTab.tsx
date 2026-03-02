@@ -8,8 +8,10 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
-import { Building2, Users, Crown, Shield, User, Loader2, Plus, Check, X, Key, LogIn, Palette, Globe, MapPin } from 'lucide-react';
+import { Building2, Users, Crown, Shield, User, Loader2, Plus, Check, X, Key, LogIn, Palette, Globe, MapPin, ExternalLink } from 'lucide-react';
 import { InviteUserDialog } from '@/components/company/InviteUserDialog';
+import { useCompanyMediaParent } from '@/hooks/useMediaCompanyManagement';
+import { Link } from 'react-router-dom';
 import { PendingInvitationsList } from '@/components/company/PendingInvitationsList';
 import { SetUserPasswordDialog } from '@/components/company/SetUserPasswordDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +36,7 @@ export function CompanyTab() {
   const { data: profile } = useProfile();
   const { user, isSuperAdmin, impersonateUser } = useAuth();
   const updateCompany = useUpdateCompany();
+  const { data: mediaParent } = useCompanyMediaParent(company?.id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -154,6 +157,33 @@ export function CompanyTab() {
               <Label>URL Slug</Label>
               <p className="text-sm text-muted-foreground">longtale.ai/<span className="font-mono">{company.slug}</span></p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Media Company Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><CardTitle>Media Company</CardTitle></div>
+            <CardDescription>The media company this company belongs to</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {mediaParent ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{mediaParent.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{mediaParent.relationship_type} company</p>
+                </div>
+                <Link to={`/app/media-company/${mediaParent.id}`}>
+                  <Button variant="outline" size="sm">
+                    <ExternalLink className="w-4 h-4 mr-1.5" />
+                    View
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Not associated with a media company</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-3">Contact your media company admin to change this.</p>
           </CardContent>
         </Card>
 

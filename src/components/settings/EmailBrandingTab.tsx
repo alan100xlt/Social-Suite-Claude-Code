@@ -112,7 +112,7 @@ export function EmailBrandingTab() {
 
   const [form, setForm] = useState<Omit<EmailSettings, 'id'>>({ ...defaults });
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading, isError } = useQuery({
     queryKey: ['global-email-settings'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -192,6 +192,18 @@ export function EmailBrandingTab() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-2">
+          <ShieldAlert className="h-8 w-8 text-destructive mx-auto" />
+          <p className="text-sm font-medium">Access denied</p>
+          <p className="text-xs text-muted-foreground">You don't have permission to manage email branding.</p>
+        </div>
       </div>
     );
   }
