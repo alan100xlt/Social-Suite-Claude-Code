@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Longtale.ai — Platform Analysis Report</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+            display: ['"Syne"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --bg-card: rgba(255,255,255,0.025);
+      --bg-card-hover: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.07);
+      --border-hover: rgba(168,85,247,0.35);
+      --text-primary: #f4f4f5;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --purple: #a855f7;
+      --fuchsia: #d946ef;
+      --coral: #ff6b4a;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --blue: #60a5fa;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 72px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    h1,h2,h3,h4,h5,h6 { font-family: 'Syne', system-ui, sans-serif; line-height: 1.2; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    ::selection { background: rgba(168,85,247,0.35); color: #fff; }
+
+    /* ── Gradient text ── */
+    .text-gradient {
+      background: linear-gradient(135deg, #a855f7 0%, #d946ef 50%, #ff6b4a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .text-gradient-subtle {
+      background: linear-gradient(135deg, #c084fc 0%, #e879f9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Glass cards ── */
+    .glass-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .glass-card:hover { border-color: rgba(168,85,247,0.2); background: var(--bg-card-hover); }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 9999px;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em;
+      white-space: nowrap; font-family: 'DM Sans', sans-serif;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .badge-complete  { background: rgba(74,222,128,0.1);  color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+    .badge-partial   { background: rgba(251,191,36,0.1);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .badge-stubbed   { background: rgba(129,140,248,0.1); color: #818cf8; border: 1px solid rgba(129,140,248,0.2); }
+    .badge-missing   { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+    .badge-green  { background: rgba(74,222,128,0.1);  color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+    .badge-yellow { background: rgba(251,191,36,0.1);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+    .badge-red    { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+    .badge-p0 { background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); font-size: 0.75rem; padding: 4px 12px; }
+    .badge-p1 { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); font-size: 0.75rem; padding: 4px 12px; }
+    .badge-p2 { background: rgba(96,165,250,0.12); color: #93c5fd; border: 1px solid rgba(96,165,250,0.25); font-size: 0.75rem; padding: 4px 12px; }
+    .badge-p3 { background: rgba(161,161,170,0.12); color: #d4d4d8; border: 1px solid rgba(161,161,170,0.2); font-size: 0.75rem; padding: 4px 12px; }
+    .badge-complexity-s  { background: rgba(74,222,128,0.08);  color: #86efac; border: 1px solid rgba(74,222,128,0.15); padding: 2px 8px; }
+    .badge-complexity-m  { background: rgba(251,191,36,0.08);  color: #fde68a; border: 1px solid rgba(251,191,36,0.15); padding: 2px 8px; }
+    .badge-complexity-l  { background: rgba(248,113,113,0.08); color: #fca5a5; border: 1px solid rgba(248,113,113,0.15); padding: 2px 8px; }
+    .badge-complexity-xl { background: rgba(192,38,211,0.08);  color: #e879f9; border: 1px solid rgba(192,38,211,0.15); padding: 2px 8px; }
+
+    /* ── Tables ── */
+    .report-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    .report-table thead th {
+      background: rgba(255,255,255,0.03);
+      color: var(--text-muted);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 10px 14px; text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .report-table tbody td {
+      padding: 9px 14px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      vertical-align: top;
+    }
+    .report-table tbody tr:last-child td { border-bottom: none; }
+    .report-table tbody tr:hover td { background: rgba(255,255,255,0.018); }
+    .report-table .td-feature { color: var(--text-primary); font-weight: 500; }
+    .report-table .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #818cf8; word-break: break-all; }
+    .report-table .td-notes { color: var(--text-muted); font-size: 0.78rem; }
+
+    /* ── Competitive matrix ── */
+    .matrix-wrap { overflow-x: auto; }
+    .matrix-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 820px; }
+    .matrix-table thead th {
+      background: rgba(255,255,255,0.03);
+      color: var(--text-muted);
+      font-family: 'Syne', sans-serif; font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 10px 12px; text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .matrix-table thead th:first-child { text-align: left; min-width: 180px; }
+    .matrix-table thead th.col-longtale {
+      background: linear-gradient(180deg, rgba(168,85,247,0.15), rgba(217,70,239,0.08));
+      color: #c084fc; border-bottom: 2px solid rgba(168,85,247,0.4);
+    }
+    .matrix-table tbody td {
+      padding: 8px 12px; text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      color: var(--text-muted);
+    }
+    .matrix-table tbody td:first-child { text-align: left; font-weight: 500; color: var(--text-primary); }
+    .matrix-table tbody td.col-longtale { background: rgba(168,85,247,0.04); }
+    .matrix-table tbody tr:hover td { background: rgba(255,255,255,0.015); }
+    .matrix-table tbody tr:hover td.col-longtale { background: rgba(168,85,247,0.07); }
+    .check { color: #4ade80; font-size: 1rem; }
+    .cross { color: #3f3f46; font-size: 1rem; }
+    .warn  { color: #fbbf24; font-size: 0.9rem; }
+
+    /* ── Rating cards ── */
+    .rating-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .rating-card::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+    }
+    .rating-card[data-r="green"]::before  { background: linear-gradient(90deg,#22c55e,#4ade80); }
+    .rating-card[data-r="yellow"]::before { background: linear-gradient(90deg,#d97706,#fbbf24); }
+    .rating-card[data-r="red"]::before    { background: linear-gradient(90deg,#dc2626,#f87171); }
+    .rating-card[data-r="green"]:hover  { border-color: rgba(74,222,128,0.25); }
+    .rating-card[data-r="yellow"]:hover { border-color: rgba(251,191,36,0.25); }
+    .rating-card[data-r="red"]:hover    { border-color: rgba(248,113,113,0.25); }
+
+    /* ── Category cards (collapsible) ── */
+    .cat-card { border: 1px solid var(--border); border-radius: 0.875rem; overflow: hidden; margin-bottom: 0.5rem; transition: border-color 0.2s; }
+    .cat-card:hover { border-color: rgba(168,85,247,0.2); }
+    .cat-header {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.25rem; background: none; border: none; cursor: pointer;
+      text-align: left; transition: background 0.15s;
+    }
+    .cat-header:hover { background: rgba(255,255,255,0.025); }
+    .cat-body { overflow: hidden; transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1); max-height: 0; }
+    .cat-body.open { max-height: 9999px; }
+    .cat-chevron { transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); color: var(--text-muted); flex-shrink: 0; }
+    .cat-chevron.rotated { transform: rotate(180deg); }
+
+    /* ── Filter pills ── */
+    .filter-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+      color: var(--text-muted); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .filter-pill:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+    .filter-pill.active { background: rgba(168,85,247,0.12); color: #c084fc; border-color: rgba(168,85,247,0.3); }
+
+    /* ── Phase header ── */
+    .phase-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2.5rem; height: 2.5rem; border-radius: 0.625rem;
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1rem;
+      color: white; flex-shrink: 0;
+    }
+    .phase-1 { background: linear-gradient(135deg, #a855f7, #d946ef); }
+    .phase-2 { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+    .phase-3 { background: linear-gradient(135deg, #f59e0b, #ff6b4a); }
+
+    /* ── Roadmap priority blocks ── */
+    .priority-block { margin-bottom: 2rem; }
+    .roadmap-row td:first-child { border-left: 2px solid transparent; }
+    .roadmap-row[data-p="P0"] td:first-child { border-left-color: #ef4444; }
+    .roadmap-row[data-p="P1"] td:first-child { border-left-color: #f59e0b; }
+    .roadmap-row[data-p="P2"] td:first-child { border-left-color: #3b82f6; }
+    .roadmap-row[data-p="P3"] td:first-child { border-left-color: #6b7280; }
+
+    /* ── Nav ── */
+    #top-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      background: rgba(9,9,11,0.82); backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav-link {
+      padding: 6px 12px; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 500;
+      color: var(--text-muted); text-decoration: none;
+      transition: color 0.15s, background 0.15s;
+    }
+    .nav-link:hover { color: var(--text-secondary); background: rgba(255,255,255,0.05); }
+    .nav-link.active { color: #c084fc; background: rgba(168,85,247,0.1); }
+
+    /* ── Back to top ── */
+    #btt {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 40;
+      width: 2.5rem; height: 2.5rem; border-radius: 50%;
+      background: linear-gradient(135deg, #a855f7, #ff6b4a);
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transform: translateY(8px); pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      box-shadow: 0 4px 20px rgba(168,85,247,0.35);
+    }
+    #btt.visible { opacity: 1; transform: translateY(0); pointer-events: all; }
+
+    /* ── Stat box ── */
+    .stat-box {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 0.875rem; padding: 1.25rem; text-align: center;
+    }
+    .stat-num { font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800; line-height: 1; }
+    .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Divider line ── */
+    .phase-divider { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(168,85,247,0.4), transparent); }
+
+    /* ── Insight bullet ── */
+    .insight-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: 0.85rem; }
+    .insight-icon { flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px; }
+
+    /* ── Section label pill ── */
+    .section-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 14px; border-radius: 9999px;
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.2); color: #c084fc;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff !important; color: #111 !important; }
+      #top-nav, #btt, .filter-pill, .no-print { display: none !important; }
+      .cat-body { max-height: none !important; display: block !important; }
+      .report-table thead th { background: #f3f4f6 !important; color: #374151 !important; }
+      .report-table tbody td { color: #374151 !important; border-color: #e5e7eb !important; }
+      .glass-card, .cat-card, .rating-card, .stat-box {
+        background: #fff !important; border: 1px solid #e5e7eb !important;
+      }
+      .text-gradient, .text-gradient-subtle {
+        -webkit-text-fill-color: #111 !important; background: none !important;
+      }
+      a { color: inherit !important; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     STICKY NAV
+═══════════════════════════════════════════ -->
+<nav id="top-nav">
+  <div style="max-width:72rem;margin:0 auto;padding:0 1.5rem;height:56px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.9375rem;color:#f4f4f5;letter-spacing:-0.01em;">Longtale.ai</span>
+      <span style="color:#3f3f46;font-size:0.75rem;">|</span>
+      <span style="color:var(--text-muted);font-size:0.8125rem;">Platform Analysis</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:2px;" class="hidden md:flex">
+      <a href="#summary"     class="nav-link" data-s="summary">Summary</a>
+      <a href="#phase1"      class="nav-link" data-s="phase1">Features</a>
+      <a href="#phase2"      class="nav-link" data-s="phase2">Code Quality</a>
+      <a href="#competitive" class="nav-link" data-s="competitive">Competitive</a>
+      <a href="#roadmap"     class="nav-link" data-s="roadmap">Roadmap</a>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#52525b;">
+      <span id="prog">0</span>%
+    </div>
+  </div>
+  <div style="height:1px;background:linear-gradient(90deg,transparent 0%,#a855f7 30%,#d946ef 60%,#ff6b4a 80%,transparent 100%);opacity:0.5;"></div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════ -->
+<header style="position:relative;padding:6.5rem 1.5rem 4rem;overflow:hidden;">
+  <!-- glow blobs -->
+  <div style="position:absolute;top:-80px;left:10%;width:500px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.18) 0%,transparent 70%);filter:blur(60px);pointer-events:none;"></div>
+  <div style="position:absolute;bottom:-40px;right:5%;width:400px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(255,107,74,0.12) 0%,transparent 70%);filter:blur(60px);pointer-events:none;"></div>
+  <!-- grid texture -->
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:64px 64px;pointer-events:none;"></div>
+
+  <div style="position:relative;max-width:72rem;margin:0 auto;">
+    <div style="margin-bottom:1.5rem;">
+      <span class="section-label">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#c084fc" stroke-width="1.5"/><circle cx="5" cy="5" r="1.5" fill="#c084fc"/></svg>
+        Internal Platform Analysis
+      </span>
+    </div>
+
+    <h1 style="font-size:clamp(2.25rem,6vw,4.5rem);font-weight:800;letter-spacing:-0.03em;color:#f4f4f5;line-height:1.08;margin-bottom:1.25rem;">
+      Longtale.ai<br>
+      <span class="text-gradient">Platform Analysis</span>
+    </h1>
+
+    <p style="font-size:1.0625rem;color:var(--text-muted);max-width:40rem;line-height:1.7;margin-bottom:2rem;">
+      A comprehensive three-phase analysis covering feature inventory, code quality, competitive positioning, and a prioritized enhancement roadmap.
+    </p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-muted);">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        March 2026
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-muted);">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        3 Analysis Phases
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-muted);">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        13 Feature Categories
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-muted);">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        7 Quality Dimensions
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.8125rem;color:var(--text-muted);">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        22-Item Roadmap
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════
+     EXECUTIVE SUMMARY
+═══════════════════════════════════════════ -->
+<section id="summary" style="max-width:72rem;margin:0 auto;padding:0 1.5rem 5rem;">
+
+  <div style="margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;">
+    <div>
+      <div class="section-label" style="background:rgba(255,107,74,0.08);border-color:rgba(255,107,74,0.2);color:#fb923c;">TL;DR</div>
+    </div>
+    <h2 style="font-size:1.75rem;font-weight:800;color:#f4f4f5;margin-left:4px;">Executive Summary</h2>
+  </div>
+
+  <!-- Top score cards -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <div class="stat-box">
+      <div class="stat-num" style="color:#c084fc;">8/10</div>
+      <div class="stat-label">Feature Completeness</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">Core platform robust across 13 categories</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:#f87171;">5/10</div>
+      <div class="stat-label">Code Quality</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">2 critical issues requiring immediate action</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:#fbbf24;">6/10</div>
+      <div class="stat-label">Competitive Position</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">Unique AI workflow; gaps in inbox &amp; bulk tools</div>
+    </div>
+  </div>
+
+  <!-- Main summary card -->
+  <div style="border:1px solid var(--border);border-radius:1.25rem;overflow:hidden;background:linear-gradient(135deg,rgba(168,85,247,0.04) 0%,rgba(9,9,11,1) 50%,rgba(255,107,74,0.03) 100%);">
+    <div style="padding:2rem;">
+
+      <!-- Strengths / Gaps in two columns -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-bottom:2rem;">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#4ade80;margin-bottom:0.875rem;">✦ Unique Strengths</div>
+          <ul style="list-style:none;space-y:0.5rem;">
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="color:var(--text-secondary);">Strategy-first AI content workflow — unique vs. all competitors</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="color:var(--text-secondary);">URL-based discovery onboarding pipeline</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="color:var(--text-secondary);">Media company hierarchy for multi-brand publishing</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="color:var(--text-secondary);">5-level brand voice AI autonomy system</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="color:var(--text-secondary);">Deep RSS-to-social automation pipeline</span></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#f87171;margin-bottom:0.875rem;">⚠ Critical Gaps</div>
+          <ul style="list-style:none;">
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg><span style="color:var(--text-secondary);">No React ErrorBoundary — white-screen crashes on any error</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg><span style="color:var(--text-secondary);">Redis credentials in client-side browser bundle</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1" fill="#fbbf24" stroke="none"/></svg><span style="color:var(--text-secondary);">No social inbox / unified messaging</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1" fill="#fbbf24" stroke="none"/></svg><span style="color:var(--text-secondary);">No bulk scheduling / CSV import</span></li>
+            <li class="insight-item"><svg class="insight-icon" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1" fill="#fbbf24" stroke="none"/></svg><span style="color:var(--text-secondary);">No PDF/CSV analytics export for client reporting</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Top 5 actions -->
+      <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);border-radius:0.875rem;padding:1.25rem;">
+        <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#c084fc;margin-bottom:1rem;">⚡ Top 5 Actions — Do These First</div>
+        <div style="display:grid;gap:0.5rem;">
+          <div style="display:flex;align-items:baseline;gap:10px;font-size:0.85rem;">
+            <span style="font-family:'JetBrains Mono',monospace;color:#f87171;font-weight:600;min-width:24px;">01</span>
+            <span style="color:var(--text-secondary);">Add <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#818cf8;background:rgba(129,140,248,0.1);padding:1px 5px;border-radius:3px;">&lt;ErrorBoundary&gt;</code> in App.tsx to prevent white-screen crashes <span style="color:var(--text-muted);">— 1 hour</span></span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;font-size:0.85rem;">
+            <span style="font-family:'JetBrains Mono',monospace;color:#f87171;font-weight:600;min-width:24px;">02</span>
+            <span style="color:var(--text-secondary);">Remove server-side Redis/Express code from browser bundle <span style="color:var(--text-muted);">— 2 hours</span></span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;font-size:0.85rem;">
+            <span style="font-family:'JetBrains Mono',monospace;color:#fbbf24;font-weight:600;min-width:24px;">03</span>
+            <span style="color:var(--text-secondary);">Add <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#818cf8;background:rgba(129,140,248,0.1);padding:1px 5px;border-radius:3px;">React.lazy()</code> route splitting — zero code splitting currently <span style="color:var(--text-muted);">— half day</span></span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;font-size:0.85rem;">
+            <span style="font-family:'JetBrains Mono',monospace;color:#fbbf24;font-weight:600;min-width:24px;">04</span>
+            <span style="color:var(--text-secondary);">Build PDF/CSV analytics export for agency client reporting <span style="color:var(--text-muted);">— 2–3 days</span></span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;font-size:0.85rem;">
+            <span style="font-family:'JetBrains Mono',monospace;color:#60a5fa;font-weight:600;min-width:24px;">05</span>
+            <span style="color:var(--text-secondary);">Build month calendar view to match competitor feature parity <span style="color:var(--text-muted);">— 1–2 days</span></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PHASE 1 -->
+<section id="phase1" style="max-width:72rem;margin:0 auto;padding:0 1.5rem 5rem;">
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:2rem;">
+    <span class="phase-num phase-1">1</span>
+    <div>
+      <h2 style="font-size:1.625rem;font-weight:800;color:#f4f4f5;letter-spacing:-0.02em;">Feature Inventory</h2>
+      <p style="font-size:0.8125rem;color:var(--text-muted);margin-top:2px;">13 categories assessed across the src/ directory</p>
+    </div>
+    <div class="phase-divider"></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:1.25rem;" class="no-print">
+    <div style="display:flex;flex-wrap:wrap;gap:0.375rem;">
+      <button class="filter-pill active" onclick="filterStatus('all')">All</button>
+      <button class="filter-pill" onclick="filterStatus('complete')"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;"></span>Complete</button>
+      <button class="filter-pill" onclick="filterStatus('partial')"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#fbbf24;"></span>Partial</button>
+      <button class="filter-pill" onclick="filterStatus('stubbed')"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#818cf8;"></span>Stubbed</button>
+      <button class="filter-pill" onclick="filterStatus('missing')"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;"></span>Missing</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <button onclick="expandAll()" style="font-size:0.75rem;color:var(--text-muted);background:none;border:none;cursor:pointer;">Expand All</button>
+      <span style="color:#3f3f46;">|</span>
+      <button onclick="collapseAll()" style="font-size:0.75rem;color:var(--text-muted);background:none;border:none;cursor:pointer;">Collapse All</button>
+    </div>
+  </div>
+
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Authentication &amp; Auth Flows</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">9 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">8 Complete</span><span class="badge badge-partial">1 Partial</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Email/Password Login</td><td class="td-mono">src/components/auth/LoginForm.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Supabase Auth integration</td></tr>
+<tr data-status="complete"><td class="td-feature">Email/Password Signup</td><td class="td-mono">src/components/auth/SignupForm.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Supports invite tokens via URL params</td></tr>
+<tr data-status="complete"><td class="td-feature">Password Reset</td><td class="td-mono">src/pages/ResetPassword.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Hash &amp; query-based recovery links</td></tr>
+<tr data-status="complete"><td class="td-feature">OAuth Callback</td><td class="td-mono">src/pages/OAuthCallback.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Popup + redirect mode for GetLate</td></tr>
+<tr data-status="complete"><td class="td-feature">Protected Routes</td><td class="td-mono">src/components/auth/ProtectedRoute.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Auto-redirect to onboarding if needed</td></tr>
+<tr data-status="complete"><td class="td-feature">Superadmin Check</td><td class="td-mono">src/contexts/AuthContext.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Via is_superadmin RPC — no hardcoded emails</td></tr>
+<tr data-status="complete"><td class="td-feature">User Impersonation</td><td class="td-mono">src/contexts/AuthContext.tsx + ImpersonationBanner.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Magic link tokens, session save/restore</td></tr>
+<tr data-status="complete"><td class="td-feature">Magic Links</td><td class="td-mono">edge fn: impersonate-user</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Used for impersonation flow</td></tr>
+<tr data-status="partial"><td class="td-feature">PostHog Tracking</td><td class="td-mono">src/contexts/AuthContext.tsx:73</td><td><span class="badge badge-partial">Partial</span></td><td class="td-notes">Auto-identify on auth; no event taxonomy</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Onboarding</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">11 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">11 Complete</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">URL Discovery</td><td class="td-mono">src/pages/GetStarted.tsx + Discover.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Full crawl: RSS, social channels, AI posts</td></tr>
+<tr data-status="complete"><td class="td-feature">Discovery Board</td><td class="td-mono">src/components/onboarding/DiscoveryBoard.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Business info, RSS feeds, social channels</td></tr>
+<tr data-status="complete"><td class="td-feature">Discovery Progress Modal</td><td class="td-mono">src/components/onboarding/DiscoveryProgressModal.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Real-time phase tracking</td></tr>
+<tr data-status="complete"><td class="td-feature">Sample Post Previews</td><td class="td-mono">src/components/onboarding/SocialPostPreviewModal.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">4 persona-based AI posts</td></tr>
+<tr data-status="complete"><td class="td-feature">Company Setup</td><td class="td-mono">src/pages/SetupCompany.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Name/slug creation, invitation acceptance</td></tr>
+<tr data-status="complete"><td class="td-feature">Onboarding Wizard</td><td class="td-mono">src/pages/OnboardingWizard.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">3-step with progress tracking</td></tr>
+<tr data-status="complete"><td class="td-feature">Step 1: Connect Socials</td><td class="td-mono">src/components/onboarding/steps/ConnectSocialsStep.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">8 platforms, OAuth + page selection</td></tr>
+<tr data-status="complete"><td class="td-feature">Step 2: Brand Voice</td><td class="td-mono">src/components/onboarding/steps/BrandVoiceStep.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Tone, length, emoji, hashtags config</td></tr>
+<tr data-status="complete"><td class="td-feature">Step 3: Automation</td><td class="td-mono">src/components/onboarding/steps/AutomationStep.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Pre-filled rule wizard</td></tr>
+<tr data-status="complete"><td class="td-feature">Progress Widget</td><td class="td-mono">src/components/dashboard/OnboardingProgressWidget.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Dashboard widget with step navigation</td></tr>
+<tr data-status="complete"><td class="td-feature">Status Tracking</td><td class="td-mono">src/hooks/useOnboardingStatus.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">in_progress to wizard_complete to complete</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Dashboard</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">8 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">8 Complete</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">KPI Stat Cards</td><td class="td-mono">src/components/dashboard/StatCard.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Followers, Reach, Engagement Rate, Posts (90d)</td></tr>
+<tr data-status="complete"><td class="td-feature">AI Daily Briefing</td><td class="td-mono">src/components/dashboard/DailyBriefing.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">AI-generated, 4hr cache, manual refresh</td></tr>
+<tr data-status="complete"><td class="td-feature">Top Post Spotlight</td><td class="td-mono">src/components/dashboard/TopPostSpotlight.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Best post from last 7 days</td></tr>
+<tr data-status="complete"><td class="td-feature">Trend Metrics</td><td class="td-mono">src/components/dashboard/TrendMetrics.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">WoW direction indicators</td></tr>
+<tr data-status="complete"><td class="td-feature">Engagement Chart</td><td class="td-mono">src/components/dashboard/EngagementChart.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Nivo 30-day chart</td></tr>
+<tr data-status="complete"><td class="td-feature">Recent Posts Table</td><td class="td-mono">src/components/dashboard/RecentPostsTable.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Multi-platform expandable rows</td></tr>
+<tr data-status="complete"><td class="td-feature">Upcoming Timeline</td><td class="td-mono">src/components/dashboard/UpcomingTimeline.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Scheduled posts, pending approvals, drafts</td></tr>
+<tr data-status="complete"><td class="td-feature">Framer Motion Animations</td><td class="td-mono">src/pages/Index.tsx:16-24</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Staggered fade-up entrance per widget</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Content / Posts</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">12 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">11 Complete</span><span class="badge badge-partial">1 Partial</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Content Hub (6 tabs)</td><td class="td-mono">src/pages/Content.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Articles, Posts, Calendar, Feeds, Automations, Logs</td></tr>
+<tr data-status="complete"><td class="td-feature">Multi-Step Compose</td><td class="td-mono">src/components/posts/ComposeTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">7-step flow, strategy-first AI — 1,653 lines</td></tr>
+<tr data-status="complete"><td class="td-feature">AI Strategy Generation</td><td class="td-mono">src/hooks/useGenerateSocialPost.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Strategy to Posts to Compliance pipeline</td></tr>
+<tr data-status="complete"><td class="td-feature">Per-Platform Editing</td><td class="td-mono">src/components/posts/ComposeTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Platform-specific editing and preview</td></tr>
+<tr data-status="complete"><td class="td-feature">Draft Management</td><td class="td-mono">src/hooks/usePostDrafts.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Auto-save, resume, CRUD</td></tr>
+<tr data-status="complete"><td class="td-feature">Calendar View (week only)</td><td class="td-mono">src/components/posts/CalendarTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Week view only — month view missing</td></tr>
+<tr data-status="complete"><td class="td-feature">Post Scheduling</td><td class="td-mono">src/components/posts/ComposeTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Date/time picker, future validation</td></tr>
+<tr data-status="complete"><td class="td-feature">Multi-Platform Preview</td><td class="td-mono">src/components/content/MultiPlatformPreview.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">FB/IG/TW/LI previews</td></tr>
+<tr data-status="complete"><td class="td-feature">Approval Workflow</td><td class="td-mono">src/pages/ApprovePost.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Token-based, 7-day expiry, public route</td></tr>
+<tr data-status="complete"><td class="td-feature">Articles Browser</td><td class="td-mono">src/components/content/ArticlesTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">RSS articles with status filters</td></tr>
+<tr data-status="complete"><td class="td-feature">Contextual Card Actions</td><td class="td-mono">src/components/content/ContextualCardActions.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">State-dependent action buttons</td></tr>
+<tr data-status="partial"><td class="td-feature">Flyout Editor</td><td class="td-mono">src/components/content/FlyoutEditor.tsx</td><td><span class="badge badge-partial">Partial</span></td><td class="td-notes">Split-panel editor/preview — basic impl</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">RSS Automations</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">8 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">8 Complete</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Feed Management</td><td class="td-mono">src/components/content/FeedsTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">CRUD, activation toggle, scraping config</td></tr>
+<tr data-status="complete"><td class="td-feature">Feed Form Dialog</td><td class="td-mono">src/components/content/FeedFormDialog.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">URL, polling interval, Firecrawl toggle</td></tr>
+<tr data-status="complete"><td class="td-feature">Automation Rules</td><td class="td-mono">src/components/content/AutomationsContent.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Full CRUD with rule wizard</td></tr>
+<tr data-status="complete"><td class="td-feature">Automation Rule Wizard</td><td class="td-mono">src/components/automations/AutomationRuleWizard.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Feed to platform to action to objective config</td></tr>
+<tr data-status="complete"><td class="td-feature">Automation Logs</td><td class="td-mono">src/components/content/AutomationLogsContent.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Filtering, pagination, detail modal</td></tr>
+<tr data-status="complete"><td class="td-feature">RSS Polling</td><td class="td-mono">edge fn: rss-poll</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">XML/Atom/JSON + Firecrawl scraping</td></tr>
+<tr data-status="complete"><td class="td-feature">Article Processing</td><td class="td-mono">edge fn: run-automation-article</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">AI content generation per rule</td></tr>
+<tr data-status="complete"><td class="td-feature">Feed Discovery</td><td class="td-mono">edge fn: discover-rss-feeds</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Auto-discover RSS from any URL</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Analytics</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">9 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">7 Complete</span><span class="badge badge-partial">1 Partial</span><span class="badge badge-stubbed">1 Stubbed</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Analytics Dashboard V1</td><td class="td-mono">src/pages/Analytics.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">5 tabs: Overview, Platforms, Engagement, Audience, Posts</td></tr>
+<tr data-status="partial"><td class="td-feature">Analytics V2</td><td class="td-mono">src/pages/AnalyticsV2.tsx</td><td><span class="badge badge-partial">Partial</span></td><td class="td-notes">Separate v2 — in-progress</td></tr>
+<tr data-status="complete"><td class="td-feature">12+ Nivo Chart Types</td><td class="td-mono">src/components/analytics/charts/</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Area, Bar, Donut, Line, Stacked, Heatmap, Radar</td></tr>
+<tr data-status="complete"><td class="td-feature">Date Range Filter</td><td class="td-mono">src/components/analytics/DateRangeFilter.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">7D/30D/90D presets, custom, Since Signup</td></tr>
+<tr data-status="complete"><td class="td-feature">Platform Breakdown Table</td><td class="td-mono">src/components/analytics/PlatformBreakdownTable.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Per-platform metrics table</td></tr>
+<tr data-status="complete"><td class="td-feature">Top Posts Table</td><td class="td-mono">src/components/analytics/TopPostsTable.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Sortable, filterable, highlight support</td></tr>
+<tr data-status="complete"><td class="td-feature">Sync External Posts</td><td class="td-mono">src/components/analytics/SyncExternalPostDialog.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Import analytics for external posts</td></tr>
+<tr data-status="complete"><td class="td-feature">Optimal Posting Widget</td><td class="td-mono">src/components/analytics/OptimalPostingWidget.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Best time recommendations</td></tr>
+<tr data-status="stubbed"><td class="td-feature">Portfolio Analytics</td><td class="td-mono">src/components/analytics/PortfolioAnalytics.tsx</td><td><span class="badge badge-stubbed">Stubbed</span></td><td class="td-notes">Mock data — no real multi-company aggregation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Connections / Integrations</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">6 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">6 Complete</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Connections Page</td><td class="td-mono">src/pages/Connections.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">10 platforms with OAuth flow</td></tr>
+<tr data-status="complete"><td class="td-feature">OAuth Connect/Disconnect</td><td class="td-mono">src/hooks/useGetLateAccounts.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Full connect/disconnect cycle via GetLate</td></tr>
+<tr data-status="complete"><td class="td-feature">Page Selection Dialog</td><td class="td-mono">src/components/connections/PageSelectionDialog.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">For FB/IG/LI/YT multi-page selection</td></tr>
+<tr data-status="complete"><td class="td-feature">Platform Cards</td><td class="td-mono">src/components/dashboard/PlatformCard.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Connection status, followers, username</td></tr>
+<tr data-status="complete"><td class="td-feature">GetLate API Layer</td><td class="td-mono">src/lib/api/getlate.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Connect, Accounts, Posts, Analytics APIs</td></tr>
+<tr data-status="complete"><td class="td-feature">10 Platform Support</td><td class="td-mono">src/pages/Connections.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">IG, X, FB, LI, TikTok, YT, Pinterest, Reddit, Bluesky, Threads</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Settings</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">7 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">6 Complete</span><span class="badge badge-stubbed">1 Stubbed</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Profile Tab</td><td class="td-mono">src/components/settings/ProfileTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Name, email, password, appearance</td></tr>
+<tr data-status="complete"><td class="td-feature">Company Tab</td><td class="td-mono">src/components/settings/CompanyTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Name, slug, GetLate profile, team management</td></tr>
+<tr data-status="complete"><td class="td-feature">Brand Voice V1 (legacy)</td><td class="td-mono">src/components/settings/BrandVoiceTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Duplicate of V2 — candidate for removal</td></tr>
+<tr data-status="complete"><td class="td-feature">Brand Voice V2</td><td class="td-mono">src/components/settings/BrandVoiceTabV2.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">5 voice modes, Content Playground</td></tr>
+<tr data-status="stubbed"><td class="td-feature">Notifications Tab</td><td class="td-mono">src/components/settings/NotificationsTab.tsx</td><td><span class="badge badge-stubbed">Stubbed</span></td><td class="td-notes">UI toggles only — no backend persistence</td></tr>
+<tr data-status="complete"><td class="td-feature">Email Branding</td><td class="td-mono">src/components/settings/EmailBrandingTab.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Logo, colors, templates, test send</td></tr>
+<tr data-status="complete"><td class="td-feature">Content Playground</td><td class="td-mono">src/components/settings/ContentPlayground.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Live AI post testing with voice settings</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Admin / Superadmin</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">9 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">8 Complete</span><span class="badge badge-partial">1 Partial</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Superadmin Companies</td><td class="td-mono">src/pages/SuperadminCompanies.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Full metrics table, bulk delete</td></tr>
+<tr data-status="complete"><td class="td-feature">API Logs</td><td class="td-mono">src/pages/ApiLogs.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Filters, detail modal, AI token costs</td></tr>
+<tr data-status="complete"><td class="td-feature">Cron Health</td><td class="td-mono">src/pages/CronHealth.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Job execution monitoring</td></tr>
+<tr data-status="complete"><td class="td-feature">GetLate Mapping</td><td class="td-mono">src/pages/GetLateMapping.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Company to GetLate profile linking</td></tr>
+<tr data-status="complete"><td class="td-feature">Wizard Variations</td><td class="td-mono">src/pages/WizardVariations.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Onboarding wizard testing/preview</td></tr>
+<tr data-status="complete"><td class="td-feature">Platform Settings</td><td class="td-mono">src/pages/PlatformSettings.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Platform branding config</td></tr>
+<tr data-status="complete"><td class="td-feature">Progress Page</td><td class="td-mono">src/pages/Progress.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Onboarding progress overview</td></tr>
+<tr data-status="complete"><td class="td-feature">Impersonation</td><td class="td-mono">src/contexts/AuthContext.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Full flow with session restore</td></tr>
+<tr data-status="partial"><td class="td-feature">Advanced Admin Dashboard</td><td class="td-mono">src/components/admin/AdvancedAdminDashboard.tsx</td><td><span class="badge badge-partial">Partial</span></td><td class="td-notes">UI complete — mock data, no backend</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">AI Features</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">6 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">6 Complete</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Strategy-First Content Gen</td><td class="td-mono">src/hooks/useGenerateSocialPost.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">3-step: strategy to posts to compliance</td></tr>
+<tr data-status="complete"><td class="td-feature">Brand Voice AI (V2)</td><td class="td-mono">src/components/settings/BrandVoiceTabV2.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">5 autonomy levels — AI-decides at max</td></tr>
+<tr data-status="complete"><td class="td-feature">AI Daily Briefing</td><td class="td-mono">src/components/dashboard/DailyBriefing.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Dashboard summary with metrics context</td></tr>
+<tr data-status="complete"><td class="td-feature">Claude Assistant</td><td class="td-mono">src/components/claude/ClaudeAssistant.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Claude chat integration in workspace</td></tr>
+<tr data-status="complete"><td class="td-feature">Content Playground</td><td class="td-mono">src/components/settings/ContentPlayground.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Live AI post testing with voice settings</td></tr>
+<tr data-status="complete"><td class="td-feature">Global Voice Defaults</td><td class="td-mono">src/components/settings/VoiceDefaultsSection.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Superadmin global defaults across companies</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Notifications</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">4 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">3 Complete</span><span class="badge badge-stubbed">1 Stubbed</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Courier Inbox</td><td class="td-mono">src/components/layout/NotificationInbox.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Bell icon, unread count, Courier SDK</td></tr>
+<tr data-status="complete"><td class="td-feature">Courier Token Provider</td><td class="td-mono">src/contexts/CourierContext.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">JWT auth, 12hr refresh cycle</td></tr>
+<tr data-status="complete"><td class="td-feature">Slack Notifications</td><td class="td-mono">src/services/notifications/SlackService.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Multi-type notification support</td></tr>
+<tr data-status="stubbed"><td class="td-feature">Notification Preferences</td><td class="td-mono">src/components/settings/NotificationsTab.tsx</td><td><span class="badge badge-stubbed">Stubbed</span></td><td class="td-notes">UI toggles only — no DB persistence</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Multi-tenancy</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">5 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">4 Complete</span><span class="badge badge-partial">1 Partial</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Company Switcher</td><td class="td-mono">src/components/company/CompanySwitcher.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Search, cross-tab sync</td></tr>
+<tr data-status="complete"><td class="td-feature">Selected Company Context</td><td class="td-mono">src/contexts/SelectedCompanyContext.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">localStorage persistence</td></tr>
+<tr data-status="complete"><td class="td-feature">Company Hooks</td><td class="td-mono">src/hooks/useCompany.ts + useCompanies.ts</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">CRUD, memberships, role checks</td></tr>
+<tr data-status="complete"><td class="td-feature">User Invitations</td><td class="td-mono">src/components/company/InviteUserDialog.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Full invite to accept flow</td></tr>
+<tr data-status="partial"><td class="td-feature">Media Company Hierarchy</td><td class="td-mono">src/hooks/useMediaCompanyHierarchy.ts</td><td><span class="badge badge-partial">Partial</span></td><td class="td-notes">Hooks exist — no hierarchy management UI</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cat-card">
+    <button class="cat-header" onclick="toggleCat(this)">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.9375rem;color:#f4f4f5;">Theme System</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text-muted);">7 features</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-complete">5 Complete</span><span class="badge badge-partial">1 Partial</span><span class="badge badge-missing">1 Missing</span>
+        <svg class="cat-chevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </button>
+    <div class="cat-body">
+      <div style="overflow-x:auto;padding:0 0.5rem 1rem;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%">Feature</th><th style="width:35%">Files / Components</th><th style="width:11%">Status</th><th>Notes</th></tr></thead>
+          <tbody>
+<tr data-status="complete"><td class="td-feature">Theme Provider (6 variants)</td><td class="td-mono">src/contexts/ThemeContext.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Professional, Modern, Minimal, Vibrant, Dark Pro, Aurora</td></tr>
+<tr data-status="complete"><td class="td-feature">Theme Toggle</td><td class="td-mono">src/components/theme/ThemeToggle.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Selection UI with preview swatches</td></tr>
+<tr data-status="complete"><td class="td-feature">Theme Preview</td><td class="td-mono">src/components/theme/ThemePreview.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Side-by-side comparison</td></tr>
+<tr data-status="complete"><td class="td-feature">CSS Variable Injection</td><td class="td-mono">src/contexts/ThemeContext.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Applies 40+ CSS custom properties to document root</td></tr>
+<tr data-status="complete"><td class="td-feature">Figma Import UI</td><td class="td-mono">src/components/theme/FigmaThemeImport.tsx</td><td><span class="badge badge-complete">Complete</span></td><td class="td-notes">Import dialog with preview</td></tr>
+<tr data-status="partial"><td class="td-feature">Figma Service</td><td class="td-mono">src/services/figmaService.ts</td><td><span class="badge badge-partial">Partial</span></td><td class="td-notes">Placeholder extraction — not wired to real Figma API</td></tr>
+<tr data-status="missing"><td class="td-feature">Custom Theme Persistence</td><td class="td-mono">—</td><td><span class="badge badge-missing">Missing</span></td><td class="td-notes">Imported themes don't persist to themeVariants</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PHASE 2 — CODE QUALITY -->
+<section id="phase2" style="max-width:72rem;margin:0 auto;padding:0 1.5rem 5rem;">
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:2rem;">
+    <span class="phase-num phase-2">2</span>
+    <div>
+      <h2 style="font-size:1.625rem;font-weight:800;color:#f4f4f5;letter-spacing:-0.02em;">Code Quality Analysis</h2>
+      <p style="font-size:0.8125rem;color:var(--text-muted);margin-top:2px;">7 dimensions rated across architecture, security, performance, and maintainability</p>
+    </div>
+    <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(59,130,246,0.4),transparent);"></div>
+  </div>
+
+  <!-- Scorecard dots -->
+  <div style="display:flex;flex-wrap:wrap;gap:0.625rem;margin-bottom:2rem;padding:1.25rem;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:0.875rem;">
+    <div style="font-family:'Syne',sans-serif;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);width:100%;margin-bottom:0.375rem;">Quick Scorecard</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>Architecture</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>Performance</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#f87171;display:inline-block;flex-shrink:0;"></span>Security</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>Type Safety</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#f87171;display:inline-block;flex-shrink:0;"></span>Error Handling</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>Dead Code</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8125rem;color:#d4d4d8;"><span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;flex-shrink:0;"></span>Technical Debt</div>
+  </div>
+
+  <!-- Rating cards grid -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;">
+
+    <!-- Architecture -->
+    <div class="rating-card" data-r="yellow">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-yellow">Needs Work</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-top:0.25rem;margin-bottom:0.25rem;padding-top:0.5rem;">Architecture</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">Component structure, separation of concerns, service layer</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Clean context provider hierarchy (5 well-typed contexts)</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Good separation: API layer (getlate.ts) from UI hooks</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>Mega-component:</strong> ComposeTab.tsx is 1,653 lines with 40+ imports</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Server-side code (Redis, Express) mixed into client src/</span></div>
+      </div>
+    </div>
+
+    <!-- Performance -->
+    <div class="rating-card" data-r="yellow">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-yellow">Needs Work</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-bottom:0.25rem;padding-top:0.5rem;">Performance</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">Re-renders, memoization, bundle size, lazy loading</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">TanStack Query with appropriate cache times (4hr briefing, 30s stats)</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>Zero React.lazy()</strong> — all 40+ routes eagerly loaded in App.tsx</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Heavy Nivo library loaded globally — never lazy-loaded</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Only 28 of 200+ components use memoization (useMemo/useCallback)</span></div>
+      </div>
+    </div>
+
+    <!-- Security -->
+    <div class="rating-card" data-r="red">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-red">Critical</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-bottom:0.25rem;padding-top:0.5rem;">Security</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">Client-side secrets, auth checks, RLS, server code in browser</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Supabase anon key loaded via VITE_* env vars (correct)</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>CRITICAL:</strong> SecurityContextService.ts connects to Redis in browser bundle (REDIS_HOST, REDIS_PASSWORD)</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>CRITICAL:</strong> ErrorMonitor.ts performs file system reads/writes from browser</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Impersonation tokens stored in localStorage (XSS risk)</span></div>
+      </div>
+    </div>
+
+    <!-- Type Safety -->
+    <div class="rating-card" data-r="yellow">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-yellow">Needs Work</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-bottom:0.25rem;padding-top:0.5rem;">Type Safety</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">any usage, missing types, unsafe casts</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Generated Supabase types provide strong DB typing</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>71 occurrences</strong> of ": any" across 37 files</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>63 occurrences</strong> of "as any" casts — 134 total any exposure</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Double-cast anti-pattern: <code style="font-size:0.75rem;color:#818cf8;">as unknown as PlatformSettings</code></span></div>
+      </div>
+    </div>
+
+    <!-- Error Handling -->
+    <div class="rating-card" data-r="red">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-red">Critical</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-bottom:0.25rem;padding-top:0.5rem;">Error Handling</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">Error boundaries, unhandled promises, silent failures</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#4ade80" stroke-width="2"><polyline points="3 8 7 12 13 4"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">TanStack Query built-in error/retry for API calls</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><strong>No ErrorBoundary exists</strong> — any React error = white-screen crash</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Silent <code style="font-size:0.75rem;color:#818cf8;">catch {}</code> in AuthContext swallows JSON parse errors</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">190+ console.log/error statements — no structured error tracking (Sentry etc.)</span></div>
+      </div>
+    </div>
+
+    <!-- Dead Code -->
+    <div class="rating-card" data-r="yellow">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-yellow">Needs Work</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-bottom:0.25rem;padding-top:0.5rem;">Dead Code</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">Unused imports, exports, duplicate services, legacy pages</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Duplicate SecurityContextService (securityContextService.ts + security/SecurityContextService.ts)</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">ErrorMonitor.ts — never imported, does browser file I/O</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">middleware/security.ts — Express middleware in a Vite SPA</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">4 versions of the landing page (only 1 needed in production)</span></div>
+      </div>
+    </div>
+
+    <!-- Technical Debt -->
+    <div class="rating-card" data-r="yellow" style="grid-column: 1 / -1; max-width: 100%;">
+      <div style="position:absolute;top:1rem;right:1rem;"><span class="badge badge-yellow">Needs Work</span></div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#f4f4f5;margin-bottom:0.25rem;padding-top:0.5rem;">Technical Debt</h3>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;">Duplicated logic, inconsistent patterns, Node.js deps in browser bundle</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Platform icon/color maps defined 3+ times in separate files</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#f87171" stroke-width="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;"><code style="font-size:0.75rem;color:#818cf8;">formatNumber()</code> defined inline in 3 separate page files</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">Node.js-only dep <code style="font-size:0.75rem;color:#818cf8;">ioredis</code> in package.json (ships to browser)</span></div>
+        <div class="insight-item"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" fill="none" viewBox="0 0 16 16" stroke="#fbbf24" stroke-width="2"><line x1="8" y1="3" x2="8" y2="10"/><circle cx="8" cy="13" r="1.2" fill="#fbbf24" stroke="none"/></svg><span style="font-size:0.8125rem;color:#d4d4d8;">IDE plugin artifacts in devDependencies (lovable-tagger, windsurf-task-manager, etc.)</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- PHASE 3 — COMPETITIVE ANALYSIS -->
+<section id="competitive" style="max-width:72rem;margin:0 auto;padding:0 1.5rem 3rem;">
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:2rem;">
+    <span class="phase-num phase-3">3</span>
+    <div>
+      <h2 style="font-size:1.625rem;font-weight:800;color:#f4f4f5;letter-spacing:-0.02em;">Competitive Analysis</h2>
+      <p style="font-size:0.8125rem;color:var(--text-muted);margin-top:2px;">Longtale.ai vs Buffer, Hootsuite, Sprout Social, Later, Publer, ContentStudio</p>
+    </div>
+    <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(245,158,11,0.4),transparent);"></div>
+  </div>
+
+  <div style="border:1px solid var(--border);border-radius:1rem;overflow:hidden;">
+    <div class="matrix-wrap">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="col-longtale">Longtale.ai</th>
+            <th>Buffer</th>
+            <th>Hootsuite</th>
+            <th>Sprout Social</th>
+            <th>Later</th>
+            <th>Publer</th>
+            <th>ContentStudio</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Multi-platform publishing</td><td class="col-longtale"><span class="check">✓</span> 10 platforms</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>AI content generation</td><td class="col-longtale"><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span> OwlyWriter</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Strategy-first AI workflow</td><td class="col-longtale"><span class="check">✓</span> <strong style="color:#c084fc;">Unique</strong></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+          <tr><td>RSS → social automation</td><td class="col-longtale"><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Calendar view</td><td class="col-longtale"><span class="warn">⚠</span> Week only</td><td><span class="check">✓</span> Month</td><td><span class="check">✓</span> Month</td><td><span class="check">✓</span> Month</td><td><span class="check">✓</span> Visual</td><td><span class="check">✓</span> Month</td><td><span class="check">✓</span> Month</td></tr>
+          <tr><td>Approval workflows</td><td class="col-longtale"><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Multi-brand / tenancy</td><td class="col-longtale"><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Social inbox / unified DMs</td><td class="col-longtale"><span class="cross" style="color:#f87171;font-weight:700;">Missing</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Bulk scheduling / CSV import</td><td class="col-longtale"><span class="cross" style="color:#f87171;font-weight:700;">Missing</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Content recycling</td><td class="col-longtale"><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Hashtag research</td><td class="col-longtale"><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td></tr>
+          <tr><td>Link shortening / UTM tracking</td><td class="col-longtale"><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Analytics report export (PDF/CSV)</td><td class="col-longtale"><span class="cross" style="color:#f87171;font-weight:700;">Missing</span></td><td><span class="check">✓</span> PDF</td><td><span class="check">✓</span> PDF</td><td><span class="check">✓</span> PDF</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Canva / media library integration</td><td class="col-longtale"><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Mobile app</td><td class="col-longtale"><span class="cross">—</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>White-label offering</td><td class="col-longtale"><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td>Media company hierarchy</td><td class="col-longtale"><span class="check">✓</span> <strong style="color:#c084fc;">Unique</strong></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap" style="max-width:72rem;margin:0 auto;padding:0 1.5rem 5rem;">
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:2rem;">
+    <div style="display:inline-flex;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;border-radius:0.625rem;background:linear-gradient(135deg,#f59e0b,#ff6b4a);font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:white;flex-shrink:0;">&#9881;</div>
+    <div>
+      <h2 style="font-size:1.625rem;font-weight:800;color:#f4f4f5;letter-spacing:-0.02em;">Prioritized Roadmap</h2>
+      <p style="font-size:0.8125rem;color:var(--text-muted);margin-top:2px;">22 items across 4 priority tiers — P0 critical to P3 polish</p>
+    </div>
+    <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(245,158,11,0.4),transparent);"></div>
+  </div>
+
+  
+  <div class="priority-block">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem;">
+      <span class="badge badge-p0">P0 — Critical</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);">Blocks growth or causes data/security risk — ship immediately</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:0.875rem;overflow:hidden;">
+      <div style="overflow-x:auto;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%;padding-left:18px;">What</th><th style="width:22%;">Why It Matters</th><th>Implementation Approach</th><th style="width:8%;text-align:center;">Size</th></tr></thead>
+          <tbody><tr class="roadmap-row" data-p="P0"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Add React ErrorBoundary</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Any unhandled error = white-screen crash for users</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Add react-error-boundary in App.tsx + per-page boundaries</td><td style="text-align:center;"><span class="badge badge-complexity-s">S</span></td></tr><tr class="roadmap-row" data-p="P0"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Remove server code from bundle</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Redis creds and Express middleware ship to browser</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Delete/move SecurityContextService.ts, middleware/security.ts, ErrorMonitor.ts to server/; remove ioredis dep</td><td style="text-align:center;"><span class="badge badge-complexity-s">S</span></td></tr><tr class="roadmap-row" data-p="P0"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Fix notification preferences</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Settings toggles do nothing — broken user trust</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Create notification_preferences table; add mutations; wire Courier/email channels</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P0"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Route-level code splitting</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">All 40+ pages load eagerly — hurts TTFB/LCP</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Replace static imports in App.tsx with React.lazy() + Suspense; prioritize Analytics, Admin pages</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="priority-block">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem;">
+      <span class="badge badge-p1">P1 — High Priority</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);">Competitive parity — features all major competitors already have</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:0.875rem;overflow:hidden;">
+      <div style="overflow-x:auto;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%;padding-left:18px;">What</th><th style="width:22%;">Why It Matters</th><th>Implementation Approach</th><th style="width:8%;text-align:center;">Size</th></tr></thead>
+          <tbody><tr class="roadmap-row" data-p="P1"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Social inbox / unified messaging</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Hootsuite, Sprout Social, ContentStudio all have this — critical for community management</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Build inbox component using GetLate messaging API; display comments/DMs; allow replies</td><td style="text-align:center;"><span class="badge badge-complexity-xl">XL</span></td></tr><tr class="roadmap-row" data-p="P1"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Bulk scheduling / CSV import</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Every competitor supports uploading 50-100 posts at once — essential for agencies</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Build CSV upload parser, preview table, batch scheduling via getlatePosts.create</td><td style="text-align:center;"><span class="badge badge-complexity-l">L</span></td></tr><tr class="roadmap-row" data-p="P1"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Month calendar view</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">All competitors offer month view — Longtale only has week</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Extend CalendarTab with month/week toggle using react-day-picker</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P1"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Link shortening & UTM tracking</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Buffer, Hootsuite, Sprout all track link clicks — needed to prove ROI</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Integrate bit.ly API or custom shortener; add UTM builder to compose flow; track in analytics</td><td style="text-align:center;"><span class="badge badge-complexity-l">L</span></td></tr><tr class="roadmap-row" data-p="P1"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Analytics report export (PDF/CSV)</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Every competitor offers downloadable reports — agencies need these for clients</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Use jsPDF or html2canvas for PDF; add CSV export to analytics tables</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P1"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Canva / media library integration</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Later, Publer, Buffer all have Canva — visual content creation is table stakes</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Integrate Canva Button SDK; add persistent media library with Supabase storage</td><td style="text-align:center;"><span class="badge badge-complexity-l">L</span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="priority-block">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem;">
+      <span class="badge badge-p2">P2 — Medium Priority</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);">Differentiation — features that would make Longtale stand out</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:0.875rem;overflow:hidden;">
+      <div style="overflow-x:auto;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%;padding-left:18px;">What</th><th style="width:22%;">Why It Matters</th><th>Implementation Approach</th><th style="width:8%;text-align:center;">Size</th></tr></thead>
+          <tbody><tr class="roadmap-row" data-p="P2"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Portfolio analytics (real data)</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">PortfolioAnalytics.tsx uses mock data — this is Longtale's unique media company angle</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Wire real data from hierarchy system; aggregate cross-company analytics; add comparison charts</td><td style="text-align:center;"><span class="badge badge-complexity-l">L</span></td></tr><tr class="roadmap-row" data-p="P2"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Content recycling / evergreen posts</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Publer and ContentStudio have this — re-queue top-performing content automatically</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Add evergreen flag to posts table; build queue that re-schedules with AI-refreshed copy</td><td style="text-align:center;"><span class="badge badge-complexity-l">L</span></td></tr><tr class="roadmap-row" data-p="P2"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Hashtag research tool</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Hootsuite, Sprout Social, Later all offer this — improves reach and discoverability</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Build AI + platform trends suggestion engine; integrate into compose flow</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P2"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Complete Figma theme import</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">figmaService.ts is stubbed — theme customization is a real differentiator</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Complete Figma API parsing for real colors/fonts/spacing; add persistence for custom themes</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P2"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Real-time collaboration</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">RealTimeCollaboration.tsx component exists — Sprout Social offers shared calendars</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Implement Supabase Realtime for post editing + calendar updates; add presence indicators</td><td style="text-align:center;"><span class="badge badge-complexity-xl">XL</span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="priority-block">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem;">
+      <span class="badge badge-p3">P3 — Low Priority</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);">Polish — UX improvements, performance wins, code quality fixes</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:0.875rem;overflow:hidden;">
+      <div style="overflow-x:auto;">
+        <table class="report-table">
+          <thead><tr><th style="width:22%;padding-left:18px;">What</th><th style="width:22%;">Why It Matters</th><th>Implementation Approach</th><th style="width:8%;text-align:center;">Size</th></tr></thead>
+          <tbody><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Break up ComposeTab mega-component</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">1,653 lines is unmaintainable and undebuggable</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Extract each compose step into its own component; shared state via custom hook</td><td style="text-align:center;"><span class="badge badge-complexity-l">L</span></td></tr><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Deduplicate platform constants</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Platform icons/colors/names defined 3+ times</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Create src/lib/platforms.ts with shared PLATFORM_CONFIG; import everywhere</td><td style="text-align:center;"><span class="badge badge-complexity-s">S</span></td></tr><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Eliminate 'any' types</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">134 instances weaken TypeScript safety guarantees</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Prioritize services and hooks; replace with proper interfaces; use satisfies</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Add structured error logging</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">190+ console statements invisible in production</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Integrate Sentry or similar; replace console.error with structured logger</td><td style="text-align:center;"><span class="badge badge-complexity-m">M</span></td></tr><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Remove dead code</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">Duplicate services, unused middleware add confusion</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Delete securityContextService.ts (duplicate), ErrorMonitor.ts, middleware/security.ts; archive landing V1-V3</td><td style="text-align:center;"><span class="badge badge-complexity-s">S</span></td></tr><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Mobile app / PWA</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">All major competitors have mobile apps</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Start with PWA (service worker, manifest); React Native long-term</td><td style="text-align:center;"><span class="badge badge-complexity-xl">XL</span></td></tr><tr class="roadmap-row" data-p="P3"><td style="font-weight:500;color:#f4f4f5;min-width:160px;padding-left:18px;">Clean up package.json</td><td style="min-width:160px;color:#a1a1aa;font-size:0.8rem;">IDE plugin devDeps and ioredis pollute the project</td><td style="min-width:220px;color:#a1a1aa;font-size:0.8rem;">Remove unused devDeps; move ioredis to server-only package if needed</td><td style="text-align:center;"><span class="badge badge-complexity-s">S</span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer style="max-width:72rem;margin:0 auto;padding:2rem 1.5rem 4rem;border-top:1px solid var(--border);">
+  <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(168,85,247,0.4),rgba(217,70,239,0.4),rgba(255,107,74,0.3),transparent);margin-bottom:2rem;"></div>
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;">
+    <div style="font-size:0.8125rem;color:var(--text-muted);">
+      Generated for <span style="color:#f4f4f5;font-weight:500;">Longtale.ai</span> internal team &nbsp;·&nbsp; Claude Opus 4.6 analysis
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:#52525b;">March 2026 &nbsp;·&nbsp; 200+ files analyzed</div>
+  </div>
+</footer>
+
+<!-- BACK TO TOP -->
+<button id="btt" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top">
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<!-- JAVASCRIPT -->
+<script>
+// ── Collapse/Expand categories ──
+function toggleCat(btn) {
+  const body = btn.nextElementSibling;
+  const chevron = btn.querySelector('.cat-chevron');
+  const isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    chevron.classList.remove('rotated');
+  } else {
+    body.classList.add('open');
+    chevron.classList.add('rotated');
+  }
+}
+function expandAll() {
+  document.querySelectorAll('.cat-body').forEach(b => { b.classList.add('open'); b.previousElementSibling.querySelector('.cat-chevron').classList.add('rotated'); });
+}
+function collapseAll() {
+  document.querySelectorAll('.cat-body').forEach(b => { b.classList.remove('open'); b.previousElementSibling.querySelector('.cat-chevron').classList.remove('rotated'); });
+}
+
+// ── Status filter ──
+function filterStatus(status) {
+  document.querySelectorAll('#status-filters .filter-pill').forEach(btn => btn.classList.remove('active'));
+  event.target.closest('.filter-pill').classList.add('active');
+
+  document.querySelectorAll('.cat-card').forEach(card => {
+    const rows = card.querySelectorAll('tbody tr[data-status]');
+    let visible = 0;
+    rows.forEach(row => {
+      const show = status === 'all' || row.dataset.status === status;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    // Expand cards that have matching rows, collapse empty ones
+    const body = card.querySelector('.cat-body');
+    const chevron = card.querySelector('.cat-chevron');
+    if (status !== 'all' && visible > 0) {
+      body.classList.add('open');
+      chevron.classList.add('rotated');
+    } else if (status === 'all') {
+      body.classList.remove('open');
+      chevron.classList.remove('rotated');
+    }
+  });
+}
+
+// ── Active nav via IntersectionObserver ──
+const navLinks = document.querySelectorAll('.nav-link[data-s]');
+const sections = document.querySelectorAll('section[id], header');
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      navLinks.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector('.nav-link[data-s="' + id + '"]');
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-60px 0px -60% 0px', threshold: 0 });
+sections.forEach(s => observer.observe(s));
+
+// ── Scroll progress + back-to-top ──
+const btt = document.getElementById('btt');
+const prog = document.getElementById('prog');
+window.addEventListener('scroll', () => {
+  const pct = Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100);
+  prog.textContent = Math.min(pct, 100);
+  if (window.scrollY > 400) btt.classList.add('visible');
+  else btt.classList.remove('visible');
+}, { passive: true });
+
+// ── Smooth scroll with nav offset ──
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      const offset = 72 + 12;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' });
+    }
+  });
+});
+</script>
+</body>
+</html>

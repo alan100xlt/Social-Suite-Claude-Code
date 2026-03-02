@@ -148,6 +148,8 @@ A bidirectional Slack integration posts to #claude-code and lets the user respon
 
 ### Hooks (automatic — no action needed)
 - **PreToolUse** on all Bash/Edit/Write/MCP tools → `notify-permission.js` checks if auto-approved, otherwise posts to Slack and blocks until Approve/Reject
+- **PreToolUse** on `AskUserQuestion` → `intercept-question.js` mirrors the question to Slack (non-blocking — IDE prompt also shows)
+- **PostToolUse** on `AskUserQuestion` → `resolve-question.js` marks the Slack message as resolved if answered in IDE
 - **Stop** → posts session-complete notification
 - **SessionStart** → auto-starts the Slack listener + ngrok tunnel
 

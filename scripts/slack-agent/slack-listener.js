@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { WebClient } from '@slack/web-api';
-import { readState, writeState, STATUSES } from './state.js';
+import { readAllStates, writeState, STATUSES } from './state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, '.env') });
@@ -16,7 +16,6 @@ const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 function verifySlackSignature(signingSecret, timestamp, slackSig, rawBody) {
   if (!timestamp || !slackSig) return false;
-  // Reject requests older than 5 minutes
   if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > 300) return false;
 
   const sigBase = `v0:${timestamp}:${rawBody}`;
@@ -30,7 +29,7 @@ function verifySlackSignature(signingSecret, timestamp, slackSig, rawBody) {
   }
 }
 
-// Use raw body for signature verification
+// Handle button clicks from Slack
 app.post('/slack/actions', express.raw({ type: '*/*' }), (req, res) => {
   const rawBody = req.body.toString('utf8');
   const timestamp = req.headers['x-slack-request-timestamp'];
@@ -62,15 +61,21 @@ app.post('/slack/actions', express.raw({ type: '*/*' }), (req, res) => {
 
   const isApproved = status === 'approved';
 
-  writeState({
+  // Find which session this button belongs to by matching thread_ts
+  const allStates = readAllStates();
+  const matching = allStates.find((s) => s.state.thread_ts === messageTs);
+  const sessionId = matching?.sessionId || null;
+
+  writeState(sessionId, {
     status: isApproved ? STATUSES.APPROVED : STATUSES.REJECTED,
     event: 'button_click',
     context: contextText,
+    thread_ts: messageTs,
     message: action.value,
     respondedBy: userName,
   });
 
-  console.log(`Action received: ${status} by ${userName}`);
+  console.log(`Action received: ${status} by ${userName} (session: ${sessionId || 'unknown'})`);
 
   // Replace buttons with confirmation text
   const originalText = payload.message?.blocks?.[0]?.text?.text || contextText;
@@ -83,10 +88,7 @@ app.post('/slack/actions', express.raw({ type: '*/*' }), (req, res) => {
     blocks: [
       {
         type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: originalText,
-        },
+        text: { type: 'mrkdwn', text: originalText },
       },
       { type: 'divider' },
       {
@@ -101,8 +103,6 @@ app.post('/slack/actions', express.raw({ type: '*/*' }), (req, res) => {
     ],
   });
 
-  // Add emoji reactions for at-a-glance scanning
-  // Decision: ✅ or ❌ | Claude status: 🤖 resumed or 🛑 stopped
   const decisionEmoji = isApproved ? 'white_check_mark' : 'x';
   const claudeEmoji = isApproved ? 'robot_face' : 'octagonal_sign';
 
@@ -114,62 +114,76 @@ app.post('/slack/actions', express.raw({ type: '*/*' }), (req, res) => {
 
 app.get('/health', (_, res) => res.send('ok'));
 
-// Poll for thread replies while status is "waiting"
-// This lets you type a freeform message in the thread instead of tapping buttons
+// Poll thread replies across ALL active sessions
 const THREAD_POLL_INTERVAL_MS = 5000;
 const CHANNEL = process.env.SLACK_CHANNEL_ID;
 
 async function pollThreadReplies() {
-  const state = readState();
-  if (state.status !== STATUSES.WAITING || !state.thread_ts) return;
+  const allStates = readAllStates();
 
-  try {
-    const result = await slack.conversations.replies({
-      channel: CHANNEL,
-      ts: state.thread_ts,
-    });
+  for (const { sessionId, state } of allStates) {
+    const isWaiting = state.status === STATUSES.WAITING;
+    const isWaitingReply = state.status === STATUSES.WAITING_REPLY;
 
-    const replies = result.messages?.slice(1) ?? [];
-    const humanReply = replies.find((m) => !m.bot_id);
+    if ((!isWaiting && !isWaitingReply) || !state.thread_ts) continue;
 
-    if (humanReply) {
-      const text = humanReply.text.trim();
-      const lower = text.toLowerCase();
-
-      // Detect approve/reject keywords, otherwise treat as freeform instruction
-      let status;
-      if (lower.startsWith('approve') || lower === 'yes' || lower === 'y' || lower === 'go') {
-        status = STATUSES.APPROVED;
-      } else if (lower.startsWith('reject') || lower === 'no' || lower === 'n' || lower === 'stop') {
-        status = STATUSES.REJECTED;
-      } else {
-        // Freeform reply — treat as approved with instructions
-        status = STATUSES.APPROVED;
-      }
-
-      const isApproved = status === STATUSES.APPROVED;
-
-      writeState({
-        ...state,
-        status,
-        message: text,
-        respondedBy: humanReply.user || 'unknown',
+    try {
+      const result = await slack.conversations.replies({
+        channel: CHANNEL,
+        ts: state.thread_ts,
       });
 
-      console.log(`Thread reply detected: ${status} — "${text}"`);
+      const replies = result.messages?.slice(1) ?? [];
+      const humanReply = replies.find((m) => !m.bot_id);
 
-      // Add reactions
-      const decisionEmoji = isApproved ? 'white_check_mark' : 'x';
-      const claudeEmoji = isApproved ? 'robot_face' : 'octagonal_sign';
+      if (humanReply) {
+        const text = humanReply.text.trim();
+        const lower = text.toLowerCase();
 
-      await Promise.all([
-        slack.reactions.add({ channel: CHANNEL, name: decisionEmoji, timestamp: state.thread_ts }),
-        slack.reactions.add({ channel: CHANNEL, name: claudeEmoji, timestamp: state.thread_ts }),
-        slack.reactions.add({ channel: CHANNEL, name: 'speech_balloon', timestamp: state.thread_ts }),
-      ]).catch(() => {});
+        let newStatus;
+
+        if (isWaitingReply) {
+          newStatus = STATUSES.ANSWERED;
+        } else {
+          if (lower.startsWith('approve') || lower === 'yes' || lower === 'y' || lower === 'go') {
+            newStatus = STATUSES.APPROVED;
+          } else if (lower.startsWith('reject') || lower === 'no' || lower === 'n' || lower === 'stop') {
+            newStatus = STATUSES.REJECTED;
+          } else {
+            newStatus = STATUSES.APPROVED;
+          }
+        }
+
+        writeState(sessionId, {
+          ...state,
+          status: newStatus,
+          message: text,
+          respondedBy: humanReply.user || 'unknown',
+        });
+
+        console.log(`Thread reply for session ${sessionId || 'legacy'}: ${newStatus} — "${text}"`);
+
+        // Add reactions
+        if (isWaitingReply) {
+          await Promise.all([
+            slack.reactions.add({ channel: CHANNEL, name: 'speech_balloon', timestamp: state.thread_ts }),
+            slack.reactions.add({ channel: CHANNEL, name: 'robot_face', timestamp: state.thread_ts }),
+          ]).catch(() => {});
+        } else {
+          const isApproved = newStatus === STATUSES.APPROVED;
+          const decisionEmoji = isApproved ? 'white_check_mark' : 'x';
+          const claudeEmoji = isApproved ? 'robot_face' : 'octagonal_sign';
+
+          await Promise.all([
+            slack.reactions.add({ channel: CHANNEL, name: decisionEmoji, timestamp: state.thread_ts }),
+            slack.reactions.add({ channel: CHANNEL, name: claudeEmoji, timestamp: state.thread_ts }),
+            slack.reactions.add({ channel: CHANNEL, name: 'speech_balloon', timestamp: state.thread_ts }),
+          ]).catch(() => {});
+        }
+      }
+    } catch {
+      // Silently ignore polling errors for individual sessions
     }
-  } catch (err) {
-    // Silently ignore polling errors
   }
 }
 

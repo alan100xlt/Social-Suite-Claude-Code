@@ -18,6 +18,7 @@ import { useMediaCompanyHierarchy } from '@/hooks/useMediaCompanyHierarchy'
 import { useMediaCompany } from '@/hooks/useMediaCompanyHierarchy'
 import { MediaCompanyChild } from '@/hooks/useMediaCompanyHierarchy'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AddChildCompanyDialog } from './AddChildCompanyDialog'
 
 interface MediaCompanyDashboardProps {
   mediaCompanyId: string
@@ -25,6 +26,7 @@ interface MediaCompanyDashboardProps {
 
 export function MediaCompanyDashboard({ mediaCompanyId }: MediaCompanyDashboardProps) {
   const [selectedView, setSelectedView] = useState<'overview' | 'companies' | 'members'>('overview')
+  const [showAddCompany, setShowAddCompany] = useState(false)
   
   const { data: mediaCompany, isLoading: companyLoading } = useMediaCompany(mediaCompanyId)
   const { data: hierarchy, isLoading: hierarchyLoading } = useMediaCompanyHierarchy(mediaCompanyId)
@@ -94,7 +96,7 @@ export function MediaCompanyDashboard({ mediaCompanyId }: MediaCompanyDashboardP
             <Settings className="w-4 h-4 mr-2" />
             Settings
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => setShowAddCompany(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Company
           </Button>
@@ -278,6 +280,13 @@ export function MediaCompanyDashboard({ mediaCompanyId }: MediaCompanyDashboardP
           </CardContent>
         </Card>
       )}
+
+      <AddChildCompanyDialog
+        open={showAddCompany}
+        onOpenChange={setShowAddCompany}
+        mediaCompanyId={mediaCompanyId}
+        existingChildIds={hierarchy?.map(c => c.company_id) || []}
+      />
     </div>
   )
 }

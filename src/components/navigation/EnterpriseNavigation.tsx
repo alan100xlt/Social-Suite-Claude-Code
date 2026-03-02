@@ -296,7 +296,7 @@ export function EnterpriseNavigation({
 
   // Filter and sort companies
   const filteredCompanies = useMemo(() => {
-    let filtered = companies.filter(company => {
+    const filtered = companies.filter(company => {
       const matchesSearch = company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            company.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            company.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));

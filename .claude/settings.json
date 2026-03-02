@@ -16,7 +16,19 @@
       "Bash(git checkout *)",
       "Bash(git branch *)",
       "Bash(gh pr *)",
-      "Bash(gh issue *)"
+      "Bash(gh issue *)",
+      "Bash(gh api *)",
+      "Bash(gh run *)",
+      "Bash(ls *)",
+      "Bash(ls)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(echo *)",
+      "Bash(pwd)",
+      "Bash(node scripts/*)"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -28,28 +40,38 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash(rm *)",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/slack-agent/notify.js --event permission_prompt --context \"Risky delete command requested\""
-          },
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/check-approval.js"
+            "command": "node scripts/slack-agent/notify-permission.js"
           }
         ]
       },
       {
-        "matcher": "Bash(git push --force*)",
+        "matcher": "Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/slack-agent/notify.js --event permission_prompt --context \"Force push requested\""
-          },
+            "command": "node scripts/slack-agent/notify-permission.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
           {
             "type": "command",
-            "command": "node scripts/slack-agent/check-approval.js"
+            "command": "node scripts/slack-agent/notify-permission.js"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/notify-permission.js"
           }
         ]
       }
@@ -60,13 +82,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx eslint --fix $(node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));if(d.tool_input&&d.tool_input.file_path&&d.tool_input.file_path.match(/\\.(tsx?|jsx?)$/))process.stdout.write(d.tool_input.file_path)\" 2>/dev/null) 2>/dev/null || true"
+            "command": "node scripts/slack-agent/post-tool-eslint.js"
           },
           {
             "type": "command",
-            "command": "node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));if(d.tool_input&&d.tool_input.file_path&&d.tool_input.file_path.match(/\\.(tsx?|ts)$/))process.exit(1)\" 2>/dev/null && exit 0; npx tsc --noEmit 2>&1 | head -20 || true",
+            "command": "node scripts/slack-agent/post-tool-tsc.js",
             "async": true,
             "statusMessage": "Type-checking..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/slack-agent/ensure-listener.sh"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/slack-agent/notify-session-start.js"
           }
         ]
       }
@@ -76,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/slack-agent/notify.js --event session_complete --context \"Claude Code session ended\""
+            "command": "node scripts/slack-agent/notify-session-stop.js"
           }
         ]
       }

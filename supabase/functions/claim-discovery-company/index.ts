@@ -119,6 +119,39 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Auto-create a media company with the same name
+    try {
+      const { data: companyData } = await adminClient
+        .from("companies")
+        .select("name")
+        .eq("id", companyId)
+        .single();
+
+      if (companyData?.name) {
+        const { data: mc, error: mcError } = await adminClient
+          .from("media_companies")
+          .insert({ name: companyData.name })
+          .select("id")
+          .single();
+
+        if (!mcError && mc) {
+          await adminClient.from("media_company_children").insert({
+            parent_company_id: mc.id,
+            child_company_id: companyId,
+            relationship_type: "owned",
+          });
+
+          await adminClient.from("media_company_members").insert({
+            media_company_id: mc.id,
+            user_id: userId,
+            role: "admin",
+          });
+        }
+      }
+    } catch (mcErr) {
+      console.error("Failed to auto-create media company:", mcErr);
+    }
+
     return new Response(
       JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

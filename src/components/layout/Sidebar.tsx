@@ -28,6 +28,7 @@ import { SiBluesky, SiThreads } from "react-icons/si";
 import { useAccounts } from "@/hooks/useGetLateAccounts";
 import { useUserRole } from "@/hooks/useCompany";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserMediaCompanies } from "@/hooks/useMediaCompanyManagement";
 import { usePlatform } from "@/contexts/PlatformContext";
 import { Platform } from "@/lib/api/getlate";
 import {
@@ -93,6 +94,7 @@ export function Sidebar() {
   const { data: accounts, isLoading: accountsLoading } = useAccounts();
   const { data: userRole } = useUserRole();
   const { isSuperAdmin } = useAuth();
+  const { data: mediaCompanies } = useUserMediaCompanies();
   const platform = usePlatform();
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
@@ -268,6 +270,57 @@ export function Sidebar() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Media Company */}
+        {mediaCompanies && mediaCompanies.length > 0 && (
+          mediaCompanies.length === 1 ? (
+            <Link
+              to={`/app/media-company/${mediaCompanies[0].id}`}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                location.pathname.startsWith(`/app/media-company/${mediaCompanies[0].id}`)
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+              )}
+            >
+              <Building2
+                size={20}
+                className="flex-shrink-0 transition-transform group-hover:scale-110"
+              />
+              {!collapsed && (
+                <span className="font-medium text-sm">Media Company</span>
+              )}
+            </Link>
+          ) : (
+            <div className="space-y-1">
+              {!collapsed && (
+                <div className="px-3 pt-2 pb-1">
+                  <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Media Companies</p>
+                </div>
+              )}
+              {mediaCompanies.map((mc) => (
+                <Link
+                  key={mc.id}
+                  to={`/app/media-company/${mc.id}`}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
+                    location.pathname.startsWith(`/app/media-company/${mc.id}`)
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent"
+                  )}
+                >
+                  <Building2
+                    size={18}
+                    className="flex-shrink-0 transition-transform group-hover:scale-110"
+                  />
+                  {!collapsed && (
+                    <span className="font-medium text-sm truncate">{mc.name}</span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )
+        )}
 
         {/* Settings */}
         <Link

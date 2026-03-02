@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS media_company_post_instances (
     
     -- Publishing status
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'publishing', 'published', 'failed', 'skipped')),
-    post_id UUID REFERENCES posts(id), -- Link to actual post when published
+    post_id UUID, -- Link to actual post when published (FK added later when posts table exists)
     
     -- Publishing metadata
     scheduled_at TIMESTAMPTZ,

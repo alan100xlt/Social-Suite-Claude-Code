@@ -42,7 +42,6 @@ ALTER TABLE rss_feeds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rss_feed_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_approvals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_analytics_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE account_analytics_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE automation_rules ENABLE ROW LEVEL SECURITY;
@@ -117,27 +116,33 @@ FOR SELECT USING (
     )
 );
 
--- Posts table
-CREATE POLICY "Users can view posts in accessible companies" ON posts
-FOR SELECT USING (
-    company_id = ANY(session_accessible_companies())
-);
+-- Posts table (created later in bulk_content_system migration — wrap in IF EXISTS)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'posts') THEN
+        ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can create posts in accessible companies" ON posts
-FOR INSERT WITH CHECK (
-    company_id = ANY(session_accessible_companies())
-);
+        DROP POLICY IF EXISTS "Users can view posts in accessible companies" ON posts;
+        DROP POLICY IF EXISTS "Users can create posts in accessible companies" ON posts;
+        DROP POLICY IF EXISTS "Users can update posts in accessible companies" ON posts;
+        DROP POLICY IF EXISTS "Users can delete posts in accessible companies" ON posts;
 
-CREATE POLICY "Users can update posts in accessible companies" ON posts
-FOR UPDATE USING (
-    company_id = ANY(session_accessible_companies())
-);
+        CREATE POLICY "Users can view posts in accessible companies" ON posts
+        FOR SELECT USING (company_id = ANY(session_accessible_companies()));
 
-CREATE POLICY "Users can delete posts in accessible companies" ON posts
-FOR DELETE USING (
-    company_id = ANY(session_accessible_companies())
-    AND current_setting('app.max_access_level', true)::INTEGER >= 3
-);
+        CREATE POLICY "Users can create posts in accessible companies" ON posts
+        FOR INSERT WITH CHECK (company_id = ANY(session_accessible_companies()));
+
+        CREATE POLICY "Users can update posts in accessible companies" ON posts
+        FOR UPDATE USING (company_id = ANY(session_accessible_companies()));
+
+        CREATE POLICY "Users can delete posts in accessible companies" ON posts
+        FOR DELETE USING (
+            company_id = ANY(session_accessible_companies())
+            AND current_setting('app.max_access_level', true)::INTEGER >= 3
+        );
+    END IF;
+END $$;
 
 -- Post drafts table
 CREATE POLICY "Users can view drafts in accessible companies" ON post_drafts
@@ -367,12 +372,10 @@ GRANT EXECUTE ON FUNCTION get_user_context() TO authenticated;
 -- Comments for documentation
 COMMENT ON POLICY "Users can view accessible companies" ON companies IS 'Simplified RLS using session variables';
 COMMENT ON POLICY "Users can view profiles in accessible companies" ON profiles IS 'Simplified RLS using session variables';
-COMMENT ON POLICY "Users can view posts in accessible companies" ON posts IS 'Simplified RLS using session variables';
 COMMENT ON FUNCTION set_user_context(UUID, TEXT) IS 'Set current user context for RLS';
 COMMENT ON FUNCTION get_user_context() IS 'Get current user context';
 
 -- Performance optimization: Create indexes for common RLS queries
-CREATE INDEX IF NOT EXISTS idx_posts_company_session ON posts(company_id);
 CREATE INDEX IF NOT EXISTS idx_post_drafts_company_session ON post_drafts(company_id);
 CREATE INDEX IF NOT EXISTS idx_post_analytics_company_session ON post_analytics_snapshots(company_id);
 CREATE INDEX IF NOT EXISTS idx_automation_rules_company_session ON automation_rules(company_id);

@@ -14,7 +14,19 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   optimizeDeps: {
-    include: ['@nivo/treemap', '@nivo/sunburst', '@nivo/scatterplot'],
+    include: [
+      '@nivo/bar',
+      '@nivo/bump',
+      '@nivo/funnel',
+      '@nivo/heatmap',
+      '@nivo/line',
+      '@nivo/pie',
+      '@nivo/radar',
+      '@nivo/scatterplot',
+      '@nivo/sunburst',
+      '@nivo/theming',
+      '@nivo/treemap',
+    ],
   },
   resolve: {
     alias: {

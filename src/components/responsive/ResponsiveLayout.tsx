@@ -105,7 +105,7 @@ export function ResponsiveLayout({ children, onDeviceChange }: ResponsiveLayoutP
       const userAgent = navigator.userAgent;
       
       let type: 'mobile' | 'tablet' | 'desktop' = 'desktop';
-      let orientation: 'portrait' | 'landscape' = width > height ? 'landscape' : 'portrait';
+      const orientation: 'portrait' | 'landscape' = width > height ? 'landscape' : 'portrait';
       
       // Device type detection
       if (width <= 768) {

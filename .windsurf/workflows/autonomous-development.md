@@ -95,7 +95,7 @@ The workflow runs continuously:
 ## Slack Integration
 
 ### Webhook Configuration
-**Slack Webhook URL**: `https://hooks.slack.com/services/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`
+**Slack Webhook URL**: `$SLACK_WEBHOOK_URL` (set in environment variables — do not hardcode)
 
 ### Notification Types
 

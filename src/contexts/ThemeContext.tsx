@@ -201,7 +201,7 @@ export const themeVariants: Record<ThemeVariant, ThemeConfig> = {
       sidebar: '#ff6b6b'
     },
     typography: {
-      fontFamily: "'Inter', system-ui, sans-serif',
+      fontFamily: "'Inter', system-ui, sans-serif",
       headingFont: "'Montserrat', system-ui, sans-serif",
       scale: 1.1
     },

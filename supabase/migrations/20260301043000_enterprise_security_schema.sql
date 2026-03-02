@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS media_company_hierarchy (
     
     -- Constraints for data integrity
     CONSTRAINT media_company_hierarchy_unique UNIQUE(user_id, child_company_id),
-    CONSTRAINT media_company_hierarchy_role_check CHECK (
+    CONSTRAINT media_company_hierarchy_not_null_check CHECK (
         (media_company_id IS NOT NULL) OR (child_company_id IS NOT NULL)
     )
 );

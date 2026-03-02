@@ -226,7 +226,9 @@ BEGIN
     -- Refresh materialized views
     PERFORM refresh_user_permissions();
     
-    RETURN VALUES(v_cleaned_records, v_cleaned_users);
+    cleaned_records := v_cleaned_records;
+    cleaned_users := v_cleaned_users;
+    RETURN NEXT;
 END;
 $$;
 
