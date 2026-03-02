@@ -60,5 +60,8 @@ verify_jwt = false
 [functions.admin-delete-companies]
 verify_jwt = false
 
+[functions.admin-users]
+verify_jwt = false
+
 [functions.instant-signup]
 verify_jwt = false
