@@ -45,7 +45,11 @@ function useAdminCompanies() {
     queryKey: ['admin-companies'],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('admin-companies');
-      if (error) throw error;
+      if (error) {
+        // Surface the actual server error message from the response body
+        const detail = (data as any)?.error ?? error.message;
+        throw new Error(detail);
+      }
       return data.companies as CompanyRow[];
     },
   });

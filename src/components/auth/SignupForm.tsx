@@ -2,23 +2,25 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatform } from '@/contexts/PlatformContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader2, Mail, Lock, User, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function SignupForm() {
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite');
   const inviteEmail = searchParams.get('email') || '';
-  
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const { signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -59,18 +61,40 @@ export function SignupForm() {
       return;
     }
 
-    toast({
-      title: 'Account Created!',
-      description: `Welcome to ${platform.platform_name}!`,
-    });
+    // Check if we have an active session (auto-confirm is on) or need email confirmation
+    const { data: { session } } = await supabase.auth.getSession();
 
-    // If they have an invite token, they'll be redirected to accept it
-    // Otherwise, they go to company setup
-    // After signup, redirect to setup-company which auto-detects pending invitations
-    navigate(inviteToken ? '/app/onboarding/wizard' : '/app/onboarding/setup');
+    if (session) {
+      // Auto-confirm is on — user is logged in, navigate immediately
+      navigate(inviteToken ? '/app/onboarding/wizard' : '/app/onboarding/setup');
+    } else {
+      // Email confirmation required — show message instead of navigating to protected route
+      setAwaitingConfirmation(true);
+    }
 
     setIsLoading(false);
   };
+
+  if (awaitingConfirmation) {
+    return (
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-8 pb-8 text-center space-y-4">
+          <CheckCircle className="h-12 w-12 text-primary mx-auto" />
+          <h2 className="text-xl font-bold">Check your email</h2>
+          <p className="text-muted-foreground text-sm">
+            We sent a confirmation link to <strong>{email}</strong>.
+            Click it to activate your account and continue.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Already confirmed?{' '}
+            <Link to="/auth/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md">

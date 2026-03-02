@@ -345,8 +345,9 @@ export function Sidebar() {
         {isSuperAdmin && (
           <>
             {!collapsed && (
-              <div className="pt-4 pb-1 px-3">
+              <div className="pt-4 pb-1 px-3 flex items-center gap-2">
                 <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Superadmin</p>
+                <span className="text-xs font-bold text-primary">CC</span>
               </div>
             )}
             <Link

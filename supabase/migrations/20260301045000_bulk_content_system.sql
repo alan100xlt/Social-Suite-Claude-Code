@@ -243,10 +243,10 @@ CREATE OR REPLACE FUNCTION create_bulk_media_post(
     _title TEXT,
     _content TEXT,
     _target_company_ids UUID[],
+    _created_by UUID,
     _platform_customizations JSONB DEFAULT '{}',
     _publishing_strategy TEXT DEFAULT 'immediate',
-    _scheduled_at TIMESTAMPTZ DEFAULT NULL,
-    _created_by UUID
+    _scheduled_at TIMESTAMPTZ DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -359,27 +359,34 @@ SELECT
     COUNT(*) FILTER (WHERE status = 'publishing') as publishing_posts,
     COUNT(*) FILTER (WHERE status = 'published') as published_posts,
     COUNT(*) FILTER (WHERE status = 'failed') as failed_posts,
-    (SELECT COUNT(*) FROM media_company_post_instances WHERE media_company_id = _media_company_id OR _media_company_id IS NULL) as total_instances,
-    (SELECT COUNT(*) FROM bulk_publishing_queue bpq 
+    (SELECT COUNT(*) FROM media_company_post_instances mcpi
+     JOIN media_company_posts mcp ON mcpi.media_company_post_id = mcp.id
+     WHERE mcp.media_company_id = _media_company_id OR _media_company_id IS NULL) as total_instances,
+    (SELECT COUNT(*) FROM bulk_publishing_queue bpq
      JOIN media_company_post_instances mcpi ON bpq.media_company_post_id = mcpi.media_company_post_id
-     WHERE (mcpi.media_company_id = _media_company_id OR _media_company_id IS NULL)
+     JOIN media_company_posts mcp ON mcpi.media_company_post_id = mcp.id
+     WHERE (mcp.media_company_id = _media_company_id OR _media_company_id IS NULL)
      AND bpq.status = 'queued') as queued_instances,
-    (SELECT COUNT(*) FROM bulk_publishing_queue bpq 
+    (SELECT COUNT(*) FROM bulk_publishing_queue bpq
      JOIN media_company_post_instances mcpi ON bpq.media_company_post_id = mcpi.media_company_post_id
-     WHERE (mcpi.media_company_id = _media_company_id OR _media_company_id IS NULL)
+     JOIN media_company_posts mcp ON mcpi.media_company_post_id = mcp.id
+     WHERE (mcp.media_company_id = _media_company_id OR _media_company_id IS NULL)
      AND bpq.status = 'processing') as processing_instances,
-    (SELECT COUNT(*) FROM bulk_publishing_queue bpq 
+    (SELECT COUNT(*) FROM bulk_publishing_queue bpq
      JOIN media_company_post_instances mcpi ON bpq.media_company_post_id = mcpi.media_company_post_id
-     WHERE (mcpi.media_company_id = _media_company_id OR _media_company_id IS NULL)
+     JOIN media_company_posts mcp ON mcpi.media_company_post_id = mcp.id
+     WHERE (mcp.media_company_id = _media_company_id OR _media_company_id IS NULL)
      AND bpq.status = 'completed') as completed_instances,
-    (SELECT COUNT(*) FROM bulk_publishing_queue bpq 
+    (SELECT COUNT(*) FROM bulk_publishing_queue bpq
      JOIN media_company_post_instances mcpi ON bpq.media_company_post_id = mcpi.media_company_post_id
-     WHERE (mcpi.media_company_id = _media_company_id OR _media_company_id IS NULL)
+     JOIN media_company_posts mcp ON mcpi.media_company_post_id = mcp.id
+     WHERE (mcp.media_company_id = _media_company_id OR _media_company_id IS NULL)
      AND bpq.status = 'failed') as failed_instances,
-    (SELECT AVG(completed_at - started_processing_at) 
-     FROM bulk_publishing_queue bpq 
+    (SELECT AVG(bpq.completed_at - bpq.started_processing_at)
+     FROM bulk_publishing_queue bpq
      JOIN media_company_post_instances mcpi ON bpq.media_company_post_id = mcpi.media_company_post_id
-     WHERE (mcpi.media_company_id = _media_company_id OR _media_company_id IS NULL)
+     JOIN media_company_posts mcp ON mcpi.media_company_post_id = mcp.id
+     WHERE (mcp.media_company_id = _media_company_id OR _media_company_id IS NULL)
      AND bpq.status = 'completed'
      AND bpq.started_processing_at IS NOT NULL
      AND bpq.completed_at IS NOT NULL) as avg_publishing_time,
@@ -463,7 +470,7 @@ END;
 $$;
 
 -- Grant permissions for functions
-GRANT EXECUTE ON FUNCTION create_bulk_media_post(UUID, TEXT, TEXT, UUID[], JSONB, TEXT, TIMESTAMPTZ, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION create_bulk_media_post(UUID, TEXT, TEXT, UUID[], UUID, JSONB, TEXT, TIMESTAMPTZ) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_bulk_publishing_stats(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_publishing_queue_items(TEXT, INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION complete_queue_item(UUID, BOOLEAN, TEXT, UUID) TO authenticated;
@@ -473,7 +480,7 @@ COMMENT ON TABLE media_company_posts IS 'Bulk content posts for media companies'
 COMMENT ON TABLE media_company_post_instances IS 'Individual post instances for each target company';
 COMMENT ON TABLE bulk_publishing_queue IS 'Queue for processing bulk publishing operations';
 COMMENT ON TABLE content_templates IS 'Templates for platform-specific content customization';
-COMMENT ON FUNCTION create_bulk_media_post(UUID, TEXT, TEXT, UUID[], JSONB, TEXT, TIMESTAMPTZ, UUID) IS 'Create bulk content post with validation';
+COMMENT ON FUNCTION create_bulk_media_post(UUID, TEXT, TEXT, UUID[], UUID, JSONB, TEXT, TIMESTAMPTZ) IS 'Create bulk content post with validation';
 COMMENT ON FUNCTION get_bulk_publishing_stats(UUID) IS 'Get publishing statistics for media company';
 COMMENT ON FUNCTION get_publishing_queue_items(TEXT, INTEGER) IS 'Get next items from publishing queue for workers';
 COMMENT ON FUNCTION complete_queue_item(UUID, BOOLEAN, TEXT, UUID) IS 'Mark queue item as completed or failed';
