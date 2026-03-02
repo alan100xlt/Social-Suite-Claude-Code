@@ -118,6 +118,7 @@ Claude Code has live access to:
 - **Otter** — meeting transcripts
 - **Figma** — read design context, screenshots, assets (`https://mcp.figma.com/mcp`)
 - **context7** — live library docs for React, Radix, TanStack Query, Nivo, Recharts
+- **Supabase** — direct schema inspection, table browsing, query execution
 
 ### MCP Setup (run once after installing Claude CLI)
 ```bash
@@ -129,6 +130,9 @@ claude mcp add --scope user playwright -- npx -y @playwright/mcp
 
 # Figma — design-to-code (requires OAuth after adding)
 claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp
+
+# Supabase — schema inspection, table browsing, query execution
+claude mcp add --scope user supabase -- npx -y @supabase/mcp-server
 ```
 
 ## Commands
@@ -197,6 +201,7 @@ Do not lecture. Offer to continue. Use the `session-hygiene` skill for full guid
 - `/session-hygiene` — review session hygiene signals and advise on context management
 - `/supabase-migration <description>` — scaffold and apply a new DB migration with RLS
 - `/analytics-widget <description>` — scaffold a new chart widget (Recharts or Nivo)
+- `/review-pr [number|url]` — review a PR: summarize changes, run security checks, post findings to Slack
 
 ## Linear Issue Generation (required before starting work)
 
