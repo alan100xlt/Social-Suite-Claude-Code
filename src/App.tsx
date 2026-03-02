@@ -15,6 +15,7 @@ import Connections from "./pages/Connections";
 import Content from "./pages/Content";
 import Analytics from "./pages/Analytics";
 import AnalyticsV2 from "./pages/AnalyticsV2";
+import AnalyticsV3 from "./pages/AnalyticsV3";
 import Settings from "./pages/Settings";
 import OAuthCallback from "./pages/OAuthCallback";
 import NotFound from "./pages/NotFound";
@@ -42,6 +43,7 @@ import SuperadminCompanies from "./pages/SuperadminCompanies";
 import CronHealth from "./pages/CronHealth";
 import Progress from "./pages/Progress";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
+import { MediaCompanyWorkspace } from "./pages/MediaCompanyWorkspace";
 import ThemeSettings from "./pages/ThemeSettings";
 
 const queryClient = new QueryClient();
@@ -86,6 +88,7 @@ const App = () => (
               <Route path="/app/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
               <Route path="/app/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/app/analytics-v2" element={<ProtectedRoute><AnalyticsV2 /></ProtectedRoute>} />
+              <Route path="/app/analytics-v3" element={<ProtectedRoute><AnalyticsV3 /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/app/theme" element={<ProtectedRoute><ThemeSettings /></ProtectedRoute>} />
@@ -110,6 +113,7 @@ const App = () => (
 
               {/* Media Company Routes */}
               <Route path="/app/media-company/:mediaCompanyId" element={<ProtectedRoute><MediaCompanyDashboard /></ProtectedRoute>} />
+              <Route path="/app/media-company/:mediaCompanyId/workspace" element={<ProtectedRoute><MediaCompanyWorkspace /></ProtectedRoute>} />
 
               {/* Backward-compatible redirects */}
               <Route path="/landing" element={<Navigate to="/" replace />} />
