@@ -23,4 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 scripts/slack-agent/.env
+scripts/slack-agent/.listener.pid
+scripts/slack-agent/.ngrok.pid
 supabase/functions/.env
