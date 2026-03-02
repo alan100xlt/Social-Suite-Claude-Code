@@ -24,6 +24,13 @@ interface CompanyMembership {
   role: 'owner' | 'admin' | 'member';
 }
 
+interface MediaMembership {
+  media_company_id: string;
+  media_company_name: string;
+  role: 'admin' | 'member' | 'viewer';
+  is_active: boolean;
+}
+
 interface AdminUser {
   id: string;
   email: string;
@@ -32,6 +39,7 @@ interface AdminUser {
   last_sign_in_at: string | null;
   is_superadmin: boolean;
   company_memberships: CompanyMembership[];
+  media_memberships: MediaMembership[];
 }
 
 // -- Hooks ------------------------------------------------------------------
@@ -132,8 +140,19 @@ function UserSheet({ user, open, onClose }: { user: AdminUser | null; open: bool
     enabled: open,
   });
 
+  const { data: allMediaCompanies } = useQuery({
+    queryKey: ['all-media-companies-for-admin'],
+    queryFn: async () => {
+      const { data } = await supabase.from('media_companies').select('id, name').order('name');
+      return data || [];
+    },
+    enabled: open,
+  });
+
   const [addCompanyId, setAddCompanyId] = useState('');
   const [addCompanyRole, setAddCompanyRole] = useState<'owner' | 'admin' | 'member'>('member');
+  const [addMediaId, setAddMediaId] = useState('');
+  const [addMediaRole, setAddMediaRole] = useState<'admin' | 'member' | 'viewer'>('member');
 
   if (!user) return null;
 
@@ -252,6 +271,90 @@ function UserSheet({ user, open, onClose }: { user: AdminUser | null; open: bool
                   mutation.mutate(
                     { action: 'update_company_membership', user_id: user.id, company_id: addCompanyId, role: addCompanyRole },
                     { onSuccess: () => setAddCompanyId('') },
+                  );
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Media Company Access */}
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Media Company Access</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Grants access to all child companies within the media company</p>
+            </div>
+            {user.media_memberships.filter((m) => m.is_active).length === 0 && (
+              <p className="text-xs text-muted-foreground">No media company access</p>
+            )}
+            {user.media_memberships.filter((m) => m.is_active).map((m) => (
+              <div key={m.media_company_id} className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm flex-1 truncate">{m.media_company_name}</span>
+                <Select
+                  value={m.role}
+                  onValueChange={(role) =>
+                    mutation.mutate({ action: 'update_media_membership', user_id: user.id, media_company_id: m.media_company_id, role })
+                  }
+                >
+                  <SelectTrigger className="w-24 h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() =>
+                    mutation.mutate({ action: 'update_media_membership', user_id: user.id, media_company_id: m.media_company_id, remove: true })
+                  }
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 pt-1">
+              <Select value={addMediaId} onValueChange={setAddMediaId}>
+                <SelectTrigger className="flex-1 h-8 text-xs">
+                  <SelectValue placeholder="Add to media company..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(allMediaCompanies || [])
+                    .filter((m: any) => !user.media_memberships.find((em) => em.media_company_id === m.id && em.is_active))
+                    .map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Select value={addMediaRole} onValueChange={(v) => setAddMediaRole(v as any)}>
+                <SelectTrigger className="w-24 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8"
+                disabled={!addMediaId || mutation.isPending}
+                onClick={() => {
+                  mutation.mutate(
+                    { action: 'update_media_membership', user_id: user.id, media_company_id: addMediaId, role: addMediaRole },
+                    { onSuccess: () => setAddMediaId('') },
                   );
                 }}
               >
@@ -385,6 +488,11 @@ export default function AdminUsers() {
                             +{user.company_memberships.length - 2}
                           </Badge>
                         )}
+                        {user.media_memberships.filter((m) => m.is_active).map((m) => (
+                          <Badge key={m.media_company_id} variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                            {m.media_company_name}
+                          </Badge>
+                        ))}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
