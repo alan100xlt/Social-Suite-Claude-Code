@@ -10,8 +10,8 @@ serve(async (req) => {
     const auth = await authorize(req);
 
     const stats = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     const systemPrompt = `You are a social media analytics assistant for a social media management tool. Generate a concise 2-3 sentence daily briefing based on the stats provided. Be specific with numbers. Mention the most important highlight first, then what needs attention. Use a professional but friendly tone. Do not use markdown formatting - just plain text. Keep it under 60 words.`;
 
@@ -34,15 +34,15 @@ Generate the daily briefing now.`;
     let lastError = "";
     for (let attempt = 0; attempt < 2; attempt++) {
       response = await fetch(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${GEMINI_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "gemini-2.5-flash",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },

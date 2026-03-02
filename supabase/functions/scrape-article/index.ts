@@ -4,7 +4,7 @@ import { authorize, corsHeaders } from "../_shared/authorize.ts";
 
 async function crawlAndClean(url: string, articleTitle: string): Promise<string | null> {
   const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (!firecrawlKey || !url) return null;
 
   const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
@@ -22,15 +22,15 @@ async function crawlAndClean(url: string, articleTitle: string): Promise<string 
   const rawMarkdown = data?.data?.markdown || data?.markdown || null;
   if (!rawMarkdown) throw new Error("No content returned from scraper");
 
-  if (lovableKey && rawMarkdown.length > 200) {
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  if (geminiKey && rawMarkdown.length > 200) {
+    const aiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableKey}`,
+        Authorization: `Bearer ${geminiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: [
           {
             role: "system",

@@ -47,9 +47,7 @@ export function InviteUserDialog({ open, onOpenChange, companyId, companyName }:
 
       if (error) throw error;
 
-      // Use the published app URL for invite links so recipients land on the real domain
-      const isPreview = window.location.hostname.includes('lovableproject.com') || window.location.hostname.includes('lovable.app');
-      const appOrigin = isPreview ? 'https://social.longtale.ai' : window.location.origin;
+      const appOrigin = window.location.origin;
       const inviteeEmail = encodeURIComponent(email.trim().toLowerCase());
       const signupUrl = `${appOrigin}/auth/signup?invite=${invitation.token}&email=${inviteeEmail}`;
       const inviterName = profile?.full_name || user.email || 'A team member';

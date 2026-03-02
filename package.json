@@ -138,7 +138,6 @@
     "globals": "^15.15.0",
     "jsdom": "^20.0.3",
     "kiro-memory": "^3.0.1",
-    "lovable-tagger": "^1.1.13",
     "memorix": "^0.10.0",
     "neo-skill": "^0.1.30",
     "opencode-windsurf-codeium": "^0.1.38",
