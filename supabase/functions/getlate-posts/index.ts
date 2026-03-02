@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
 
       // SERVER-SIDE VALIDATION: Verify all accountIds belong to the company's profile
       // Also build account metadata for explicit platforms array to prevent cross-posting
-      let profileAccountsMap: Map<string, Record<string, unknown>> = new Map();
+      const profileAccountsMap: Map<string, Record<string, unknown>> = new Map();
       if (profileId && accountIds && accountIds.length > 0) {
         const verifyResponse = await fetch(`${GETLATE_API_URL}/accounts?profileId=${profileId}`, {
           method: 'GET',

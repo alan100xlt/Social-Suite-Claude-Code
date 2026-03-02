@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
     }
 
     // Strip any existing protocol and www prefix to get the bare domain
-    let bareDomain = url.trim()
+    const bareDomain = url.trim()
       .replace(/^https?:\/\//i, '')
       .replace(/^www\./i, '')
       .replace(/\/+$/, '');

@@ -6,7 +6,8 @@ import { ComposeTab } from '@/components/posts/ComposeTab';
 import { CalendarTab } from '@/components/posts/CalendarTab';
 import { AutomationsContent } from '@/components/content/AutomationsContent';
 import { AutomationLogsContent } from '@/components/content/AutomationLogsContent';
-import { Newspaper, PenSquare, Rss, Zap, ClipboardList, Calendar } from 'lucide-react';
+import { QueueTab } from '@/components/posts/QueueTab';
+import { Newspaper, PenSquare, Rss, Zap, ClipboardList, Calendar, ListOrdered } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useCompany } from '@/hooks/useCompany';
 
@@ -40,6 +41,9 @@ export default function ContentPage() {
             <TabsTrigger value="posts" className="flex items-center gap-2">
               <PenSquare className="h-4 w-4" />Social Posts
             </TabsTrigger>
+            <TabsTrigger value="queue" className="flex items-center gap-2">
+              <ListOrdered className="h-4 w-4" />Queue
+            </TabsTrigger>
             <TabsTrigger value="calendar" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />Calendar
             </TabsTrigger>
@@ -59,6 +63,9 @@ export default function ContentPage() {
           </TabsContent>
           <TabsContent value="posts">
             <ComposeTab key={company?.id || 'no-company'} draftId={draftId} onOpenDraft={handleOpenDraft} />
+          </TabsContent>
+          <TabsContent value="queue">
+            <QueueTab />
           </TabsContent>
           <TabsContent value="calendar">
             <CalendarTab />

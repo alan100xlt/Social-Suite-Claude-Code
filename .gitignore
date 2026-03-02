@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+scripts/slack-agent/.env
+supabase/functions/.env

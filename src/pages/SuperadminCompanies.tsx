@@ -12,10 +12,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Building2, Users, Link2, Newspaper, Trash2, AlertTriangle } from 'lucide-react';
+import { Building2, Users, Link2, Newspaper, Trash2, AlertTriangle, Plus } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
+import { CreateMediaCompanyDialog } from '@/components/admin/CreateMediaCompanyDialog';
+import { CreateCompanyDialog } from '@/components/admin/CreateCompanyDialog';
+import { MediaCompanyCombobox } from '@/components/admin/MediaCompanyCombobox';
+import { useCompanyMediaCompanyMap } from '@/hooks/useMediaCompanyManagement';
 
 interface CompanyRow {
   id: string;
@@ -41,7 +45,11 @@ function useAdminCompanies() {
     queryKey: ['admin-companies'],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('admin-companies');
-      if (error) throw error;
+      if (error) {
+        // Surface the actual server error message from the response body
+        const detail = (data as any)?.error ?? error.message;
+        throw new Error(detail);
+      }
       return data.companies as CompanyRow[];
     },
   });
@@ -81,7 +89,10 @@ export default function SuperadminCompanies() {
   const { data: companies, isLoading, error } = useAdminCompanies();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showCreateMC, setShowCreateMC] = useState(false);
+  const [showCreateCompany, setShowCreateCompany] = useState(false);
   const queryClient = useQueryClient();
+  const { data: mediaCompanyMap } = useCompanyMediaCompanyMap();
 
   const deleteMutation = useMutation({
     mutationFn: async (companyIds: string[]) => {
@@ -146,17 +157,27 @@ export default function SuperadminCompanies() {
               {companies ? `${companies.length} companies` : 'Loading...'}
             </p>
           </div>
-          {selected.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowConfirm(true)}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="w-4 h-4 mr-1.5" />
-              Delete {selected.size} selected
+          <div className="flex items-center gap-2">
+            {selected.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowConfirm(true)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4 mr-1.5" />
+                Delete {selected.size}
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setShowCreateMC(true)}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Media Company
             </Button>
-          )}
+            <Button size="sm" onClick={() => setShowCreateCompany(true)}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Company
+            </Button>
+          </div>
         </div>
 
         <div className="border border-border rounded-lg overflow-hidden">
@@ -171,6 +192,7 @@ export default function SuperadminCompanies() {
                     />
                   </TableHead>
                   <TableHead className="font-semibold">Company</TableHead>
+                  <TableHead className="font-semibold">Media Company</TableHead>
                   <TableHead className="font-semibold">Onboarding</TableHead>
                   <TableHead className="font-semibold">Signed Up</TableHead>
                   <TableHead className="font-semibold">Last Login</TableHead>
@@ -198,20 +220,20 @@ export default function SuperadminCompanies() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 9 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : error ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-destructive py-8">
+                    <TableCell colSpan={9} className="text-center text-destructive py-8">
                       Failed to load companies: {error instanceof Error ? error.message : 'Unknown error'}
                     </TableCell>
                   </TableRow>
                 ) : companies?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No companies found
                     </TableCell>
                   </TableRow>
@@ -236,6 +258,13 @@ export default function SuperadminCompanies() {
                             </a>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="min-w-[160px]">
+                        <MediaCompanyCombobox
+                          companyId={c.id}
+                          currentMediaCompanyId={mediaCompanyMap?.get(c.id)?.mediaCompanyId}
+                          currentMediaCompanyName={mediaCompanyMap?.get(c.id)?.mediaCompanyName}
+                        />
                       </TableCell>
                       <TableCell>
                         <OnboardingBadge status={c.onboarding_status} step={c.onboarding_step} />
@@ -297,6 +326,9 @@ export default function SuperadminCompanies() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateMediaCompanyDialog open={showCreateMC} onOpenChange={setShowCreateMC} />
+      <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
     </DashboardLayout>
   );
 }

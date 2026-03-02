@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { ResponsiveLine } from "@nivo/line";
+import { ResponsiveBar } from "@nivo/bar";
 import { buildNivoThemeV2, chartColors } from "@/lib/nivo-theme";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
@@ -16,6 +17,8 @@ interface StatSparklineWidgetProps {
   /** Optional secondary label shown under the sparkline */
   secondaryLabel?: string;
   secondaryValue?: string | number;
+  /** Chart type: "line" for area chart, "bar" for vertical bar sparkline */
+  chartType?: "line" | "bar";
 }
 
 function formatValue(v: string | number): string {
@@ -35,6 +38,7 @@ export function StatSparklineWidget({
   icon,
   secondaryLabel,
   secondaryValue,
+  chartType = "line",
 }: StatSparklineWidgetProps) {
   const theme = useMemo(() => buildNivoThemeV2(), []);
 
@@ -47,6 +51,12 @@ export function StatSparklineWidget({
 
   const lineData =
     sparklineData.length > 0 ? [{ id: "spark", data: sparklineData }] : [];
+
+  // Prepare data for bar chart
+  const barData = sparklineData.map((d, i) => ({
+    x: i.toString(),
+    value: d.y,
+  }));
 
   return (
     <Card className="relative overflow-hidden p-0 flex flex-col group hover:shadow-lg transition-all duration-200">
@@ -68,40 +78,60 @@ export function StatSparklineWidget({
         )}
       </div>
 
-      {/* Sparkline chart - wider, takes full card width */}
-      {lineData.length > 0 && (
+      {/* Chart - wider, takes full card width */}
+      {sparklineData.length > 0 && (
         <div className="w-full h-16 px-1 opacity-80 group-hover:opacity-100 transition-opacity">
-          <ResponsiveLine
-            data={lineData}
-            theme={theme}
-            margin={{ top: 6, right: 4, bottom: 4, left: 4 }}
-            xScale={{ type: "point" }}
-            yScale={{ type: "linear", min: "auto", max: "auto" }}
-            curve="monotoneX"
-            enableArea
-            areaOpacity={1}
-            enableGridX={false}
-            enableGridY={false}
-            enablePoints={false}
-            isInteractive={false}
-            axisTop={null}
-            axisRight={null}
-            axisBottom={null}
-            axisLeft={null}
-            colors={[color]}
-            lineWidth={2}
-            defs={[
-              {
-                id: "sparkGrad",
-                type: "linearGradient",
-                colors: [
-                  { offset: 0, color, opacity: 0.25 },
-                  { offset: 100, color, opacity: 0.02 },
-                ],
-              },
-            ]}
-            fill={[{ match: "*", id: "sparkGrad" }]}
-          />
+          {chartType === "line" ? (
+            <ResponsiveLine
+              data={lineData}
+              theme={theme}
+              margin={{ top: 6, right: 4, bottom: 4, left: 4 }}
+              xScale={{ type: "point" }}
+              yScale={{ type: "linear", min: "auto", max: "auto" }}
+              curve="monotoneX"
+              enableArea
+              areaOpacity={1}
+              enableGridX={false}
+              enableGridY={false}
+              enablePoints={false}
+              isInteractive={false}
+              axisTop={null}
+              axisRight={null}
+              axisBottom={null}
+              axisLeft={null}
+              colors={[color]}
+              lineWidth={2}
+              defs={[
+                {
+                  id: "sparkGrad",
+                  type: "linearGradient",
+                  colors: [
+                    { offset: 0, color, opacity: 0.25 },
+                    { offset: 100, color, opacity: 0.02 },
+                  ],
+                },
+              ]}
+              fill={[{ match: "*", id: "sparkGrad" }]}
+            />
+          ) : (
+            <ResponsiveBar
+              data={barData}
+              theme={theme}
+              margin={{ top: 6, right: 4, bottom: 4, left: 4 }}
+              keys={["value"]}
+              indexBy="x"
+              colors={[color]}
+              enableGridX={false}
+              enableGridY={false}
+              axisBottom={null}
+              axisLeft={null}
+              enableLabel={false}
+              isInteractive={false}
+              borderRadius={2}
+              padding={0.2}
+              innerPadding={0}
+            />
+          )}
         </div>
       )}
 

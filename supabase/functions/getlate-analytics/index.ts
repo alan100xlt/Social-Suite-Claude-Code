@@ -237,6 +237,126 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get best times to post (by day/hour)
+    if (action === 'best-time') {
+      const { platform, profileId } = body;
+      const params = new URLSearchParams();
+      if (platform) params.append('platform', platform);
+      if (profileId) params.append('profileId', profileId);
+
+      const response = await fetch(`${GETLATE_API_URL}/analytics/best-time?${params}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      });
+
+      const { data, error: parseError } = await safeJsonParse(response);
+      const duration = Date.now() - startTime;
+
+      if (parseError || !response.ok) {
+        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get best times';
+        await logApiCall(supabase, {
+          function_name: 'getlate-analytics', action: 'best-time',
+          request_body: { platform, profileId }, response_body: data,
+          status_code: response.status, success: false, error_message: errMsg,
+          duration_ms: duration, user_id: userId, platform,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: errMsg }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await logApiCall(supabase, {
+        function_name: 'getlate-analytics', action: 'best-time',
+        request_body: { platform, profileId }, response_body: { hasData: !!data },
+        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
+      });
+      return new Response(
+        JSON.stringify({ success: true, ...(data as object) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get content decay (engagement accumulation over time after publish)
+    if (action === 'content-decay') {
+      const { platform, accountId, postId } = body;
+      const params = new URLSearchParams();
+      if (platform) params.append('platform', platform);
+      if (accountId) params.append('accountId', accountId);
+      if (postId) params.append('postId', postId);
+
+      const response = await fetch(`${GETLATE_API_URL}/analytics/get-content-decay?${params}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      });
+
+      const { data, error: parseError } = await safeJsonParse(response);
+      const duration = Date.now() - startTime;
+
+      if (parseError || !response.ok) {
+        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get content decay';
+        await logApiCall(supabase, {
+          function_name: 'getlate-analytics', action: 'content-decay',
+          request_body: { platform, accountId, postId }, response_body: data,
+          status_code: response.status, success: false, error_message: errMsg,
+          duration_ms: duration, user_id: userId, platform,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: errMsg }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await logApiCall(supabase, {
+        function_name: 'getlate-analytics', action: 'content-decay',
+        request_body: { platform, accountId, postId }, response_body: { hasData: !!data },
+        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
+      });
+      return new Response(
+        JSON.stringify({ success: true, ...(data as object) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get posting frequency vs engagement correlation
+    if (action === 'posting-frequency') {
+      const { platform } = body;
+      const params = new URLSearchParams();
+      if (platform) params.append('platform', platform);
+
+      const response = await fetch(`${GETLATE_API_URL}/analytics/get-posting-frequency?${params}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      });
+
+      const { data, error: parseError } = await safeJsonParse(response);
+      const duration = Date.now() - startTime;
+
+      if (parseError || !response.ok) {
+        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get posting frequency';
+        await logApiCall(supabase, {
+          function_name: 'getlate-analytics', action: 'posting-frequency',
+          request_body: { platform }, response_body: data,
+          status_code: response.status, success: false, error_message: errMsg,
+          duration_ms: duration, user_id: userId, platform,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: errMsg }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await logApiCall(supabase, {
+        function_name: 'getlate-analytics', action: 'posting-frequency',
+        request_body: { platform }, response_body: { hasData: !!data },
+        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
+      });
+      return new Response(
+        JSON.stringify({ success: true, ...(data as object) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ success: false, error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

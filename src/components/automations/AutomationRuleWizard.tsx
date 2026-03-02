@@ -77,7 +77,7 @@ const objectiveOptions = [
 
 const actionOptions = [
   { value: 'publish_immediate', label: 'Publish immediately', description: 'Post goes live as soon as it\'s generated', icon: Globe },
-  { value: 'publish_optimal', label: 'Optimal time', description: 'Schedule for peak engagement (coming soon)', icon: Clock, disabled: true },
+  { value: 'publish_optimal', label: 'Optimal time', description: 'Schedule for peak engagement based on your data', icon: Clock },
   { value: 'send_approval', label: 'Send for approval', description: 'Email reviewers before publishing', icon: Send },
   { value: 'draft', label: 'Save as draft', description: 'Save for manual review later', icon: FileText },
 ];
