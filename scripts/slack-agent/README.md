@@ -17,31 +17,24 @@ Required values:
 - `SLACK_SIGNING_SECRET` — from your Slack app's Basic Information page
 - `SLACK_CHANNEL_ID` — right-click #claude-code in Slack → View channel details → Channel ID (`C...`)
 
-### 2. Set up Cloudflare named tunnel (one-time)
+### 2. Set up ngrok (one-time)
 
 ```bash
-# Authenticate (opens browser)
-cloudflared tunnel login
+# Install ngrok
+winget install ngrok.ngrok
+# Or download from https://ngrok.com/download
 
-# Create named tunnel
-cloudflared tunnel create claude-agent-bridge
+# Add your authtoken (from https://dashboard.ngrok.com/get-started/your-authtoken)
+ngrok config add-authtoken YOUR_TOKEN
 
-# Note the tunnel UUID from output, then create config at ~/.cloudflared/config.yml:
-# tunnel: claude-agent-bridge
-# credentials-file: C:\Users\<you>\.cloudflared\<UUID>.json
-# ingress:
-#   - hostname: claude-agent-bridge.<your-subdomain>.cfargotunnel.com
-#     service: http://localhost:3001
-#   - service: http_status:404
-
-# Add DNS route
-cloudflared tunnel route dns claude-agent-bridge claude-agent-bridge
+# Claim a free static domain at https://dashboard.ngrok.com/domains
+# e.g. sherika-halterlike-savanna.ngrok-free.dev
 ```
 
 ### 3. Add Request URL to Slack App
 
 1. Go to https://api.slack.com/apps → your app → Interactivity & Shortcuts
-2. Set Request URL to: `https://claude-agent-bridge.<your-subdomain>.cfargotunnel.com/slack/actions`
+2. Set Request URL to: `https://<your-ngrok-domain>/slack/actions`
 3. Save Changes
 
 ### 4. Invite the bot to #claude-code
@@ -58,7 +51,7 @@ Start the bridge before autonomous Claude sessions:
 bash scripts/slack-agent/start-listener.sh
 ```
 
-This starts both the Express listener and the Cloudflare tunnel. Keep it running in a terminal.
+This starts both the Express listener and the ngrok tunnel. Keep it running in a terminal.
 
 ---
 
@@ -77,7 +70,7 @@ This starts both the Express listener and the Cloudflare tunnel. Keep it running
 
 ## Fallback Mode (no tunnel)
 
-If the Cloudflare tunnel isn't running, switch to keyword polling:
+If the ngrok tunnel isn't running, switch to keyword polling:
 
 1. Set `APPROVAL_MODE=polling` in `.env`
 2. When Claude sends an approval request, reply in the Slack thread with:
@@ -96,7 +89,7 @@ Claude Code hook fires
     → check-approval.js (polls state file every 1s)
 
 You tap Approve in Slack
-    → Slack POSTs to Cloudflare Tunnel
+    → Slack POSTs to ngrok tunnel
     → slack-listener.js writes approval-state.json = { status: "approved" }
     → check-approval.js detects change, exits 0
     → Claude Code proceeds
