@@ -4,7 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NGROK="/c/Users/alana/AppData/Local/ngrok/ngrok.exe"
-NGROK_DOMAIN="sherika-halterlike-savanna.ngrok-free.dev"
+NGROK_DOMAIN="https://sherika-halterlike-savanna.ngrok-free.dev/"
 PID_FILE="$SCRIPT_DIR/.listener.pid"
 
 # Clean up stale state files (older than 24h)
