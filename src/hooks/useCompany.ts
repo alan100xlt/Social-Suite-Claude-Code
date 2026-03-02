@@ -279,6 +279,37 @@ export function useCreateCompany() {
         }
       }
 
+      // Auto-create a media company with the same name
+      try {
+        const { data: mc, error: mcError } = await supabase
+          .from('media_companies')
+          .insert({ name })
+          .select('id')
+          .single();
+
+        if (mcError) throw mcError;
+
+        // Link company as child of the new media company
+        await supabase
+          .from('media_company_children')
+          .insert({
+            parent_company_id: mc.id,
+            child_company_id: company.id,
+            relationship_type: 'owned',
+          });
+
+        // Make the creator a media company admin
+        await supabase
+          .from('media_company_members')
+          .insert({
+            media_company_id: mc.id,
+            user_id: user.id,
+            role: 'admin',
+          });
+      } catch (mcErr) {
+        console.error('Failed to auto-create media company:', mcErr);
+      }
+
       return company as Company;
     },
     onSuccess: () => {
@@ -287,6 +318,7 @@ export function useCreateCompany() {
       queryClient.invalidateQueries({ queryKey: ['has-membership'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['user-role'] });
+      queryClient.invalidateQueries({ queryKey: ['user-media-companies'] });
       toast({
         title: 'Company Created',
         description: 'Your company has been set up successfully!',

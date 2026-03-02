@@ -36,7 +36,7 @@ let invitedUser: TestPersona = undefined!;
 let outsiderUser: TestPersona = undefined!;
 let company: TestCompany = undefined!;
 let company2: TestCompany = undefined!;
-let createdInvitationIds: string[] = [];
+const createdInvitationIds: string[] = [];
 
 Deno.test({
   name: "invitation-flow – setup",

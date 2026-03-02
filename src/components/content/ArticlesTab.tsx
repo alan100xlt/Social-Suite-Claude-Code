@@ -21,6 +21,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import FlyoutEditor from './FlyoutEditor';
+import ContextualCardActions from './ContextualCardActions';
+import usePostState from '@/hooks/usePostState';
+import StatusBadge, { getStatusFromItem } from '@/components/ui/StatusBadge';
 
 // --- Platform icon map ---
 const platformIconMap: Record<string, React.ElementType> = {
@@ -66,6 +70,7 @@ export function ArticlesTab() {
   const [viewingArticle, setViewingArticle] = useState<RssFeedItem | null>(null);
   const [isScraping, setIsScraping] = useState(false);
   const [automationArticle, setAutomationArticle] = useState<{ id: string; title: string } | null>(null);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
 
   const handleScrapeArticle = async () => {
     if (!viewingArticle?.link) return;
@@ -386,7 +391,11 @@ export function ArticlesTab() {
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>
                         )}
-                        <button onClick={() => setViewingArticle(item)} title="Preview content" className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        <button 
+                          onClick={() => setFlyoutOpen(true)} 
+                          title="Preview content with platform tabs" 
+                          className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
                           <Eye className="h-3.5 w-3.5" />
                         </button>
                         {isPosted && item.post_id && (
@@ -396,24 +405,56 @@ export function ArticlesTab() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      {isPosted ? (
-                        <Badge variant="secondary" className="text-[10px] gap-1 h-6">
-                          <CheckCircle2 className="h-3 w-3" />Posted
-                        </Badge>
-                      ) : item.status === 'failed' ? (
-                        <Badge variant="destructive" className="text-[10px] gap-1 h-6">
-                          <XCircle className="h-3 w-3" />Failed
-                        </Badge>
-                      ) : existingDraft ? (
-                        <Button size="sm" variant="secondary" onClick={() => navigate(`/app/posts?tab=compose&draft=${existingDraft.id}`)} className="h-7 text-xs gap-1.5">
-                          <FileText className="h-3 w-3" />View Draft
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => handleCreatePost(item.id, item.title || undefined)} className="h-7 text-xs gap-1.5">
-                          <Send className="h-3 w-3" />Create Post
-                        </Button>
-                      )}
+                    <td className="px-4 py-3">
+                      {/* Use contextual actions based on post state */}
+                      {(() => {
+                        const postStateData = usePostState(item);
+                        
+                        if (!postStateData.needsAction) {
+                          // Published posts - no action needed
+                          return postStateData.hasAnalytics ? (
+                            <button 
+                              onClick={() => navigate(`/app/analytics?tab=posts&postId=${item.post_id}`)} 
+                              title="View analytics" 
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+                            >
+                              <BarChart3 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null;
+                        }
+                        
+                        // Future/Processing/Draft posts - show contextual actions
+                        return (
+                          <ContextualCardActions
+                            postState={postStateData.state}
+                            postId={item.post_id}
+                            analytics={postAnalytics?.get(item.post_id)?.[0]}
+                            onEdit={() => {
+                              if (postStateData.isEditable) {
+                                setFlyoutOpen(true);
+                              }
+                            }}
+                            onSchedule={() => {
+                              // Handle scheduling logic
+                              toast({ title: 'Scheduling', description: 'Scheduling functionality coming soon!' });
+                            }}
+                            onPublish={() => {
+                              // Handle immediate publishing
+                              toast({ title: 'Publishing', description: 'Publishing functionality coming soon!' });
+                            }}
+                            onViewAnalytics={() => {
+                              if (item.post_id) {
+                                navigate(`/app/analytics?tab=posts&postId=${item.post_id}`);
+                              }
+                            }}
+                          />
+                        );
+                      })()}
+                      <StatusBadge 
+                        status={getStatusFromItem(item)}
+                        size="sm"
+                        showIcon={true}
+                      />
                     </td>
                   </tr>
                 );
@@ -503,6 +544,22 @@ export function ArticlesTab() {
         open={!!automationArticle}
         onOpenChange={(open) => { if (!open) setAutomationArticle(null); }}
         onComplete={() => refetchItems()}
+      />
+
+      {/* Flyout Editor */}
+      <FlyoutEditor
+        isOpen={flyoutOpen}
+        onClose={() => setFlyoutOpen(false)}
+        article={{
+          id: viewingArticle?.id || '',
+          title: viewingArticle?.title || '',
+          content: viewingArticle?.full_content || '',
+          media: viewingArticle?.image_url ? [{
+            type: 'image',
+            url: viewingArticle.image_url,
+            alt: viewingArticle.title
+          }] : undefined
+        }}
       />
     </div>
   );

@@ -162,7 +162,7 @@ export function TopPostsTable({ posts, isLoading, onDeleted, highlightPostId }: 
   const deletePost = useDeletePost();
 
   const sortedPosts = useMemo(() => {
-    let filtered = [...posts];
+    const filtered = [...posts];
     // If a specific post is highlighted, put it first
     if (highlightPostId) {
       const idx = filtered.findIndex(p => p.postId === highlightPostId);

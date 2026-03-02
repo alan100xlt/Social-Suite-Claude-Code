@@ -131,7 +131,7 @@ export function useHistoricalAnalytics(params: HistoricalAnalyticsParams) {
         }
       }
 
-      let accountTotals = { impressions: 0, reach: 0, views: 0, likes: 0, comments: 0, shares: 0, clicks: 0, engagementRate: 0, followers: 0 };
+      const accountTotals = { impressions: 0, reach: 0, views: 0, likes: 0, comments: 0, shares: 0, clicks: 0, engagementRate: 0, followers: 0 };
       for (const metrics of accountMetricsByPlatform.values()) {
         accountTotals.impressions += metrics.impressions;
         accountTotals.reach += metrics.reach;

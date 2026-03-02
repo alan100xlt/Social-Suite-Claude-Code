@@ -8,12 +8,14 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SelectedCompanyProvider } from "@/contexts/SelectedCompanyContext";
 import { CourierTokenProvider } from "@/contexts/CourierContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Connections from "./pages/Connections";
 import Content from "./pages/Content";
 import Analytics from "./pages/Analytics";
 import AnalyticsV2 from "./pages/AnalyticsV2";
+import AnalyticsV3 from "./pages/AnalyticsV3";
 import Settings from "./pages/Settings";
 import OAuthCallback from "./pages/OAuthCallback";
 import NotFound from "./pages/NotFound";
@@ -39,16 +41,21 @@ import ResetPassword from "./pages/ResetPassword";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import SuperadminCompanies from "./pages/SuperadminCompanies";
 import CronHealth from "./pages/CronHealth";
+import Progress from "./pages/Progress";
+import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
+import { MediaCompanyWorkspace } from "./pages/MediaCompanyWorkspace";
+import ThemeSettings from "./pages/ThemeSettings";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <PlatformProvider>
-    <AuthProvider>
-      <SelectedCompanyProvider>
-        <CourierTokenProvider>
-        <TooltipProvider>
+    <ThemeProvider>
+      <PlatformProvider>
+      <AuthProvider>
+        <SelectedCompanyProvider>
+          <CourierTokenProvider>
+            <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -81,8 +88,10 @@ const App = () => (
               <Route path="/app/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
               <Route path="/app/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/app/analytics-v2" element={<ProtectedRoute><AnalyticsV2 /></ProtectedRoute>} />
+              <Route path="/app/analytics-v3" element={<ProtectedRoute><AnalyticsV3 /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/app/theme" element={<ProtectedRoute><ThemeSettings /></ProtectedRoute>} />
 
               {/* Protected: Onboarding */}
               <Route path="/app/onboarding/setup" element={<ProtectedRoute><SetupCompany /></ProtectedRoute>} />
@@ -100,6 +109,11 @@ const App = () => (
               <Route path="/app/admin/companies" element={<ProtectedRoute><SuperadminCompanies /></ProtectedRoute>} />
               <Route path="/app/admin/cron-health" element={<ProtectedRoute><CronHealth /></ProtectedRoute>} />
               <Route path="/app/admin/wizard" element={<ProtectedRoute><WizardVariations /></ProtectedRoute>} />
+              <Route path="/app/admin/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+
+              {/* Media Company Routes */}
+              <Route path="/app/media-company/:mediaCompanyId" element={<ProtectedRoute><MediaCompanyDashboard /></ProtectedRoute>} />
+              <Route path="/app/media-company/:mediaCompanyId/workspace" element={<ProtectedRoute><MediaCompanyWorkspace /></ProtectedRoute>} />
 
               {/* Backward-compatible redirects */}
               <Route path="/landing" element={<Navigate to="/" replace />} />
@@ -135,6 +149,7 @@ const App = () => (
       </SelectedCompanyProvider>
     </AuthProvider>
     </PlatformProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
