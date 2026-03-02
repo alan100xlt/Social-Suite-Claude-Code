@@ -18,7 +18,7 @@
 **Step 1: Check if BOOTSTRAP_SECRET is already set**
 
 ```bash
-npx supabase secrets list --project-ref yeffbytlvhhzsbrabhgg 2>&1
+npx supabase secrets list --project-ref yeffbytlvhhzsbrabhgh 2>&1
 ```
 
 Expected: list of secret names. If `BOOTSTRAP_SECRET` not present, proceed to Step 2.
@@ -29,7 +29,7 @@ Expected: list of secret names. If `BOOTSTRAP_SECRET` not present, proceed to St
 # Generate a random secret
 SECRET=$(openssl rand -hex 32)
 echo "Your bootstrap secret: $SECRET"
-npx supabase secrets set BOOTSTRAP_SECRET=$SECRET --project-ref yeffbytlvhhzsbrabhgg
+npx supabase secrets set BOOTSTRAP_SECRET=$SECRET --project-ref yeffbytlvhhzsbrabhgh
 ```
 
 Save the secret value somewhere safe — you'll need it in Step 3.
@@ -37,13 +37,13 @@ Save the secret value somewhere safe — you'll need it in Step 3.
 **Step 3: Deploy provision-superadmins if not already deployed**
 
 ```bash
-npx supabase functions deploy provision-superadmins --project-ref yeffbytlvhhzsbrabhgg 2>&1
+npx supabase functions deploy provision-superadmins --project-ref yeffbytlvhhzsbrabhgh 2>&1
 ```
 
 **Step 4: Call the function**
 
 ```bash
-curl -s -X POST https://yeffbytlvhhzsbrabhgg.supabase.co/functions/v1/provision-superadmins \
+curl -s -X POST https://yeffbytlvhhzsbrabhgh.supabase.co/functions/v1/provision-superadmins \
   -H "Content-Type: application/json" \
   -d "{\"secret\": \"$SECRET\", \"emails\": [\"alan@100xlt.ai\"]}"
 ```
@@ -545,10 +545,10 @@ Deno.serve(async (req) => {
 **Step 3: Deploy the function**
 
 ```bash
-npx supabase functions deploy admin-users --project-ref yeffbytlvhhzsbrabhgg 2>&1
+npx supabase functions deploy admin-users --project-ref yeffbytlvhhzsbrabhgh 2>&1
 ```
 
-Expected: `Deployed Functions on project yeffbytlvhhzsbrabhgg: admin-users`
+Expected: `Deployed Functions on project yeffbytlvhhzsbrabhgh: admin-users`
 
 **Step 4: Commit**
 
