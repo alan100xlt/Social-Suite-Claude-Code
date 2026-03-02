@@ -45,6 +45,7 @@ const navigation: { name: string; href: string; icon: React.ElementType; addActi
   { name: "Content", href: "/app/content", icon: Newspaper, addAction: "/app/content?tab=posts" },
   { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
   { name: "Insights", href: "/app/analytics-v2", icon: Sparkles },
+  { name: "Analytics V3", href: "/app/analytics-v3", icon: Zap },
 ];
 
 // Platform icon and color mapping
