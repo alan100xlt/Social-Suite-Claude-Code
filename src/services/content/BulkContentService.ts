@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/integrations/supabase/client'
 import { securityContextService } from '@/services/security/SecurityContextService'
 
 // Types for bulk content system
@@ -103,14 +103,7 @@ export interface PublishingStats {
 }
 
 export class BulkContentService {
-  private supabase: ReturnType<typeof createClient>
-
-  constructor() {
-    this.supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
-      process.env.VITE_SUPABASE_ANON_KEY!
-    )
-  }
+  private supabase = supabase
 
   /**
    * Create a bulk content post for multiple companies
