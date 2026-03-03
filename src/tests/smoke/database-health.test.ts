@@ -14,11 +14,10 @@ const supabase = createClient(supabaseUrl!, supabaseKey!, {
 
 describe("Database health smoke test", () => {
   test("can connect to Supabase", async () => {
-    const { error } = await supabase
-      .from("profiles")
-      .select("id")
-      .limit(0);
+    // Use an RPC call to test connectivity (table selects require auth)
+    const { data, error } = await supabase.rpc("is_superadmin");
     expect(error).toBeNull();
+    expect(typeof data).toBe("boolean");
   });
 
   test("user_is_member function exists", async () => {
@@ -44,7 +43,7 @@ describe("Database health smoke test", () => {
     expect(typeof data).toBe("boolean");
   });
 
-  test("core tables are accessible", async () => {
+  test("core tables exist (RLS may deny reads without auth)", async () => {
     const tables = [
       "companies",
       "company_memberships",
@@ -57,7 +56,14 @@ describe("Database health smoke test", () => {
 
     for (const table of tables) {
       const { error } = await supabase.from(table).select("id").limit(0);
-      expect(error, `Table ${table} should be accessible`).toBeNull();
+      // 42501 = permission denied (table exists, RLS blocks anonymous access) — that's fine
+      // PGRST204 = table not found — that's a real failure
+      if (error) {
+        expect(
+          error.code,
+          `Table ${table} should exist (got: ${error.message})`
+        ).toBe("42501");
+      }
     }
   });
 });
