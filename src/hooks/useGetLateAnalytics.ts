@@ -51,7 +51,7 @@ export function useDailyMetrics(params?: {
   startDate?: string;
   endDate?: string;
   platform?: string;
-}) {
+} | null) {
   return useQuery({
     queryKey: ['getlate-daily-metrics', params],
     queryFn: async () => {
@@ -61,6 +61,7 @@ export function useDailyMetrics(params?: {
       }
       return result.data?.metrics || [];
     },
+    enabled: params !== undefined && params !== null,
   });
 }
 

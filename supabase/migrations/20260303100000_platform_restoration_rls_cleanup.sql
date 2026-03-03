@@ -92,9 +92,12 @@ DROP POLICY IF EXISTS "Users can view media company analytics they can access" O
 -- TASK 2: Drop Redundant Enterprise Infrastructure
 -- ============================================================================
 
--- Drop triggers first
-DROP TRIGGER IF EXISTS trigger_refresh_media_company_hierarchy ON media_company_hierarchy;
-DROP TRIGGER IF EXISTS set_media_company_hierarchy_timestamp ON media_company_hierarchy;
+-- Drop triggers first (wrapped in DO block since table may not exist)
+DO $$ BEGIN
+  DROP TRIGGER IF EXISTS trigger_refresh_media_company_hierarchy ON media_company_hierarchy;
+  DROP TRIGGER IF EXISTS set_media_company_hierarchy_timestamp ON media_company_hierarchy;
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
 
 -- Drop materialized views
 DROP MATERIALIZED VIEW IF EXISTS user_security_hierarchy;
