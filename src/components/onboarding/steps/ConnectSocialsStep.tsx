@@ -42,22 +42,24 @@ export function ConnectSocialsStep({ onInvite }: ConnectSocialsStepProps) {
   const [pageSelectionOpen, setPageSelectionOpen] = useState(false);
   const [pendingPlatform, setPendingPlatform] = useState<Platform | null>(null);
   const [pendingTempToken, setPendingTempToken] = useState<string | null>(null);
-  const [pendingUserProfile, setPendingUserProfile] = useState<any>(null);
+  const [pendingDataToken, setPendingDataToken] = useState<string | null>(null);
+  const [pendingUserProfile, setPendingUserProfile] = useState<{ id?: string; name?: string; profilePicture?: string } | null>(null);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'oauth-callback') {
-        const { tempToken, error, platform, userProfile } = event.data;
+        const { tempToken, pendingDataToken: pdt, error, platform, userProfile } = event.data;
         if (error) {
           toast({ title: 'Connection Failed', description: error, variant: 'destructive' });
           setConnectingPlatform(null);
           return;
         }
-        if (tempToken) {
+        if (tempToken || pdt) {
           const config = platformConfigs.find(c => c.id === (platform || connectingPlatform));
-          if (config?.requiresPageSelection) {
+          if (config?.requiresPageSelection || pdt) {
             setPendingPlatform(platform || connectingPlatform);
-            setPendingTempToken(tempToken);
+            setPendingTempToken(tempToken || null);
+            setPendingDataToken(pdt || null);
             setPendingUserProfile(userProfile || null);
             setPageSelectionOpen(true);
           } else {
@@ -159,10 +161,12 @@ export function ConnectSocialsStep({ onInvite }: ConnectSocialsStepProps) {
         onOpenChange={setPageSelectionOpen}
         platform={pendingPlatform}
         tempToken={pendingTempToken}
+        pendingDataToken={pendingDataToken}
         userProfile={pendingUserProfile}
         onComplete={() => {
           setPendingPlatform(null);
           setPendingTempToken(null);
+          setPendingDataToken(null);
           setPendingUserProfile(null);
           refetch();
         }}

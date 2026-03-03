@@ -31,7 +31,7 @@ export interface GetLateAccount {
 export interface GetLatePost {
   id: string;
   text: string;
-  status: 'draft' | 'scheduled' | 'published' | 'failed';
+  status: 'draft' | 'scheduled' | 'published' | 'failed' | 'partial';
   scheduledFor?: string;
   publishedAt?: string;
   accountIds: string[];
@@ -51,6 +51,9 @@ export interface PlatformResult {
   status: 'success' | 'failed';
   postUrl?: string;
   error?: string;
+  errorMessage?: string;
+  errorCategory?: 'auth_expired' | 'user_content' | 'user_abuse' | 'rate_limit' | 'platform_error' | 'system_error';
+  errorSource?: 'user' | 'platform' | 'system';
 }
 
 export interface PostAnalytics {
@@ -65,9 +68,17 @@ export interface PostAnalytics {
   updatedAt: string;
 }
 
+export interface ValidationResult {
+  valid: boolean;
+  errors?: Array<{ platform: string; message: string; field?: string }>;
+  warnings?: Array<{ platform: string; message: string; field?: string }>;
+  platformLimits?: Record<string, { maxLength: number; currentLength: number; withinLimit: boolean }>;
+}
+
 type ApiResponse<T> = {
   success: boolean;
   error?: string;
+  errorType?: string;
   data?: T;
 };
 
@@ -95,6 +106,22 @@ export const getlateConnect = {
       return { success: false, error: error.message };
     }
     return { success: data.success, data: { options: data.options }, error: data.error };
+  },
+
+  // Resolve LinkedIn pendingDataToken to get tempToken + userProfile (new OAuth flow)
+  async getPendingData(pendingDataToken: string): Promise<ApiResponse<{ tempToken: string; userProfile?: { id?: string; name?: string; profilePicture?: string }; organizations?: unknown[] }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-connect', {
+      body: { action: 'get-pending-data', pendingDataToken },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return {
+      success: data.success,
+      data: { tempToken: data.tempToken, userProfile: data.userProfile, organizations: data.organizations },
+      error: data.error,
+    };
   },
 
   // Complete connection with selected page/account
@@ -186,7 +213,7 @@ export const getlatePosts = {
     profileId?: string;
     source?: string;
     objective?: string;
-  }): Promise<ApiResponse<{ post: GetLatePost }>> {
+  }): Promise<ApiResponse<{ post: GetLatePost; isPartial?: boolean }>> {
     const { data, error } = await supabase.functions.invoke('getlate-posts', {
       body: { action: 'create', ...params },
     });
@@ -194,7 +221,7 @@ export const getlatePosts = {
     if (error) {
       return { success: false, error: error.message };
     }
-    return { success: data.success, data: { post: data.post }, error: data.error };
+    return { success: data.success, data: { post: data.post, isPartial: data.isPartial }, error: data.error, errorType: data.errorType };
   },
 
   // List posts
@@ -243,6 +270,47 @@ export const getlatePosts = {
   async delete(postId: string): Promise<ApiResponse<void>> {
     const { data, error } = await supabase.functions.invoke('getlate-posts', {
       body: { action: 'delete', postId },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, error: data.error };
+  },
+
+  // Validate post content before publishing
+  async validatePost(params: {
+    text: string;
+    mediaItems?: MediaItem[];
+    platforms?: string[];
+    accountIds?: string[];
+  }): Promise<ApiResponse<{ validation: ValidationResult }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-posts', {
+      body: { action: 'validate-post', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { validation: data.validation }, error: data.error };
+  },
+
+  // Validate post content length per platform
+  async validateLength(text: string, platforms: string[]): Promise<ApiResponse<{ validation: ValidationResult }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-posts', {
+      body: { action: 'validate-length', text, platforms },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { validation: data.validation }, error: data.error };
+  },
+
+  // Unpublish post (remove from social platforms, keep in Longtale for analytics)
+  async unpublish(postId: string, platforms?: string[]): Promise<ApiResponse<void>> {
+    const { data, error } = await supabase.functions.invoke('getlate-posts', {
+      body: { action: 'unpublish', postId, platforms },
     });
 
     if (error) {
@@ -304,6 +372,38 @@ export const getlateAnalytics = {
       return { success: false, error: error.message };
     }
     return { success: data.success, data: { analytics: data.analytics }, error: data.error };
+  },
+
+  // Get daily metrics
+  async getDailyMetrics(params: {
+    profileId?: string;
+    startDate?: string;
+    endDate?: string;
+    platform?: string;
+  }): Promise<ApiResponse<{ metrics: Array<{ date: string; impressions: number; reach: number; likes: number; comments: number; shares: number; clicks: number }> }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'daily-metrics', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { metrics: data.metrics }, error: data.error };
+  },
+
+  // Get post timeline (engagement over time for a single post)
+  async getPostTimeline(postId: string, params?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<ApiResponse<{ timeline: Array<{ date: string; impressions: number; likes: number; comments: number; shares: number }> }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'post-timeline', postId, ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { timeline: data.timeline }, error: data.error };
   },
 };
 

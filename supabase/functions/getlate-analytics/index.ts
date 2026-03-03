@@ -79,6 +79,19 @@ Deno.serve(async (req) => {
     const { action } = body;
     const startTime = Date.now();
 
+    // Helper: check for 429 rate limit before generic error handling
+    const checkRateLimit = (response: Response): Response | null => {
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+        console.warn('Rate limited. Retry-After:', retryAfter);
+        return new Response(
+          JSON.stringify({ success: false, error: `Rate limited. Please try again in ${retryAfter} seconds.`, errorType: 'rate_limit', retryAfter }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return null;
+    };
+
     // Get analytics for post(s)
     if (action === 'get') {
       const { postId, postIds } = body;
@@ -90,6 +103,9 @@ Deno.serve(async (req) => {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
+
+      const rateLimitResponse = checkRateLimit(response);
+      if (rateLimitResponse) return rateLimitResponse;
 
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
@@ -129,6 +145,9 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ accountId, postUrl }),
       });
 
+      const rateLimitSync = checkRateLimit(response);
+      if (rateLimitSync) return rateLimitSync;
+
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
 
@@ -165,6 +184,9 @@ Deno.serve(async (req) => {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
+
+      const rateLimitYt = checkRateLimit(response);
+      if (rateLimitYt) return rateLimitYt;
 
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
@@ -206,6 +228,9 @@ Deno.serve(async (req) => {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
+
+      const rateLimitOv = checkRateLimit(response);
+      if (rateLimitOv) return rateLimitOv;
 
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
@@ -249,6 +274,9 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
 
+      const rateLimitBt = checkRateLimit(response);
+      if (rateLimitBt) return rateLimitBt;
+
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
 
@@ -290,6 +318,9 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
 
+      const rateLimitCd = checkRateLimit(response);
+      if (rateLimitCd) return rateLimitCd;
+
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
 
@@ -329,6 +360,9 @@ Deno.serve(async (req) => {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
 
+      const rateLimitPf = checkRateLimit(response);
+      if (rateLimitPf) return rateLimitPf;
+
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
 
@@ -353,6 +387,97 @@ Deno.serve(async (req) => {
       });
       return new Response(
         JSON.stringify({ success: true, ...(data as object) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get daily metrics (aggregated per day)
+    if (action === 'daily-metrics') {
+      const { profileId, startDate, endDate, platform } = body;
+      const params = new URLSearchParams();
+      if (profileId) params.append('profileId', profileId);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (platform) params.append('platform', platform);
+
+      const response = await fetch(`${GETLATE_API_URL}/analytics/daily-metrics?${params}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      });
+
+      const rateLimitDm = checkRateLimit(response);
+      if (rateLimitDm) return rateLimitDm;
+
+      const { data, error: parseError } = await safeJsonParse(response);
+      const duration = Date.now() - startTime;
+
+      if (parseError || !response.ok) {
+        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get daily metrics';
+        await logApiCall(supabase, {
+          function_name: 'getlate-analytics', action: 'daily-metrics',
+          request_body: { profileId, startDate, endDate, platform }, response_body: data,
+          status_code: response.status, success: false, error_message: errMsg,
+          duration_ms: duration, user_id: userId, platform,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: errMsg }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await logApiCall(supabase, {
+        function_name: 'getlate-analytics', action: 'daily-metrics',
+        request_body: { profileId, startDate, endDate, platform },
+        response_body: { hasData: !!data },
+        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
+      });
+      return new Response(
+        JSON.stringify({ success: true, dailyMetrics: data }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get post timeline (engagement over time for a specific post)
+    if (action === 'post-timeline') {
+      const { postId, fromDate, toDate } = body;
+      const params = new URLSearchParams();
+      if (postId) params.append('postId', postId);
+      if (fromDate) params.append('fromDate', fromDate);
+      if (toDate) params.append('toDate', toDate);
+
+      const response = await fetch(`${GETLATE_API_URL}/analytics/post-timeline?${params}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      });
+
+      const rateLimitPt = checkRateLimit(response);
+      if (rateLimitPt) return rateLimitPt;
+
+      const { data, error: parseError } = await safeJsonParse(response);
+      const duration = Date.now() - startTime;
+
+      if (parseError || !response.ok) {
+        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get post timeline';
+        await logApiCall(supabase, {
+          function_name: 'getlate-analytics', action: 'post-timeline',
+          request_body: { postId, fromDate, toDate }, response_body: data,
+          status_code: response.status, success: false, error_message: errMsg,
+          duration_ms: duration, user_id: userId,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: errMsg }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      await logApiCall(supabase, {
+        function_name: 'getlate-analytics', action: 'post-timeline',
+        request_body: { postId, fromDate, toDate },
+        response_body: { hasData: !!data },
+        status_code: response.status, success: true, duration_ms: duration, user_id: userId,
+      });
+      return new Response(
+        JSON.stringify({ success: true, timeline: data }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -23,7 +23,7 @@ import {
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook } from "react-icons/fa";
 import { SiBluesky } from "react-icons/si";
 import { useAccounts } from "@/hooks/useGetLateAccounts";
-import { useCreatePost } from "@/hooks/useGetLatePosts";
+import { useCreatePost, useValidatePost } from "@/hooks/useGetLatePosts";
 import { useGenerateSocialPost } from "@/hooks/useGenerateSocialPost";
 import { useAllFeedItems } from "@/hooks/useAllFeedItems";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +92,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
   const { data: drafts } = usePostDrafts();
   const deleteDraftMutation = useDeleteDraft();
   const createPostMutation = useCreatePost();
+  const validatePostMutation = useValidatePost();
   const { generateStrategy, generatePosts, checkCompliance, isGeneratingStrategy, isGeneratingPosts, isCheckingCompliance } = useGenerateSocialPost();
   const { data: feedItems } = useAllFeedItems();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -537,6 +538,48 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
 
   const handleSubmit = async (publishNow: boolean) => {
     if (selectedAccountIds.length === 0) return;
+
+    // Pre-publish validation: collect text from all selected platforms
+    const selectedPlatforms = selectedAccountIds
+      .map(id => connectedAccounts.find(a => a.id === id)?.platform)
+      .filter(Boolean) as string[];
+    const firstText = Object.values(platformContents).find(c => c.trim()) || "";
+
+    if (firstText && selectedPlatforms.length > 0) {
+      try {
+        const validation = await validatePostMutation.mutateAsync({
+          text: firstText,
+          platforms: selectedPlatforms,
+          mediaItems: imageUrl ? [{ url: imageUrl, type: "image" as const }] : undefined,
+        });
+
+        if (validation && !validation.valid) {
+          const errors = validation.errors || [];
+          const warnings = validation.warnings || [];
+
+          if (errors.length > 0) {
+            // Block publish on errors
+            toast({
+              title: "Validation Errors",
+              description: errors.map(e => `${e.platform}: ${e.message}`).join("; "),
+              variant: "destructive",
+            });
+            return;
+          }
+
+          if (warnings.length > 0) {
+            // Show warnings but allow publish-anyway (don't block)
+            toast({
+              title: "Content Warnings",
+              description: warnings.map(w => `${w.platform}: ${w.message}`).join("; "),
+            });
+          }
+        }
+      } catch {
+        // Validation endpoint failure shouldn't block publishing
+        console.warn("Pre-publish validation failed, proceeding with publish");
+      }
+    }
 
     let scheduledFor: string | undefined;
     if (!publishNow && date) {

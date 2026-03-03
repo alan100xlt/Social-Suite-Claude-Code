@@ -5,14 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { Eye, Heart, MessageCircle, Share2, MousePointer, ExternalLink, Zap, Globe, Megaphone, MousePointerClick, Loader2, ChevronDown, ChevronRight, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Heart, MessageCircle, Share2, MousePointer, ExternalLink, Zap, Globe, Megaphone, MousePointerClick, Loader2, ChevronDown, ChevronRight, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { FaInstagram, FaTwitter, FaLinkedin, FaFacebook, FaTiktok } from "react-icons/fa";
 import { SiBluesky } from "react-icons/si";
 import { Platform } from "@/lib/api/getlate";
 import { format, parseISO } from "date-fns";
 import type { TopPost } from "@/hooks/useTopPerformingPosts";
 import type { PostWithPlatforms, PlatformAnalytics } from "@/hooks/useAllPostsWithAnalytics";
-import { useDeletePost } from "@/hooks/useGetLatePosts";
+import { useDeletePost, useUnpublishPost } from "@/hooks/useGetLatePosts";
 
 const platformIcons: Partial<Record<string, React.ElementType>> = {
   instagram: FaInstagram,
@@ -160,6 +160,7 @@ export function TopPostsTable({ posts, isLoading, onDeleted, highlightPostId }: 
     highlightPostId ? new Set([highlightPostId]) : new Set()
   );
   const deletePost = useDeletePost();
+  const unpublishPost = useUnpublishPost();
 
   const sortedPosts = useMemo(() => {
     const filtered = [...posts];
@@ -497,6 +498,47 @@ export function TopPostsTable({ posts, isLoading, onDeleted, highlightPostId }: 
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
+                        )}
+                        {/* Unpublish — visible on hover for published posts */}
+                        {extPost._status === 'published' && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                className="p-1.5 rounded hover:bg-warning/10 transition-colors text-muted-foreground hover:text-warning inline-flex opacity-0 group-hover:opacity-100"
+                                title="Unpublish from social platforms"
+                              >
+                                <EyeOff className="w-3.5 h-3.5" />
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Unpublish this post?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This removes the post from social platforms but keeps it in Longtale for analytics.
+                                  {post.content && (
+                                    <span className="block mt-2 text-xs italic truncate max-w-md">
+                                      "{post.content.slice(0, 100)}…"
+                                    </span>
+                                  )}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    unpublishPost.mutate({ postId: post.postId }, {
+                                      onSuccess: () => onDeleted?.(),
+                                    });
+                                  }}
+                                >
+                                  {unpublishPost.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                  ) : null}
+                                  Unpublish
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

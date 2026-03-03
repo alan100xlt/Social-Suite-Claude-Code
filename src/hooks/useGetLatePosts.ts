@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getlatePosts, GetLatePost, MediaItem, Platform } from '@/lib/api/getlate';
+import { getlatePosts, GetLatePost, MediaItem, Platform, ValidationResult } from '@/lib/api/getlate';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
 
@@ -66,26 +66,64 @@ export function useCreatePost() {
       const profileId = company?.getlate_profile_id;
       const result = await getlatePosts.create({ ...params, profileId });
       if (!result.success) {
-        throw new Error(result.error || 'Failed to create post');
+        // Attach errorType so onError can differentiate
+        const err = new Error(result.error || 'Failed to create post');
+        (err as Error & { errorType?: string }).errorType = result.errorType;
+        throw err;
       }
-      return result.data?.post;
+      // Return full response data including isPartial flag
+      return result.data as { post: GetLatePost; isPartial?: boolean } | undefined;
     },
-    onSuccess: (post) => {
+    onSuccess: (data) => {
       const profileId = company?.getlate_profile_id;
       queryClient.invalidateQueries({ queryKey: ['getlate-posts', profileId] });
-      toast({
-        title: post?.scheduledFor ? 'Post Scheduled' : 'Post Published',
-        description: post?.scheduledFor 
-          ? `Your post has been scheduled for ${new Date(post.scheduledFor).toLocaleString()}`
-          : 'Your post has been published successfully!',
-      });
+
+      const post = data?.post;
+      const isPartial = data?.isPartial;
+
+      if (isPartial) {
+        // Identify failed platforms from platformResults
+        const failed = (post?.platformResults || [])
+          .filter(r => r.status === 'failed')
+          .map(r => r.platform);
+        toast({
+          title: 'Post Partially Published',
+          description: failed.length > 0
+            ? `Published but failed on: ${failed.join(', ')}. Check your connections.`
+            : 'Some platforms failed. Check your connections.',
+          variant: 'destructive',
+        });
+      } else if (post?.scheduledFor) {
+        toast({
+          title: 'Post Scheduled',
+          description: `Your post has been scheduled for ${new Date(post.scheduledFor).toLocaleString()}`,
+        });
+      } else {
+        toast({
+          title: 'Post Published',
+          description: 'Your post has been published successfully!',
+        });
+      }
     },
     onError: (error, variables) => {
       const errorMsg = error instanceof Error ? error.message : 'Failed to create post';
+      const errorType = (error as Error & { errorType?: string }).errorType;
       const isTikTokError = errorMsg.toLowerCase().includes('tiktok');
       const imageInfo = variables.mediaItems?.[0]?.url;
-      
-      if (isTikTokError) {
+
+      if (errorType === 'duplicate_content') {
+        toast({
+          title: 'Duplicate Content',
+          description: 'This content was already posted in the last 24 hours.',
+          variant: 'destructive',
+        });
+      } else if (errorType === 'rate_limit') {
+        toast({
+          title: 'Rate Limited',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+      } else if (isTikTokError) {
         toast({
           title: 'GetLate API Error: TikTok Processing',
           description: `The GetLate API attempted TikTok image processing even though this post was not targeting TikTok. This is a known API issue.${imageInfo ? ` Image: ${imageInfo}` : ''}`,
@@ -134,6 +172,53 @@ export function useUpdatePost() {
         description: error instanceof Error ? error.message : 'Failed to update post',
         variant: 'destructive',
       });
+    },
+  });
+}
+
+export function useUnpublishPost() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: company } = useCompany();
+
+  return useMutation({
+    mutationFn: async ({ postId, platforms }: { postId: string; platforms?: string[] }) => {
+      const result = await getlatePosts.unpublish(postId, platforms);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to unpublish post');
+      }
+    },
+    onSuccess: () => {
+      const profileId = company?.getlate_profile_id;
+      queryClient.invalidateQueries({ queryKey: ['getlate-posts', profileId] });
+      toast({
+        title: 'Post Unpublished',
+        description: 'The post has been removed from social platforms but kept in Longtale for analytics.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Unpublish Failed',
+        description: error instanceof Error ? error.message : 'Failed to unpublish post',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+export function useValidatePost() {
+  return useMutation({
+    mutationFn: async (params: {
+      text: string;
+      mediaItems?: MediaItem[];
+      platforms?: string[];
+      accountIds?: string[];
+    }) => {
+      const result = await getlatePosts.validatePost(params);
+      if (!result.success) {
+        throw new Error(result.error || 'Validation failed');
+      }
+      return result.data?.validation as ValidationResult;
     },
   });
 }

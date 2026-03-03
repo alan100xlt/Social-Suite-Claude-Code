@@ -75,6 +75,19 @@ Deno.serve(async (req) => {
     const { action, accountId, profileId } = await req.json();
     const startTime = Date.now();
 
+    // Helper: check for 429 rate limit
+    const checkRateLimit = (response: Response): Response | null => {
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+        console.warn('Rate limited. Retry-After:', retryAfter);
+        return new Response(
+          JSON.stringify({ success: false, error: `Rate limited. Please try again in ${retryAfter} seconds.`, errorType: 'rate_limit', retryAfter }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return null;
+    };
+
     const normalizeAccount = (account: Record<string, unknown>): Record<string, unknown> => {
       const id = account.id || account._id;
       if (!id) return account;
@@ -88,6 +101,9 @@ Deno.serve(async (req) => {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
+
+      const rateLimitList = checkRateLimit(response);
+      if (rateLimitList) return rateLimitList;
 
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
@@ -130,6 +146,9 @@ Deno.serve(async (req) => {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
+
+      const rateLimitGet = checkRateLimit(response);
+      if (rateLimitGet) return rateLimitGet;
 
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;
@@ -213,6 +232,9 @@ Deno.serve(async (req) => {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       });
+
+      const rateLimitFs = checkRateLimit(response);
+      if (rateLimitFs) return rateLimitFs;
 
       const { data, error: parseError } = await safeJsonParse(response);
       const duration = Date.now() - startTime;

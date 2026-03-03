@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, platform, profileId, redirectUrl, tempToken, selection, companyId, companyName, userProfile } = body;
+    const { action, platform, profileId, redirectUrl, tempToken, selection, companyId, companyName, userProfile, pendingDataToken } = body;
 
     // Create a new profile for a company
     if (action === 'create-profile') {
@@ -505,6 +505,55 @@ Deno.serve(async (req) => {
       
       return new Response(
         JSON.stringify({ success: true, options }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Resolve LinkedIn pendingDataToken to get tempToken + userProfile
+    // This is a one-time, no-auth call — token expires after 10 minutes
+    if (action === 'get-pending-data') {
+      if (!pendingDataToken) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'pendingDataToken is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Resolving pendingDataToken for LinkedIn OAuth');
+
+      const response = await fetch(
+        `${GETLATE_API_URL}/connect/pending-data?token=${encodeURIComponent(pendingDataToken)}`,
+        { method: 'GET' }
+      );
+
+      const { data, error: parseError } = await safeJsonParse(response);
+
+      if (parseError || !response.ok) {
+        console.error('GetLate pending-data error:', parseError || data);
+        const errorData = data as { message?: string; error?: string };
+        const isExpired = response.status === 410 || response.status === 404 ||
+          (errorData?.message || '').toLowerCase().includes('expired');
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: isExpired
+              ? 'Token expired. Please try connecting again (tokens are valid for 10 minutes).'
+              : parseError || errorData?.message || errorData?.error || 'Failed to resolve pending data',
+          }),
+          { status: response.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const pendingData = data as { tempToken?: string; userProfile?: unknown; organizations?: unknown[] };
+      console.log('Pending data resolved, tempToken present:', !!pendingData.tempToken);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          tempToken: pendingData.tempToken,
+          userProfile: pendingData.userProfile,
+          organizations: pendingData.organizations,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

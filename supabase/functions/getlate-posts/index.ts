@@ -183,6 +183,41 @@ Deno.serve(async (req) => {
       const data = await response.json();
       const duration = Date.now() - startTime;
 
+      // Handle 429 Rate Limit
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+        console.warn('Rate limited. Retry-After:', retryAfter);
+        await logApiCall(supabase, {
+          function_name: 'getlate-posts', action: 'create',
+          request_body: postData as Record<string, unknown>,
+          response_body: data, status_code: 429,
+          success: false, error_message: `Rate limited. Retry after ${retryAfter}s`,
+          duration_ms: duration, user_id: userId, profile_id: profileId,
+          account_ids: accountIds,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: `Rate limited. Please try again in ${retryAfter} seconds.`, errorType: 'rate_limit', retryAfter }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Handle 409 Duplicate Content
+      if (response.status === 409) {
+        console.warn('Duplicate content detected:', data);
+        await logApiCall(supabase, {
+          function_name: 'getlate-posts', action: 'create',
+          request_body: postData as Record<string, unknown>,
+          response_body: data, status_code: 409,
+          success: false, error_message: 'Duplicate content detected',
+          duration_ms: duration, user_id: userId, profile_id: profileId,
+          account_ids: accountIds,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: 'This content was already posted in the last 24 hours.', errorType: 'duplicate_content' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       if (!response.ok) {
         console.error('GetLate create post error:', data);
         await logApiCall(supabase, {
@@ -199,7 +234,16 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log('Post created successfully:', data);
+      // Handle partial success (some platforms failed)
+      const isPartial = data.status === 'partial';
+      if (isPartial) {
+        const failedPlatforms = (data.platformResults || [])
+          .filter((r: { status: string }) => r.status === 'failed')
+          .map((r: { platform: string; errorMessage?: string }) => r.platform + (r.errorMessage ? `: ${r.errorMessage}` : ''));
+        console.warn('Partial post success. Failed platforms:', failedPlatforms);
+      }
+
+      console.log('Post created:', isPartial ? 'partial' : 'success', data);
       await logApiCall(supabase, {
         function_name: 'getlate-posts', action: 'create',
         request_body: postData as Record<string, unknown>,
@@ -219,14 +263,16 @@ Deno.serve(async (req) => {
           headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
-            title: '📤 Post Published',
-            body: `Your post has been published to ${platformNames}.`,
+            title: isPartial ? '⚠️ Post Partially Published' : '📤 Post Published',
+            body: isPartial
+              ? `Your post was partially published to ${platformNames}. Some platforms failed.`
+              : `Your post has been published to ${platformNames}.`,
           }),
         }).catch(e => console.error('In-app notification error:', e));
       }
 
       return new Response(
-        JSON.stringify({ success: true, post: data }),
+        JSON.stringify({ success: true, post: data, isPartial }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -395,6 +441,149 @@ Deno.serve(async (req) => {
       });
       return new Response(
         JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Unpublish post (remove from social platforms, keep in Longtale)
+    if (action === 'unpublish') {
+      const { postId, platforms: targetPlatforms } = body;
+      if (!postId) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Post ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const requestBody: Record<string, unknown> = {};
+      if (targetPlatforms && Array.isArray(targetPlatforms) && targetPlatforms.length > 0) {
+        requestBody.platforms = targetPlatforms;
+      }
+
+      const response = await fetch(`${GETLATE_API_URL}/posts/${postId}/unpublish`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const duration = Date.now() - startTime;
+
+      if (response.status === 204 || response.status === 200) {
+        await logApiCall(supabase, {
+          function_name: 'getlate-posts', action: 'unpublish',
+          request_body: { postId, platforms: targetPlatforms },
+          status_code: response.status, success: true,
+          duration_ms: duration, user_id: userId,
+        });
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const data = await response.json();
+      await logApiCall(supabase, {
+        function_name: 'getlate-posts', action: 'unpublish',
+        request_body: { postId, platforms: targetPlatforms },
+        response_body: data, status_code: response.status,
+        success: false, error_message: data.message || 'Failed to unpublish post',
+        duration_ms: duration, user_id: userId,
+      });
+      return new Response(
+        JSON.stringify({ success: false, error: data.message || 'Failed to unpublish post' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate post content length per platform
+    if (action === 'validate-length') {
+      const { text, platforms: targetPlatforms } = body;
+      const response = await fetch(`${GETLATE_API_URL}/tools/validate/post-length`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, platforms: targetPlatforms }),
+      });
+
+      const data = await response.json();
+      const duration = Date.now() - startTime;
+      await logApiCall(supabase, {
+        function_name: 'getlate-posts', action: 'validate-length',
+        request_body: { textLength: text?.length, platforms: targetPlatforms },
+        response_body: data, status_code: response.status,
+        success: response.ok, duration_ms: duration, user_id: userId,
+      });
+
+      if (!response.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: data.message || 'Validation failed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: true, validation: data }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate full post (content + media + platform rules)
+    if (action === 'validate-post') {
+      const { text, mediaItems, platforms: targetPlatforms, accountIds: targetAccountIds } = body;
+      const response = await fetch(`${GETLATE_API_URL}/tools/validate/post`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, mediaItems, platforms: targetPlatforms, accountIds: targetAccountIds }),
+      });
+
+      const data = await response.json();
+      const duration = Date.now() - startTime;
+      await logApiCall(supabase, {
+        function_name: 'getlate-posts', action: 'validate-post',
+        request_body: { textLength: text?.length, mediaCount: mediaItems?.length, platforms: targetPlatforms },
+        response_body: data, status_code: response.status,
+        success: response.ok, duration_ms: duration, user_id: userId,
+      });
+
+      if (!response.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: data.message || 'Validation failed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: true, validation: data }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate media files
+    if (action === 'validate-media') {
+      const { mediaItems } = body;
+      const response = await fetch(`${GETLATE_API_URL}/tools/validate/media`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaItems }),
+      });
+
+      const data = await response.json();
+      const duration = Date.now() - startTime;
+      await logApiCall(supabase, {
+        function_name: 'getlate-posts', action: 'validate-media',
+        request_body: { mediaCount: mediaItems?.length },
+        response_body: data, status_code: response.status,
+        success: response.ok, duration_ms: duration, user_id: userId,
+      });
+
+      if (!response.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: data.message || 'Media validation failed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: true, validation: data }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -9,6 +9,7 @@ export default function OAuthCallback() {
     // Get OAuth callback parameters
     const tempToken = searchParams.get("tempToken");
     const connectToken = searchParams.get("connect_token");
+    const pendingDataToken = searchParams.get("pendingDataToken");
     const error = searchParams.get("error");
     const platform = searchParams.get("platform");
     const userProfileParam = searchParams.get("userProfile");
@@ -34,14 +35,15 @@ export default function OAuthCallback() {
       return;
     }
 
-    if (tempToken || connectToken) {
+    if (tempToken || connectToken || pendingDataToken) {
       // Success - send message to parent window with platform info
       if (window.opener) {
-        window.opener.postMessage({ 
-          type: 'oauth-callback', 
+        window.opener.postMessage({
+          type: 'oauth-callback',
           success: true,
           tempToken,
           connectToken,
+          pendingDataToken,
           platform,
           userProfile,
         }, window.location.origin);
@@ -51,6 +53,7 @@ export default function OAuthCallback() {
         const params = new URLSearchParams();
         params.set('connected', 'true');
         if (tempToken) params.set('tempToken', tempToken);
+        if (pendingDataToken) params.set('pendingDataToken', pendingDataToken);
         if (platform) params.set('platform', platform);
         if (userProfile) params.set('userProfile', JSON.stringify(userProfile));
         navigate('/app/connections?' + params.toString());

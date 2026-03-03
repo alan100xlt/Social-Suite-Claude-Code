@@ -32,6 +32,7 @@ interface PageSelectionDialogProps {
   onOpenChange: (open: boolean) => void;
   platform: Platform | null;
   tempToken: string | null;
+  pendingDataToken?: string | null;
   userProfile?: UserProfile | null;
   onComplete: () => void;
 }
@@ -41,33 +42,67 @@ export function PageSelectionDialog({
   onOpenChange,
   platform,
   tempToken,
+  pendingDataToken,
   userProfile,
   onComplete,
 }: PageSelectionDialogProps) {
   const { toast } = useToast();
   const { data: company } = useCompany();
   const queryClient = useQueryClient();
-  
+
   const [options, setOptions] = useState<PageOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Resolved token/profile from pendingDataToken (LinkedIn new flow)
+  const [resolvedToken, setResolvedToken] = useState<string | null>(null);
+  const [resolvedProfile, setResolvedProfile] = useState<UserProfile | null>(null);
+
+  // The effective tempToken is either the direct one or the resolved one
+  const effectiveToken = tempToken || resolvedToken;
+  const effectiveProfile = userProfile || resolvedProfile;
+
   // Fetch available pages/accounts when dialog opens
   useEffect(() => {
-    if (!open || !platform || !tempToken) return;
+    if (!open || !platform) return;
+    // Need either a tempToken or a pendingDataToken to proceed
+    if (!tempToken && !pendingDataToken) return;
 
     const fetchOptions = async () => {
       setLoading(true);
       setError(null);
       setOptions([]);
       setSelectedId(null);
+      setResolvedToken(null);
+      setResolvedProfile(null);
 
       try {
+        let tokenToUse = tempToken;
+
+        // If we have a pendingDataToken (LinkedIn new flow), resolve it first
+        if (!tokenToUse && pendingDataToken) {
+          const pendingResult = await getlateConnect.getPendingData(pendingDataToken);
+          if (!pendingResult.success || !pendingResult.data?.tempToken) {
+            setError(pendingResult.error || "Failed to resolve LinkedIn token. It may have expired (10 min limit).");
+            return;
+          }
+          tokenToUse = pendingResult.data.tempToken;
+          setResolvedToken(tokenToUse);
+          if (pendingResult.data.userProfile) {
+            setResolvedProfile(pendingResult.data.userProfile as UserProfile);
+          }
+        }
+
+        if (!tokenToUse) {
+          setError("No token available. Please try connecting again.");
+          return;
+        }
+
         const profileId = company?.getlate_profile_id || undefined;
-        const result = await getlateConnect.getOptions(platform, tempToken, profileId);
-        
+        const result = await getlateConnect.getOptions(platform, tokenToUse, profileId);
+
         if (!result.success) {
           setError(result.error || "Failed to load pages");
           return;
@@ -88,10 +123,10 @@ export function PageSelectionDialog({
     };
 
     fetchOptions();
-  }, [open, platform, tempToken]);
+  }, [open, platform, tempToken, pendingDataToken]);
 
   const handleSelect = async () => {
-    if (!platform || !tempToken || !selectedId) return;
+    if (!platform || !effectiveToken || !selectedId) return;
 
     const selectedOption = options.find((o) => o.id === selectedId);
     if (!selectedOption) return;
@@ -101,10 +136,10 @@ export function PageSelectionDialog({
     try {
       const result = await getlateConnect.select(
         platform,
-        tempToken,
+        effectiveToken,
         { id: selectedOption.id, name: selectedOption.name },
         company?.getlate_profile_id || undefined,
-        userProfile || undefined
+        effectiveProfile || undefined
       );
 
       if (!result.success) {

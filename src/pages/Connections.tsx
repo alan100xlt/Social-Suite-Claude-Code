@@ -43,14 +43,15 @@ export default function ConnectionsPage() {
   const [pageSelectionOpen, setPageSelectionOpen] = useState(false);
   const [pendingPlatform, setPendingPlatform] = useState<Platform | null>(null);
   const [pendingTempToken, setPendingTempToken] = useState<string | null>(null);
+  const [pendingDataToken, setPendingDataToken] = useState<string | null>(null);
   const [pendingUserProfile, setPendingUserProfile] = useState<{ id?: string; name?: string; profilePicture?: string } | null>(null);
 
   // Listen for OAuth callback messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'oauth-callback') {
-        const { tempToken, error, platform, userProfile } = event.data;
-        
+        const { tempToken, pendingDataToken: pdt, error, platform, userProfile } = event.data;
+
         if (error) {
           toast({
             title: 'Connection Failed',
@@ -61,13 +62,14 @@ export default function ConnectionsPage() {
         }
 
         // Check if this platform requires page selection
-        if (tempToken) {
+        if (tempToken || pdt) {
           const config = platformConfigs.find(c => c.id === (platform || connectingPlatform));
-          
-          if (config?.requiresPageSelection) {
+
+          if (config?.requiresPageSelection || pdt) {
             // Open page selection dialog
             setPendingPlatform(platform || connectingPlatform);
-            setPendingTempToken(tempToken);
+            setPendingTempToken(tempToken || null);
+            setPendingDataToken(pdt || null);
             setPendingUserProfile(userProfile || null);
             setPageSelectionOpen(true);
           } else {
@@ -86,7 +88,7 @@ export default function ConnectionsPage() {
             description: 'Your social media account has been connected successfully!',
           });
         }
-        
+
         setConnectingPlatform(null);
       }
     };
@@ -113,6 +115,7 @@ export default function ConnectionsPage() {
   const handlePageSelectionComplete = () => {
     setPendingPlatform(null);
     setPendingTempToken(null);
+    setPendingDataToken(null);
     setPendingUserProfile(null);
     refetch();
   };
@@ -242,6 +245,7 @@ export default function ConnectionsPage() {
         onOpenChange={setPageSelectionOpen}
         platform={pendingPlatform}
         tempToken={pendingTempToken}
+        pendingDataToken={pendingDataToken}
         userProfile={pendingUserProfile}
         onComplete={handlePageSelectionComplete}
       />

@@ -45,3 +45,38 @@ export function useAnalyticsOverview(params?: {
     },
   });
 }
+
+export function useDailyMetrics(params?: {
+  profileId?: string;
+  startDate?: string;
+  endDate?: string;
+  platform?: string;
+}) {
+  return useQuery({
+    queryKey: ['getlate-daily-metrics', params],
+    queryFn: async () => {
+      const result = await getlateAnalytics.getDailyMetrics(params || {});
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch daily metrics');
+      }
+      return result.data?.metrics || [];
+    },
+  });
+}
+
+export function usePostTimeline(postId: string, params?: {
+  fromDate?: string;
+  toDate?: string;
+}) {
+  return useQuery({
+    queryKey: ['getlate-post-timeline', postId, params],
+    queryFn: async () => {
+      const result = await getlateAnalytics.getPostTimeline(postId, params);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch post timeline');
+      }
+      return result.data?.timeline || [];
+    },
+    enabled: !!postId,
+  });
+}
