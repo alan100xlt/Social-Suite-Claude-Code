@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useCreateCompany } from '@/hooks/useCompany';
@@ -26,6 +26,8 @@ export default function SetupCompany() {
   const platform = usePlatform();
   const createCompany = useCreateCompany();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isAddingNew = searchParams.get('addNew') === 'true';
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -67,12 +69,12 @@ export default function SetupCompany() {
     if (!authLoading && user) checkMembership();
   }, [user, authLoading]);
 
-  // Redirect if already has a company membership
+  // Redirect if already has a company membership (unless explicitly adding a new company)
   useEffect(() => {
-    if (hasMembership === true) {
+    if (hasMembership === true && !isAddingNew) {
       navigate('/app');
     }
-  }, [hasMembership, navigate]);
+  }, [hasMembership, navigate, isAddingNew]);
 
   // Check for pending invitations
   useEffect(() => {

@@ -198,7 +198,7 @@ export function TopBar() {
                       <CommandItem
                         onSelect={() => {
                           setCompanyOpen(false);
-                          navigate("/setup-company");
+                          navigate("/app/onboarding/setup");
                         }}
                         className="cursor-pointer"
                       >
@@ -212,7 +212,7 @@ export function TopBar() {
             </Popover>
           )}
 
-          {/* Theme Toggle */}
+          {/* Theme Toggle - links to full theme page */}
           <Button
             variant="ghost"
             size="sm"
@@ -261,7 +261,7 @@ export function TopBar() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/settings?tab=company" className="flex items-center gap-2 cursor-pointer">
+                <Link to="/app/settings?tab=company" className="flex items-center gap-2 cursor-pointer">
                   <Building2 className="h-4 w-4" />
                   <span>Company Settings</span>
                 </Link>

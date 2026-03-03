@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useCreateMediaCompany } from '@/hooks/useMediaCompanyManagement';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateMediaCompanyDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function CreateMediaCompanyDialog({ open, onOpenChange }: CreateMediaComp
   const [contactEmail, setContactEmail] = useState('');
 
   const createMutation = useCreateMediaCompany();
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +33,7 @@ export function CreateMediaCompanyDialog({ open, onOpenChange }: CreateMediaComp
       logo_url: logoUrl.trim() || undefined,
       website_url: websiteUrl.trim() || undefined,
       contact_email: contactEmail.trim() || undefined,
+      firstAdminUserId: user?.id,
     });
 
     setName('');
