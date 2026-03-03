@@ -56,18 +56,43 @@ src/
 All app routes are under `/app/*` (protected). Marketing/landing at `/`. Auth at `/auth/*`.
 
 Key routes:
+
+**Public / Marketing:**
 - `/` — LandingPage (V1, default)
-- `/auth/login` `/auth/signup` `/auth/reset-password`
+- `/v2` `/v3` `/v4` — Landing page variants
+- `/get-started` — GetStarted page
+- `/discover` — Discover page
+- `/design-preview` — DesignPreview (demo)
+- `/nivo-showcase` — Nivo chart showcase (demo)
+
+**Auth:**
+- `/auth/login` `/auth/signup` `/auth/reset-password` `/auth/callback`
+
+**Standalone:**
+- `/approve/:token` — External post approval (no auth required)
+
+**App (protected):**
 - `/app` — Dashboard (Index.tsx)
 - `/app/content` — Posts, Calendar, Drafts, Automations, Feeds tabs
 - `/app/analytics` — Recharts analytics
 - `/app/analytics-v2` — Nivo analytics
 - `/app/connections` — OAuth platform connections
 - `/app/settings` — Profile, Company, BrandVoice, Notifications
-- `/app/theme` — Theme settings (ThemeToggle + ThemePreview)
-- `/app/admin/*` — Admin tools (api-logs, mapping, email-branding, cron-health)
+
+**Onboarding (protected):**
+- `/app/onboarding/setup` — SetupCompany
+- `/app/onboarding/wizard` — OnboardingWizard
+
+**Admin (protected):**
+- `/app/admin/api-logs` — API log viewer
+- `/app/admin/mapping` — GetLate mapping tool
+- `/app/admin/email-branding` — Email branding settings
+- `/app/admin/platform` — Platform settings
 - `/app/admin/companies` — Superadmin company management
-- `/app/media-company/:id` — Media company dashboard
+- `/app/admin/cron-health` — Cron job health dashboard
+- `/app/admin/wizard` — Wizard variations
+
+**Redirects:** Many legacy paths (`/login`, `/posts`, `/automations`, etc.) redirect to their `/app/*` equivalents.
 
 All pages are **eagerly imported** in App.tsx — no lazy loading yet.
 
@@ -211,9 +236,3 @@ Whenever a plan is finalized and approved and work is about to begin, **always g
 
 - `security-reviewer` — reviews auth/RLS/XSS issues; invoked automatically on security-adjacent changes
 
-## Recent Fixes (this session)
-
-1. `ThemeContext.tsx:204` — mismatched quote in `vibrant` theme `fontFamily` string
-2. `src/index.css` — moved `@import` Google Fonts above `@tailwind` directives
-3. `figmaService.ts:196` — replaced `process.env.REACT_APP_FIGMA_ACCESS_TOKEN` with `import.meta.env.VITE_FIGMA_ACCESS_TOKEN`
-4. Deleted `src/services/ErrorMonitor.ts` — dead Node.js-only code, never used
