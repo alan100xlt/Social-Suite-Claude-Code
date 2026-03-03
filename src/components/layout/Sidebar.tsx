@@ -23,6 +23,7 @@ import {
   Building2,
   HeartPulse,
   Users,
+  Palette,
 } from "lucide-react";
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
@@ -32,6 +33,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserMediaCompanies } from "@/hooks/useMediaCompanyManagement";
 import { usePlatform } from "@/contexts/PlatformContext";
 import { Platform } from "@/lib/api/getlate";
+import { CompanySwitcher } from "@/components/company/CompanySwitcher";
+import { CreateMediaCompanyDialog } from "@/components/admin/CreateMediaCompanyDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,12 +43,23 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-const navigation: { name: string; href: string; icon: React.ElementType; addAction?: string }[] = [
+type NavItem = { name: string; href: string; icon: React.ElementType; addAction?: string };
+
+const mainNavigation: NavItem[] = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard },
   { name: "Content", href: "/app/content", icon: Newspaper, addAction: "/app/content?tab=posts" },
+  { name: "Connections", href: "/app/connections", icon: Link2 },
+];
+
+const analyticsNavigation: NavItem[] = [
   { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
   { name: "Insights", href: "/app/analytics-v2", icon: Sparkles },
-  { name: "Analytics V3", href: "/app/analytics-v3", icon: Zap },
+  { name: "Advanced", href: "/app/analytics-v3", icon: Zap },
+];
+
+const manageNavigation: NavItem[] = [
+  { name: "Settings", href: "/app/settings", icon: Settings },
+  { name: "Theme", href: "/app/theme", icon: Palette },
 ];
 
 // Platform icon and color mapping
@@ -70,9 +84,9 @@ function getProfileUrl(platform: Platform, username?: string, metadata?: Record<
   if (metadata?.selectedPageId && platform === "facebook") {
     return `https://facebook.com/${metadata.selectedPageId}`;
   }
-  
+
   if (!username) return null;
-  
+
   const urlTemplates: Partial<Record<Platform, string>> = {
     instagram: `https://instagram.com/${username}`,
     twitter: `https://twitter.com/${username}`,
@@ -85,13 +99,71 @@ function getProfileUrl(platform: Platform, username?: string, metadata?: Record<
     bluesky: `https://bsky.app/profile/${username}`,
     threads: `https://threads.net/@${username}`,
   };
-  
+
   return urlTemplates[platform] || null;
+}
+
+function NavSection({ label, items, collapsed, location }: {
+  label: string;
+  items: NavItem[];
+  collapsed: boolean;
+  location: { pathname: string };
+}) {
+  return (
+    <div className="space-y-1">
+      {!collapsed && (
+        <div className="px-3 pt-4 pb-1">
+          <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">{label}</p>
+        </div>
+      )}
+      {collapsed && <div className="pt-2" />}
+      {items.map((item) => {
+        const isActive = location.pathname === item.href || (item.href !== '/app' && location.pathname.startsWith(item.href));
+        return (
+          <div key={item.name} className="flex items-center gap-1">
+            <Link
+              to={item.href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group flex-1",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+              )}
+            >
+              <item.icon
+                size={20}
+                className={cn(
+                  "flex-shrink-0 transition-transform group-hover:scale-110",
+                  isActive && "drop-shadow-sm"
+                )}
+              />
+              {!collapsed && (
+                <span className="font-medium text-sm">{item.name}</span>
+              )}
+            </Link>
+            {item.addAction && !collapsed && (
+              <Link
+                to={item.addAction}
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+                title="Create new post"
+              >
+                <Plus size={16} />
+              </Link>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(false);
+  const [createMediaCompanyOpen, setCreateMediaCompanyOpen] = useState(false);
   const location = useLocation();
   const { data: accounts, isLoading: accountsLoading } = useAccounts();
   const { data: userRole } = useUserRole();
@@ -127,48 +199,18 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Company Switcher */}
+      <div className="px-3 pt-3">
+        <CompanySwitcher collapsed={collapsed} />
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {navigation.map((item) => {
-          const isActive = location.pathname === item.href || (item.href !== '/app' && location.pathname.startsWith(item.href));
-          return (
-            <div key={item.name} className="flex items-center gap-1">
-              <Link
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group flex-1",
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent"
-                )}
-              >
-                <item.icon
-                  size={20}
-                  className={cn(
-                    "flex-shrink-0 transition-transform group-hover:scale-110",
-                    isActive && "drop-shadow-sm"
-                  )}
-                />
-                {!collapsed && (
-                  <span className="font-medium text-sm">{item.name}</span>
-                )}
-              </Link>
-              {item.addAction && !collapsed && (
-                <Link
-                  to={item.addAction}
-                  className={cn(
-                    "p-1.5 rounded-md transition-colors",
-                    "text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
-                  title="Create new post"
-                >
-                  <Plus size={16} />
-                </Link>
-              )}
-            </div>
-          );
-        })}
+        {/* Main */}
+        <NavSection label="Main" items={mainNavigation} collapsed={collapsed} location={location} />
+
+        {/* Analytics */}
+        <NavSection label="Analytics" items={analyticsNavigation} collapsed={collapsed} location={location} />
 
         {/* My Channels Flyout */}
         <DropdownMenu open={channelsOpen} onOpenChange={setChannelsOpen}>
@@ -208,7 +250,7 @@ export function Sidebar() {
               <p className="text-sm font-semibold text-foreground">My Social Channels</p>
               <p className="text-xs text-muted-foreground">Quick links to your profiles</p>
             </div>
-            
+
             {accountsLoading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -223,7 +265,7 @@ export function Sidebar() {
                     account.username,
                     account.metadata as Record<string, unknown>
                   );
-                  
+
                   return (
                     <DropdownMenuItem
                       key={account.id}
@@ -273,75 +315,64 @@ export function Sidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Media Company */}
-        {mediaCompanies && mediaCompanies.length > 0 && (
-          mediaCompanies.length === 1 ? (
-            <Link
-              to={`/app/media-company/${mediaCompanies[0].id}`}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname.startsWith(`/app/media-company/${mediaCompanies[0].id}`)
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Building2
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">Media Company</span>
-              )}
-            </Link>
-          ) : (
-            <div className="space-y-1">
-              {!collapsed && (
-                <div className="px-3 pt-2 pb-1">
-                  <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Media Companies</p>
-                </div>
-              )}
-              {mediaCompanies.map((mc) => (
+        {/* Manage */}
+        <NavSection label="Manage" items={manageNavigation} collapsed={collapsed} location={location} />
+
+        {/* Media Companies */}
+        {(isOwnerOrAdmin || isSuperAdmin || (mediaCompanies && mediaCompanies.length > 0)) && (
+          <div className="space-y-1">
+            {!collapsed && (
+              <div className="px-3 pt-4 pb-1">
+                <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Media Companies</p>
+              </div>
+            )}
+            {collapsed && <div className="pt-2" />}
+            {mediaCompanies && mediaCompanies.length > 0 ? (
+              mediaCompanies.map((mc) => (
                 <Link
                   key={mc.id}
                   to={`/app/media-company/${mc.id}`}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
                     location.pathname.startsWith(`/app/media-company/${mc.id}`)
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
                       : "text-sidebar-foreground hover:bg-sidebar-accent"
                   )}
                 >
                   <Building2
-                    size={18}
+                    size={20}
                     className="flex-shrink-0 transition-transform group-hover:scale-110"
                   />
                   {!collapsed && (
                     <span className="font-medium text-sm truncate">{mc.name}</span>
                   )}
                 </Link>
-              ))}
-            </div>
-          )
+              ))
+            ) : (
+              !collapsed && (
+                <p className="px-3 py-1 text-xs text-sidebar-foreground/40">No media companies yet</p>
+              )
+            )}
+            {(isOwnerOrAdmin || isSuperAdmin) && !collapsed && (
+              <button
+                onClick={() => setCreateMediaCompanyOpen(true)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground text-sm"
+              >
+                <Plus size={18} className="flex-shrink-0" />
+                <span className="font-medium">New Media Company</span>
+              </button>
+            )}
+            {(isOwnerOrAdmin || isSuperAdmin) && collapsed && (
+              <button
+                onClick={() => setCreateMediaCompanyOpen(true)}
+                className="w-full flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                title="New Media Company"
+              >
+                <Plus size={18} />
+              </button>
+            )}
+          </div>
         )}
-
-        {/* Settings */}
-        <Link
-          to="/app/settings"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-            location.pathname === "/app/settings"
-              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-              : "text-sidebar-foreground hover:bg-sidebar-accent"
-          )}
-        >
-          <Settings
-            size={20}
-            className="flex-shrink-0 transition-transform group-hover:scale-110"
-          />
-          {!collapsed && (
-            <span className="font-medium text-sm">Settings</span>
-          )}
-        </Link>
 
         {/* Superadmin Only */}
         {isSuperAdmin && (
@@ -352,6 +383,7 @@ export function Sidebar() {
                 <span className="text-xs font-bold text-primary">CC</span>
               </div>
             )}
+            {collapsed && <div className="pt-2" />}
             <Link
               to="/app/admin/api-logs"
               className={cn(
@@ -489,6 +521,9 @@ export function Sidebar() {
           </div>
         )}
       </div>
+
+      {/* Create Media Company Dialog */}
+      <CreateMediaCompanyDialog open={createMediaCompanyOpen} onOpenChange={setCreateMediaCompanyOpen} />
     </aside>
   );
 }

@@ -35,8 +35,8 @@ export function CompanySwitcher({ collapsed }: CompanySwitcherProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Show for superadmin OR users with multiple companies
-  if (!isSuperAdmin && (!allCompanies || allCompanies.length <= 1)) return null;
+  // Show for all users who have at least one company (allows access to "Create New Company")
+  if (!allCompanies || allCompanies.length === 0) return null;
 
   const handleSelectCompany = (companyId: string) => {
     setSelectedCompanyId(companyId);
@@ -51,7 +51,7 @@ export function CompanySwitcher({ collapsed }: CompanySwitcherProps) {
 
   const handleCreateCompany = () => {
     setOpen(false);
-    navigate('/app/onboarding/setup');
+    navigate('/app/onboarding/setup?addNew=true');
   };
 
   if (collapsed) {

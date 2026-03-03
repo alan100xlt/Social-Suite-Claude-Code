@@ -1,4 +1,5 @@
 import React from 'react';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +71,8 @@ export default function ThemeSettings() {
   const stats = getThemeStats();
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <DashboardLayout>
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -380,5 +382,6 @@ export default function ThemeSettings() {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardLayout>
   );
 }
