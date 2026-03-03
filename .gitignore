@@ -27,4 +27,8 @@ coverage
 *.sw?
 scripts/slack-agent/.env
 scripts/slack-agent/.listener.pid
+.claude/approval-state*.json
 supabase/functions/.env
+
+# Worktrees
+.worktrees
