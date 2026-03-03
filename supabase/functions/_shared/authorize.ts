@@ -52,18 +52,36 @@ export async function authorize(
   const authHeader = req.headers.get("Authorization");
 
   // --- Service role bypass ---
-  if (options.allowServiceRole) {
-    // If there's a service_role key or anon key in the auth header, allow through
-    // The anon key check is needed because pg_cron jobs use the anon key
+  if (options.allowServiceRole && authHeader) {
+    // Extract the token from "Bearer <token>"
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : authHeader.trim();
+
+    // Check if token matches service_role key or anon key
     if (
-      (supabaseServiceKey && authHeader?.includes(supabaseServiceKey)) ||
-      (supabaseAnonKey && authHeader?.includes(supabaseAnonKey))
+      (supabaseServiceKey && token === supabaseServiceKey) ||
+      (supabaseAnonKey && token === supabaseAnonKey)
     ) {
       return {
         userId: "service_role",
         email: "service_role",
         isSuperAdmin: false,
       };
+    }
+
+    // Also check if the JWT payload contains "service_role" role
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.role === 'service_role') {
+        return {
+          userId: "service_role",
+          email: "service_role",
+          isSuperAdmin: false,
+        };
+      }
+    } catch {
+      // Not a valid JWT, continue to normal auth
     }
   }
 

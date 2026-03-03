@@ -3,10 +3,9 @@ import { adminClient } from "./setup";
 
 describe("Cron job health", () => {
   test("all expected cron jobs are registered", async () => {
-    const { data, error } = await adminClient.rpc("get_cron_jobs").catch(() => {
-      // Fallback: query cron.job directly via SQL if RPC doesn't exist
-      return { data: null, error: { message: "RPC not available" } };
-    });
+    const result = await adminClient.rpc("get_cron_jobs");
+    const data = result.data;
+    const error = result.error;
 
     // If RPC doesn't work, use raw SQL via admin client
     // Note: cron.job may not be directly queryable via PostgREST.
