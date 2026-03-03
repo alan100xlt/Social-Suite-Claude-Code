@@ -1,5 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-import Redis from 'ioredis'
+import { supabase } from '@/integrations/supabase/client'
 
 // Types for security context
 export interface SecurityContext {
@@ -47,34 +46,11 @@ export interface Relationship {
 }
 
 export class SecurityContextService {
-  private redis: Redis
-  private supabase: ReturnType<typeof createClient>
+  private supabase = supabase
   private cache = new Map<string, SecurityContext>()
   private readonly CACHE_TTL = 15 * 60 * 1000 // 15 minutes
-  private readonly CACHE_KEY_PREFIX = 'security:context:'
 
   constructor() {
-    // Initialize Redis connection
-    this.redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
-    })
-
-    // Initialize Supabase client
-    this.supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
-      process.env.VITE_SUPABASE_ANON_KEY!
-    )
-
-    // Setup Redis error handling
-    this.redis.on('error', (error) => {
-      console.error('Redis connection error:', error)
-    })
-
     // Setup cache cleanup interval
     setInterval(() => {
       this.cleanupExpiredCache()
@@ -92,22 +68,6 @@ export class SecurityContextService {
     const memCached = this.cache.get(userId)
     if (memCached && memCached.expiresAt > Date.now()) {
       return memCached
-    }
-
-    // Check Redis cache
-    const redisKey = this.CACHE_KEY_PREFIX + userId
-    try {
-      const redisCached = await this.redis.get(redisKey)
-      if (redisCached) {
-        const context = JSON.parse(redisCached) as SecurityContext
-        if (context.expiresAt > Date.now()) {
-          // Update memory cache
-          this.cache.set(userId, context)
-          return context
-        }
-      }
-    } catch (error) {
-      console.warn('Redis cache miss:', error)
     }
 
     // Build security context from database
@@ -258,35 +218,17 @@ export class SecurityContextService {
   }
 
   /**
-   * Cache security context in memory and Redis
+   * Cache security context in memory
    */
   private async cacheSecurityContext(userId: string, context: SecurityContext): Promise<void> {
-    // Update memory cache
     this.cache.set(userId, context)
-
-    // Update Redis cache
-    const redisKey = this.CACHE_KEY_PREFIX + userId
-    try {
-      await this.redis.setex(redisKey, this.CACHE_TTL / 1000, JSON.stringify(context))
-    } catch (error) {
-      console.warn('Failed to cache security context in Redis:', error)
-    }
   }
 
   /**
    * Invalidate security context cache for a user
    */
   async invalidateSecurityContext(userId: string): Promise<void> {
-    // Remove from memory cache
     this.cache.delete(userId)
-
-    // Remove from Redis
-    const redisKey = this.CACHE_KEY_PREFIX + userId
-    try {
-      await this.redis.del(redisKey)
-    } catch (error) {
-      console.warn('Failed to invalidate Redis cache:', error)
-    }
   }
 
   /**
@@ -343,28 +285,10 @@ export class SecurityContextService {
   /**
    * Get cache statistics
    */
-  getCacheStats(): {
-    memoryCache: { size: number; hitRate: number }
-    redisCache: Promise<{ connected: boolean; memory: string }>
-  } {
+  getCacheStats(): { memoryCache: { size: number } } {
     return {
-      memoryCache: {
-        size: this.cache.size,
-        hitRate: 0 // TODO: Implement hit rate tracking
-      },
-      redisCache: this.redis.info().then(info => ({
-        connected: this.redis.status === 'ready',
-        memory: info.split('\r\n').find(line => line.startsWith('used_memory_human:'))?.split(':')[1] || 'unknown'
-      }))
+      memoryCache: { size: this.cache.size }
     }
-  }
-
-  /**
-   * Graceful shutdown
-   */
-  async shutdown(): Promise<void> {
-    await this.redis.quit()
-    this.cache.clear()
   }
 }
 
