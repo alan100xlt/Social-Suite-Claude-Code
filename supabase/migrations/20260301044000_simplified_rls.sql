@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100000_platform_restoration_rls_cleanup.sql
+-- The infrastructure created by this migration has been removed.
 -- Simplified RLS System for Enterprise Scale
 -- Replaces complex hierarchical RLS with session-based approach
 

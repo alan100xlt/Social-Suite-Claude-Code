@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100000_platform_restoration_rls_cleanup.sql
+-- The infrastructure created by this migration has been removed.
 -- Comprehensive Audit Trail System for Enterprise Media Companies
 -- Tracks all changes across entities with full context and attribution
 

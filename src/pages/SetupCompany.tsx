@@ -133,6 +133,18 @@ export default function SetupCompany() {
     setAcceptingInvitation(true);
 
     try {
+      // Verify the invitation email matches the current user
+      const { data: inv, error: invCheckError } = await supabase
+        .from('company_invitations')
+        .select('email')
+        .eq('id', invitation.id)
+        .single();
+
+      if (invCheckError || !inv) throw new Error('Invitation not found');
+      if (inv.email.toLowerCase() !== user.email?.toLowerCase()) {
+        throw new Error('This invitation was sent to a different email address');
+      }
+
       const { error: membershipError } = await supabase
         .from('company_memberships')
         .insert({

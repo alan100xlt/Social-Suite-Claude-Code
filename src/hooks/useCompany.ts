@@ -258,6 +258,16 @@ export function useCreateCompany() {
 
       if (membershipError) throw membershipError;
 
+      // Update profile with company_id
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ company_id: company.id })
+        .eq('id', user.id);
+
+      if (profileError) {
+        console.error('Failed to update profile company_id:', profileError);
+      }
+
       // Create default automation rule
       const userEmail = user.email;
       if (userEmail) {
@@ -271,7 +281,7 @@ export function useCreateCompany() {
             objective: 'auto',
             action: 'send_approval',
             approval_emails: [userEmail],
-            account_ids: ['dummy-facebook', 'dummy-instagram'],
+            account_ids: [],
           });
 
         if (ruleError) {

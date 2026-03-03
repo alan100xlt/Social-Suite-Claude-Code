@@ -469,6 +469,8 @@ export type Database = {
           extract_locations: boolean
           hashtag_strategy: string
           id: string
+          optimal_windows_cache: Json | null
+          optimal_windows_cached_at: string | null
           require_ai_review: boolean
           tone: string
           updated_at: string
@@ -484,6 +486,8 @@ export type Database = {
           extract_locations?: boolean
           hashtag_strategy?: string
           id?: string
+          optimal_windows_cache?: Json | null
+          optimal_windows_cached_at?: string | null
           require_ai_review?: boolean
           tone?: string
           updated_at?: string
@@ -499,6 +503,8 @@ export type Database = {
           extract_locations?: boolean
           hashtag_strategy?: string
           id?: string
+          optimal_windows_cache?: Json | null
+          optimal_windows_cached_at?: string | null
           require_ai_review?: boolean
           tone?: string
           updated_at?: string
@@ -513,42 +519,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      cron_health_logs: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          details: Json | null
-          duration_ms: number | null
-          error_message: string | null
-          id: string
-          job_name: string
-          started_at: string
-          status: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          details?: Json | null
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          job_name: string
-          started_at?: string
-          status?: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          details?: Json | null
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          job_name?: string
-          started_at?: string
-          status?: string
-        }
-        Relationships: []
       }
       discovery_leads: {
         Row: {
@@ -590,6 +560,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      getlate_changelog_checks: {
+        Row: {
+          ai_analysis: Json | null
+          checked_at: string
+          entries_found: number
+          error_message: string | null
+          id: string
+          last_seen_entry_id: string | null
+          linear_issue_url: string | null
+          new_entries: Json | null
+          slack_message_ts: string | null
+          status: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          checked_at?: string
+          entries_found?: number
+          error_message?: string | null
+          id?: string
+          last_seen_entry_id?: string | null
+          linear_issue_url?: string | null
+          new_entries?: Json | null
+          slack_message_ts?: string | null
+          status?: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          checked_at?: string
+          entries_found?: number
+          error_message?: string | null
+          id?: string
+          last_seen_entry_id?: string | null
+          linear_issue_url?: string | null
+          new_entries?: Json | null
+          slack_message_ts?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       global_email_settings: {
         Row: {
@@ -677,6 +686,175 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      media_companies: {
+        Row: {
+          contact_email: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          settings: Json | null
+          updated_at: string | null
+          website_url: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          settings?: Json | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          settings?: Json | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      media_company_analytics: {
+        Row: {
+          calculated_at: string | null
+          data_source: string | null
+          id: string
+          media_company_id: string
+          period_end: string
+          period_start: string
+          platform_breakdown: Json | null
+          total_companies: number | null
+          total_engagement: number | null
+          total_followers: number | null
+          total_posts: number | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          data_source?: string | null
+          id?: string
+          media_company_id: string
+          period_end: string
+          period_start: string
+          platform_breakdown?: Json | null
+          total_companies?: number | null
+          total_engagement?: number | null
+          total_followers?: number | null
+          total_posts?: number | null
+        }
+        Update: {
+          calculated_at?: string | null
+          data_source?: string | null
+          id?: string
+          media_company_id?: string
+          period_end?: string
+          period_start?: string
+          platform_breakdown?: Json | null
+          total_companies?: number | null
+          total_engagement?: number | null
+          total_followers?: number | null
+          total_posts?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_company_analytics_media_company_id_fkey"
+            columns: ["media_company_id"]
+            isOneToOne: false
+            referencedRelation: "media_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_company_children: {
+        Row: {
+          child_company_id: string
+          created_at: string | null
+          id: string
+          parent_company_id: string
+          relationship_type: string | null
+        }
+        Insert: {
+          child_company_id: string
+          created_at?: string | null
+          id?: string
+          parent_company_id: string
+          relationship_type?: string | null
+        }
+        Update: {
+          child_company_id?: string
+          created_at?: string | null
+          id?: string
+          parent_company_id?: string
+          relationship_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_company_children_child_company_id_fkey"
+            columns: ["child_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_company_children_parent_company_id_fkey"
+            columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "media_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_company_members: {
+        Row: {
+          created_at: string | null
+          id: string
+          invited_by: string | null
+          is_active: boolean | null
+          media_company_id: string
+          permissions: Json | null
+          role: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invited_by?: string | null
+          is_active?: boolean | null
+          media_company_id: string
+          permissions?: Json | null
+          role?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invited_by?: string | null
+          is_active?: boolean | null
+          media_company_id?: string
+          permissions?: Json | null
+          role?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_company_members_media_company_id_fkey"
+            columns: ["media_company_id"]
+            isOneToOne: false
+            referencedRelation: "media_companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_settings: {
         Row: {
@@ -1128,12 +1306,44 @@ export type Database = {
     }
     Functions: {
       auth_email: { Args: never; Returns: string }
+      get_accessible_companies: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       get_followers_by_date_platform: {
         Args: { _company_id: string; _end_date: string; _start_date: string }
         Returns: {
           followers: number
           platform: string
           snapshot_date: string
+        }[]
+      }
+      get_media_companies: { Args: { _user_id: string }; Returns: string[] }
+      get_media_company_hierarchy: {
+        Args: {
+          _include_analytics?: boolean
+          _media_company_id: string
+          _period_days?: number
+        }
+        Returns: {
+          company_id: string
+          company_name: string
+          platform_breakdown: Json
+          relationship_type: string
+          total_engagement: number
+          total_followers: number
+          total_posts: number
+        }[]
+      }
+      get_optimal_posting_windows: {
+        Args: { _company_id: string; _platform?: string; _timezone?: string }
+        Returns: {
+          avg_engagement: number
+          confidence_level: string
+          day_of_week: number
+          hour: number
+          platform: string
+          post_count: number
         }[]
       }
       get_post_analytics_by_date: {
@@ -1217,11 +1427,23 @@ export type Database = {
       }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
+      has_media_company_permission: {
+        Args: {
+          _media_company_id: string
+          _required_role?: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_media_company_admin: {
+        Args: { _media_company_id: string; _user_id: string }
         Returns: boolean
       }
       is_superadmin: { Args: never; Returns: boolean }

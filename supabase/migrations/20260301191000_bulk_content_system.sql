@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100000_platform_restoration_rls_cleanup.sql
+-- The infrastructure created by this migration has been removed.
 -- Bulk Content System for Enterprise Portfolio Management
 -- Supports cross-company content creation and publishing
 

@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100000_platform_restoration_rls_cleanup.sql
+-- The infrastructure created by this migration has been removed.
 -- Media Company Hierarchy Schema
 -- Supports parent-child relationships for media companies/agencies
 

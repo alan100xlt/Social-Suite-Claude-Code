@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100100_fix_cron_jobs.sql
+-- The infrastructure created by this migration has been removed.
 -- Schedule hourly analytics sync via pg_cron + pg_net
 -- Calls the analytics-sync edge function every hour at minute 0
 

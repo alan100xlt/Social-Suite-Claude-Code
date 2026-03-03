@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100100_fix_cron_jobs.sql
+-- The infrastructure created by this migration has been removed.
 -- Schedule RSS feed polling every 5 minutes via pg_cron + pg_net
 -- Calls the rss-poll edge function with no body (polls all active feeds)
 

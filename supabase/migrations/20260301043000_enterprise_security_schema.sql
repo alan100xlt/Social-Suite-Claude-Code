@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100000_platform_restoration_rls_cleanup.sql
+-- The infrastructure created by this migration has been removed.
 -- Enterprise Security Schema for Media Company Hierarchy
 -- Optimized for 1000+ media companies with sub-50ms permission checks
 

@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20260303100000_platform_restoration_rls_cleanup.sql
+-- The infrastructure created by this migration has been removed.
 -- Bulk Content Creation System for Enterprise Media Companies
 -- Supports creating and publishing content across multiple companies simultaneously
 
