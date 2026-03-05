@@ -245,13 +245,11 @@ export const warmCacheMiddleware = async (req: Request, res: Response, next: Nex
 export const securityHealthCheck = async (req: Request, res: Response): Promise<void> => {
   try {
     const stats = securityContextService.getCacheStats()
-    const redisStats = await stats.redisCache
-    
+
     res.json({
       status: 'healthy',
       cache: {
         memory: stats.memoryCache,
-        redis: redisStats
       },
       timestamp: new Date().toISOString()
     })

@@ -7,7 +7,8 @@ export class NotificationService {
 
   constructor() {
     // Initialize Slack if webhook URL is available
-    const webhookUrl = process.env.SLACK_WEBHOOK_URL
+    // Vite exposes env vars via import.meta.env, not process.env
+    const webhookUrl = import.meta.env.VITE_SLACK_WEBHOOK_URL
     if (webhookUrl) {
       slackService.initialize(webhookUrl, '#social-suite-development')
       this.slackEnabled = true

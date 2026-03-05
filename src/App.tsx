@@ -1,3 +1,4 @@
+import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,39 +11,25 @@ import { CourierTokenProvider } from "@/contexts/CourierContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { DemoDataProvider } from "@/lib/demo/DemoDataProvider";
-import { KokoProvider } from "@/contexts/KokoContext";
-import { KokoFab } from "@/components/koko/KokoFab";
-import { KokoCopilot } from "@/components/koko/KokoCopilot";
 
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SuperAdminRoute } from "@/components/auth/SuperAdminRoute";
+
+// Eager imports — high-traffic routes that should load immediately
 import Index from "./pages/Index";
 import Connections from "./pages/Connections";
 import Content from "./pages/Content";
 import ContentV2 from "./pages/ContentV2";
 import ContentSources from "./pages/ContentSources";
-import AutomationLogsPage from "./pages/AutomationLogsPage";
 import Analytics from "./pages/Analytics";
-import AnalyticsV2 from "./pages/AnalyticsV2";
 import AnalyticsV3 from "./pages/AnalyticsV3";
-import AnalyticsV4 from "./pages/AnalyticsV4";
 import Settings from "./pages/Settings";
 import OAuthCallback from "./pages/OAuthCallback";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import SetupCompany from "./pages/SetupCompany";
-import GetLateMapping from "./pages/GetLateMapping";
 import ApprovePost from "./pages/ApprovePost";
-import ApiLogs from "./pages/ApiLogs";
-import WizardVariations from "./pages/WizardVariations";
-import EmailBranding from "./pages/EmailBranding";
-import PlatformSettings from "./pages/PlatformSettings";
-import AdminPlatformConfig from "./pages/AdminPlatformConfig";
-import AdminDataManagement from "./pages/AdminDataManagement";
-import DesignPreview from "./pages/DesignPreview";
-import NivoShowcase from "./pages/NivoShowcase";
-import AnalyticsShowcase from "./pages/AnalyticsShowcase";
 import LandingPage from "./pages/LandingPage";
 import LandingPageV2 from "./pages/LandingPageV2";
 import LandingPageV3 from "./pages/LandingPageV3";
@@ -52,15 +39,35 @@ import GetStarted from "./pages/GetStarted";
 import Discover from "./pages/Discover";
 import ResetPassword from "./pages/ResetPassword";
 import OnboardingWizard from "./pages/OnboardingWizard";
-import SuperadminCompanies from "./pages/SuperadminCompanies";
-import AdminUsers from "./pages/AdminUsers";
-import CronHealth from "./pages/CronHealth";
-import AgGridShowcase from "./pages/AgGridShowcase";
-import AgGridShowcaseV1 from "./pages/AgGridShowcaseV1";
-import Progress from "./pages/Progress";
-import Inbox from "./pages/Inbox";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
 import { MediaCompanyWorkspace } from "./pages/MediaCompanyWorkspace";
+
+// Lazy imports — admin, analytics-heavy, and showcase routes
+const AnalyticsV2 = React.lazy(() => import("./pages/AnalyticsV2"));
+const AnalyticsV4 = React.lazy(() => import("./pages/AnalyticsV4"));
+const AnalyticsShowcase = React.lazy(() => import("./pages/AnalyticsShowcase"));
+const AdminUsers = React.lazy(() => import("./pages/AdminUsers"));
+const AdminPlatformConfig = React.lazy(() => import("./pages/AdminPlatformConfig"));
+const AdminDataManagement = React.lazy(() => import("./pages/AdminDataManagement"));
+const SuperadminCompanies = React.lazy(() => import("./pages/SuperadminCompanies"));
+const CronHealth = React.lazy(() => import("./pages/CronHealth"));
+const GetLateMapping = React.lazy(() => import("./pages/GetLateMapping"));
+const AgGridShowcase = React.lazy(() => import("./pages/AgGridShowcase"));
+const AgGridShowcaseV1 = React.lazy(() => import("./pages/AgGridShowcaseV1"));
+const AutomationLogsPage = React.lazy(() => import("./pages/AutomationLogsPage"));
+const ApiLogs = React.lazy(() => import("./pages/ApiLogs"));
+const WizardVariations = React.lazy(() => import("./pages/WizardVariations"));
+const EmailBranding = React.lazy(() => import("./pages/EmailBranding"));
+const PlatformSettings = React.lazy(() => import("./pages/PlatformSettings"));
+const Progress = React.lazy(() => import("./pages/Progress"));
+const DesignPreview = React.lazy(() => import("./pages/DesignPreview"));
+const NivoShowcase = React.lazy(() => import("./pages/NivoShowcase"));
+
+const LazyFallback = () => (
+  <div className="flex items-center justify-center h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 
 const queryClient = new QueryClient();
@@ -77,11 +84,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <KokoProvider>
             <PostHogPageviewTracker />
             <VersionSwitcher />
-            <KokoFab />
-            <KokoCopilot />
+            <Suspense fallback={<LazyFallback />}>
             <Routes>
               {/* Marketing (public, root level) */}
               <Route path="/" element={<LandingPage />} />
@@ -107,7 +112,6 @@ const App = () => (
 
               {/* Protected: App core */}
               <Route path="/app" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/app/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
               <Route path="/app/content" element={<ProtectedRoute><ContentV2 /></ProtectedRoute>} />
               <Route path="/app/content/sources" element={<ProtectedRoute><ContentSources /></ProtectedRoute>} />
               <Route path="/app/content-legacy" element={<ProtectedRoute><Content /></ProtectedRoute>} />
@@ -176,7 +180,7 @@ const App = () => (
 
               <Route path="*" element={<NotFound />} />
             </Routes>
-            </KokoProvider>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
         </ThemeProvider>

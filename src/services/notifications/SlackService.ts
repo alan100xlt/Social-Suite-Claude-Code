@@ -52,7 +52,8 @@ export class SlackService {
   private defaultChannel: string = '#social-suite-development'
 
   constructor() {
-    this.webhookUrl = process.env.SLACK_WEBHOOK_URL || null
+    // Vite exposes env vars via import.meta.env, not process.env
+    this.webhookUrl = import.meta.env.VITE_SLACK_WEBHOOK_URL || null
   }
 
   /**

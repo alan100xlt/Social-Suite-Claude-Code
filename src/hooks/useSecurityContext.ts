@@ -1,15 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import securityContextService from '@/services/securityContextService';
-
-interface SecurityContext {
-  userId: string;
-  accessibleCompanies: string[];
-  mediaCompanies: string[];
-  maxAccessLevel: number;
-  lastUpdated: number;
-}
+import { securityContextService } from '@/services/security/SecurityContextService';
 
 interface UseSecurityContextOptions {
   enabled?: boolean;

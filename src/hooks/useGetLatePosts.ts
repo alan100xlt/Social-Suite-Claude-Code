@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getlatePosts, GetLatePost, MediaItem, Platform, ValidationResult } from '@/lib/api/getlate';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
-import { isDemoCompany } from '@/lib/demo/demo-constants';
 
 export function usePosts(params?: {
   status?: 'draft' | 'scheduled' | 'published' | 'failed';
@@ -11,8 +10,6 @@ export function usePosts(params?: {
   const { data: company } = useCompany();
   const profileId = company?.getlate_profile_id;
 
-  const isDemo = isDemoCompany(company?.id);
-
   return useQuery({
     queryKey: ['getlate-posts', profileId, params],
     queryFn: async () => {
@@ -20,15 +17,14 @@ export function usePosts(params?: {
       if (!profileId) {
         return [];
       }
-
+      
       const result = await getlatePosts.list({ ...params, profileId });
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch posts');
       }
       return result.data?.posts || [];
     },
-    // Demo company: don't run queryFn — rely on pre-seeded cache from DemoDataProvider
-    enabled: !!company && !isDemo,
+    enabled: !!company,
   });
 }
 
@@ -109,11 +105,9 @@ export function useCreatePost() {
         });
       }
     },
-    onError: (error, variables) => {
+    onError: (error) => {
       const errorMsg = error instanceof Error ? error.message : 'Failed to create post';
       const errorType = (error as Error & { errorType?: string }).errorType;
-      const isTikTokError = errorMsg.toLowerCase().includes('tiktok');
-      const imageInfo = variables.mediaItems?.[0]?.url;
 
       if (errorType === 'duplicate_content') {
         toast({
@@ -126,17 +120,6 @@ export function useCreatePost() {
           title: 'Rate Limited',
           description: errorMsg,
           variant: 'destructive',
-        });
-      } else if (isTikTokError) {
-        toast({
-          title: 'GetLate API Error: TikTok Processing',
-          description: `The GetLate API attempted TikTok image processing even though this post was not targeting TikTok. This is a known API issue.${imageInfo ? ` Image: ${imageInfo}` : ''}`,
-          variant: 'destructive',
-        });
-        console.error('[GetLate API Bug] TikTok processing triggered for non-TikTok post:', {
-          error: errorMsg,
-          accountIds: variables.accountIds,
-          imageUrl: imageInfo,
         });
       } else {
         toast({
@@ -156,15 +139,6 @@ export function useUpdatePost() {
 
   return useMutation({
     mutationFn: async ({ postId, ...params }: { postId: string; text?: string; scheduledFor?: string }) => {
-      if (isDemoCompany(company?.id)) {
-        // Demo: update cache directly instead of calling API
-        const profileId = company?.getlate_profile_id;
-        queryClient.setQueryData<GetLatePost[]>(
-          ['getlate-posts', profileId],
-          (old) => old?.map((p) => (p.id === postId ? { ...p, ...params } : p)) ?? [],
-        );
-        return undefined;
-      }
       const result = await getlatePosts.update(postId, params);
       if (!result.success) {
         throw new Error(result.error || 'Failed to update post');
@@ -172,7 +146,6 @@ export function useUpdatePost() {
       return result.data?.post;
     },
     onSuccess: () => {
-      if (isDemoCompany(company?.id)) return; // cache already updated
       const profileId = company?.getlate_profile_id;
       queryClient.invalidateQueries({ queryKey: ['getlate-posts', profileId] });
       toast({
@@ -244,22 +217,12 @@ export function useDeletePost() {
 
   return useMutation({
     mutationFn: async (postId: string) => {
-      if (isDemoCompany(company?.id)) {
-        // Demo: remove from cache directly
-        const profileId = company?.getlate_profile_id;
-        queryClient.setQueryData<GetLatePost[]>(
-          ['getlate-posts', profileId],
-          (old) => old?.filter((p) => p.id !== postId) ?? [],
-        );
-        return;
-      }
       const result = await getlatePosts.delete(postId);
       if (!result.success) {
         throw new Error(result.error || 'Failed to delete post');
       }
     },
     onSuccess: () => {
-      if (isDemoCompany(company?.id)) return;
       const profileId = company?.getlate_profile_id;
       queryClient.invalidateQueries({ queryKey: ['getlate-posts', profileId] });
       toast({
