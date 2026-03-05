@@ -1,4 +1,4 @@
-import { Settings, LogOut, Building2, Check, ChevronsUpDown, Plus, Shield, Loader2, Palette } from "lucide-react";
+import { Settings, LogOut, Shield, Loader2, Building2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,34 +20,26 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
-import { useCompany, useAllCompanies } from "@/hooks/useCompany";
-import { useSelectedCompany } from "@/contexts/SelectedCompanyContext";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useCompany } from "@/hooks/useCompany";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { IntegrationStatusMenu } from "./IntegrationStatusMenu";
 import { NotificationInbox } from "./NotificationInbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "@/contexts/ThemeContext";
+
 
 export function TopBar() {
   const { user, signOut, isSuperAdmin, impersonateUser } = useAuth();
   const { data: profile } = useProfile();
   const { data: company } = useCompany();
-  const { data: allCompanies } = useAllCompanies();
-  const { setSelectedCompanyId } = useSelectedCompany();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { currentTheme, toggleTheme, setTheme } = useTheme();
-  const [companyOpen, setCompanyOpen] = useState(false);
   const [impersonateOpen, setImpersonateOpen] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
 
@@ -82,16 +74,6 @@ export function TopBar() {
     navigate("/login");
   };
 
-  const handleSelectCompany = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    queryClient.invalidateQueries({ queryKey: ["company"] });
-    queryClient.invalidateQueries({ queryKey: ["company-members"] });
-    queryClient.invalidateQueries({ queryKey: ["rss-feeds"] });
-    queryClient.invalidateQueries({ queryKey: ["getlate-accounts"] });
-    queryClient.invalidateQueries({ queryKey: ["getlate-posts"] });
-    queryClient.invalidateQueries({ queryKey: ["last-sync-time"] });
-    setCompanyOpen(false);
-  };
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return user?.email?.charAt(0).toUpperCase() || "U";
@@ -104,7 +86,7 @@ export function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+    <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="flex items-center justify-end h-14 px-6">
         {/* Right side - Actions */}
         <div className="flex items-center gap-2">
@@ -153,75 +135,6 @@ export function TopBar() {
             </Popover>
           )}
 
-          {/* Company Selector (Superadmin only) */}
-          {isSuperAdmin && allCompanies && (
-            <Popover open={companyOpen} onOpenChange={setCompanyOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={companyOpen}
-                  className="w-48 justify-between"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <Building2 className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{company?.name || "Select company"}</span>
-                  </div>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="end">
-                <Command>
-                  <CommandInput placeholder="Search companies..." />
-                  <CommandList>
-                    <CommandEmpty>No companies found.</CommandEmpty>
-                    <CommandGroup heading="Companies">
-                      {allCompanies.map((c) => (
-                        <CommandItem
-                          key={c.id}
-                          value={c.name}
-                          onSelect={() => handleSelectCompany(c.id)}
-                          className="cursor-pointer"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              company?.id === c.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <span>{c.name}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                    <CommandSeparator />
-                    <CommandGroup>
-                      <CommandItem
-                        onSelect={() => {
-                          setCompanyOpen(false);
-                          navigate("/app/onboarding/setup");
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create New Company
-                      </CommandItem>
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {/* Theme Toggle - links to full theme page */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleTheme}
-            className="h-9 w-9 rounded-full"
-            title="Toggle Theme"
-          >
-            <Palette className="h-4 w-4" />
-          </Button>
 
           {/* Notifications */}
           <NotificationInbox />
@@ -246,13 +159,6 @@ export function TopBar() {
                   <p className="text-xs text-muted-foreground mt-1">{company.name}</p>
                 )}
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/app/theme" className="flex items-center gap-2 cursor-pointer">
-                  <Palette className="h-4 w-4" />
-                  <span>Theme Settings</span>
-                </Link>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link to="/app/settings" className="flex items-center gap-2 cursor-pointer">

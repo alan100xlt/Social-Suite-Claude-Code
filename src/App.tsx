@@ -9,14 +9,20 @@ import { SelectedCompanyProvider } from "@/contexts/SelectedCompanyContext";
 import { CourierTokenProvider } from "@/contexts/CourierContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { DemoDataProvider } from "@/lib/demo/DemoDataProvider";
+
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SuperAdminRoute } from "@/components/auth/SuperAdminRoute";
 import Index from "./pages/Index";
 import Connections from "./pages/Connections";
 import Content from "./pages/Content";
+import ContentV2 from "./pages/ContentV2";
+import ContentSources from "./pages/ContentSources";
+import AutomationLogsPage from "./pages/AutomationLogsPage";
 import Analytics from "./pages/Analytics";
 import AnalyticsV2 from "./pages/AnalyticsV2";
 import AnalyticsV3 from "./pages/AnalyticsV3";
+import AnalyticsV4 from "./pages/AnalyticsV4";
 import Settings from "./pages/Settings";
 import OAuthCallback from "./pages/OAuthCallback";
 import NotFound from "./pages/NotFound";
@@ -29,8 +35,11 @@ import ApiLogs from "./pages/ApiLogs";
 import WizardVariations from "./pages/WizardVariations";
 import EmailBranding from "./pages/EmailBranding";
 import PlatformSettings from "./pages/PlatformSettings";
+import AdminPlatformConfig from "./pages/AdminPlatformConfig";
+import AdminDataManagement from "./pages/AdminDataManagement";
 import DesignPreview from "./pages/DesignPreview";
 import NivoShowcase from "./pages/NivoShowcase";
+import AnalyticsShowcase from "./pages/AnalyticsShowcase";
 import LandingPage from "./pages/LandingPage";
 import LandingPageV2 from "./pages/LandingPageV2";
 import LandingPageV3 from "./pages/LandingPageV3";
@@ -43,20 +52,23 @@ import OnboardingWizard from "./pages/OnboardingWizard";
 import SuperadminCompanies from "./pages/SuperadminCompanies";
 import AdminUsers from "./pages/AdminUsers";
 import CronHealth from "./pages/CronHealth";
+import AgGridShowcase from "./pages/AgGridShowcase";
+import AgGridShowcaseV1 from "./pages/AgGridShowcaseV1";
 import Progress from "./pages/Progress";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
 import { MediaCompanyWorkspace } from "./pages/MediaCompanyWorkspace";
-import ThemeSettings from "./pages/ThemeSettings";
+
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <PlatformProvider>
+    <PlatformProvider>
       <AuthProvider>
         <SelectedCompanyProvider>
+        <DemoDataProvider>
           <CourierTokenProvider>
+            <ThemeProvider>
             <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -84,35 +96,46 @@ const App = () => (
               {/* Dev-only */}
               <Route path="/design-preview" element={<DesignPreview />} />
               <Route path="/nivo-showcase" element={<NivoShowcase />} />
+              <Route path="/analytics-showcase" element={<AnalyticsShowcase />} />
 
               {/* Protected: App core */}
               <Route path="/app" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/app/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
+              <Route path="/app/content" element={<ProtectedRoute><ContentV2 /></ProtectedRoute>} />
+              <Route path="/app/content/sources" element={<ProtectedRoute><ContentSources /></ProtectedRoute>} />
+              <Route path="/app/content-legacy" element={<ProtectedRoute><Content /></ProtectedRoute>} />
               <Route path="/app/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/app/analytics-v2" element={<ProtectedRoute><AnalyticsV2 /></ProtectedRoute>} />
               <Route path="/app/analytics-v3" element={<ProtectedRoute><AnalyticsV3 /></ProtectedRoute>} />
+              <Route path="/app/analytics-v4" element={<ProtectedRoute><AnalyticsV4 /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              <Route path="/app/theme" element={<ProtectedRoute><ThemeSettings /></ProtectedRoute>} />
+
 
               {/* Protected: Onboarding */}
               <Route path="/app/onboarding/setup" element={<ProtectedRoute><SetupCompany /></ProtectedRoute>} />
               <Route path="/app/onboarding/wizard" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
 
-              {/* Protected: Automations — redirect to Content */}
-              <Route path="/app/automations" element={<Navigate to="/app/content?tab=automations" replace />} />
-              <Route path="/app/automations/logs" element={<Navigate to="/app/content?tab=logs" replace />} />
+              {/* Protected: Automations — redirect to Content Sources */}
+              <Route path="/app/automations" element={<Navigate to="/app/content/sources" replace />} />
+              <Route path="/app/automations/logs" element={<Navigate to="/app/admin/automation-logs" replace />} />
 
               {/* Protected: Admin / Superadmin */}
+              <Route path="/app/admin/platform-config" element={<ProtectedRoute><SuperAdminRoute><AdminPlatformConfig /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/data" element={<ProtectedRoute><SuperAdminRoute><AdminDataManagement /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/api-logs" element={<ProtectedRoute><SuperAdminRoute><ApiLogs /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/mapping" element={<ProtectedRoute><SuperAdminRoute><GetLateMapping /></SuperAdminRoute></ProtectedRoute>} />
-              <Route path="/app/admin/email-branding" element={<ProtectedRoute><SuperAdminRoute><EmailBranding /></SuperAdminRoute></ProtectedRoute>} />
-              <Route path="/app/admin/platform" element={<ProtectedRoute><SuperAdminRoute><PlatformSettings /></SuperAdminRoute></ProtectedRoute>} />
-              <Route path="/app/admin/companies" element={<ProtectedRoute><SuperAdminRoute><SuperadminCompanies /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/cron-health" element={<ProtectedRoute><SuperAdminRoute><CronHealth /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/wizard" element={<ProtectedRoute><SuperAdminRoute><WizardVariations /></SuperAdminRoute></ProtectedRoute>} />
-              <Route path="/app/admin/users" element={<ProtectedRoute><SuperAdminRoute><AdminUsers /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/progress" element={<ProtectedRoute><SuperAdminRoute><Progress /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/automation-logs" element={<ProtectedRoute><SuperAdminRoute><AutomationLogsPage /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/ag-grid-showcase" element={<ProtectedRoute><SuperAdminRoute><AgGridShowcase /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/ag-grid-showcase-v1" element={<ProtectedRoute><SuperAdminRoute><AgGridShowcaseV1 /></SuperAdminRoute></ProtectedRoute>} />
+
+              {/* Admin redirects (old routes → new tabbed pages) */}
+              <Route path="/app/admin/platform" element={<Navigate to="/app/admin/platform-config?tab=branding" replace />} />
+              <Route path="/app/admin/email-branding" element={<Navigate to="/app/admin/platform-config?tab=email" replace />} />
+              <Route path="/app/admin/companies" element={<Navigate to="/app/admin/data?tab=companies" replace />} />
+              <Route path="/app/admin/users" element={<Navigate to="/app/admin/data?tab=users" replace />} />
 
               {/* Media Company Routes */}
               <Route path="/app/media-company/:mediaCompanyId" element={<ProtectedRoute><MediaCompanyDashboard /></ProtectedRoute>} />
@@ -129,12 +152,11 @@ const App = () => (
               <Route path="/analytics" element={<Navigate to="/app/analytics" replace />} />
               <Route path="/connections" element={<Navigate to="/app/connections" replace />} />
               <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
-              <Route path="/automations" element={<Navigate to="/app/content?tab=automations" replace />} />
-              <Route path="/app/automations/logs" element={<Navigate to="/app/content?tab=logs" replace />} />
+              <Route path="/automations" element={<Navigate to="/app/content/sources" replace />} />
               <Route path="/api-logs" element={<Navigate to="/app/admin/api-logs" replace />} />
               <Route path="/getlate-mapping" element={<Navigate to="/app/admin/mapping" replace />} />
-              <Route path="/email-branding" element={<Navigate to="/app/admin/email-branding" replace />} />
-              <Route path="/platform-settings" element={<Navigate to="/app/admin/platform" replace />} />
+              <Route path="/email-branding" element={<Navigate to="/app/admin/platform-config?tab=email" replace />} />
+              <Route path="/platform-settings" element={<Navigate to="/app/admin/platform-config?tab=branding" replace />} />
               <Route path="/wizard-variations" element={<Navigate to="/app/admin/wizard" replace />} />
 
               {/* Legacy redirects updated to new paths */}
@@ -148,11 +170,12 @@ const App = () => (
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
+        </ThemeProvider>
         </CourierTokenProvider>
+        </DemoDataProvider>
       </SelectedCompanyProvider>
     </AuthProvider>
     </PlatformProvider>
-    </ThemeProvider>
   </QueryClientProvider>
 );
 
