@@ -65,3 +65,12 @@ verify_jwt = false
 
 [functions.instant-signup]
 verify_jwt = false
+
+[functions.getlate-inbox]
+verify_jwt = false
+
+[functions.inbox-sync]
+verify_jwt = false
+
+[functions.inbox-ai]
+verify_jwt = false

@@ -25,6 +25,7 @@ import {
   Users,
   Shield,
   Inbox,
+  Monitor,
 } from "lucide-react";
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
@@ -69,6 +70,7 @@ const superadminChildren: NavItem[] = [
   { name: "Automation Logs", href: "/app/admin/automation-logs", icon: ClipboardList },
   { name: "API Mapping", href: "/app/admin/mapping", icon: Link2 },
   { name: "Cron Health", href: "/app/admin/cron-health", icon: HeartPulse },
+  { name: "Operations", href: "/app/admin/operations", icon: Monitor },
 ];
 
 // Platform icon and color mapping

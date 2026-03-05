@@ -8,11 +8,20 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let action = 'unknown';
+  let companyId = '';
+  let userId = '';
+
   try {
     const body = await req.json();
-    const { action, companyId, ...params } = body;
+    ({ action, companyId } = body);
+    const params = { ...body };
+    delete params.action;
+    delete params.companyId;
 
     const auth = await authorize(req, { companyId });
+    userId = auth.userId;
 
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
@@ -47,12 +56,50 @@ Deno.serve(async (req) => {
         });
     }
 
+    // Log successful AI action
+    try {
+      await supabase.from('api_call_logs' as any).insert({
+        function_name: 'inbox-ai',
+        action,
+        request_summary: JSON.stringify({ action, companyId, conversationId: params.conversationId }).slice(0, 500),
+        response_summary: JSON.stringify(result).slice(0, 500),
+        success: true,
+        duration_ms: Date.now() - startTime,
+        company_id: companyId,
+        user_id: userId,
+      });
+    } catch (logErr) {
+      console.error('Failed to log ai call:', logErr);
+    }
+
     return new Response(JSON.stringify({ success: true, ...result }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     if (error instanceof Response) return error;
     console.error('inbox-ai error:', error);
+
+    // Log failed AI action
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const logClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      await logClient.from('api_call_logs' as any).insert({
+        function_name: 'inbox-ai',
+        action,
+        request_summary: JSON.stringify({ action, companyId }).slice(0, 500),
+        response_summary: String(error).slice(0, 500),
+        success: false,
+        duration_ms: Date.now() - startTime,
+        company_id: companyId || null,
+        user_id: userId || null,
+      });
+    } catch (logErr) {
+      console.error('Failed to log ai call error:', logErr);
+    }
+
     return new Response(JSON.stringify({ success: false, error: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

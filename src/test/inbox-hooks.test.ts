@@ -282,6 +282,136 @@ describe('Inbox data shape validation', () => {
   });
 });
 
+describe('Inbox API client invocations', () => {
+  let mockInvoke: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { supabase } = await import('@/integrations/supabase/client');
+    mockInvoke = supabase.functions.invoke as ReturnType<typeof vi.fn>;
+    mockInvoke.mockResolvedValue({ data: { success: true }, error: null });
+  });
+
+  it('conversations.list should invoke getlate-inbox with list-conversations', async () => {
+    await inboxApi.conversations.list('comp-1', { status: 'open', platform: 'twitter' });
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'list-conversations', companyId: 'comp-1', status: 'open', platform: 'twitter' },
+    });
+  });
+
+  it('conversations.get should invoke with get-conversation', async () => {
+    await inboxApi.conversations.get('comp-1', 'conv-123');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'get-conversation', companyId: 'comp-1', conversationId: 'conv-123' },
+    });
+  });
+
+  it('conversations.updateStatus should invoke with update-status', async () => {
+    await inboxApi.conversations.updateStatus('comp-1', 'conv-1', 'resolved');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'update-status', companyId: 'comp-1', conversationId: 'conv-1', status: 'resolved' },
+    });
+  });
+
+  it('conversations.assign should invoke with assign action', async () => {
+    await inboxApi.conversations.assign('comp-1', 'conv-1', 'user-42');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'assign', companyId: 'comp-1', conversationId: 'conv-1', assigneeId: 'user-42' },
+    });
+  });
+
+  it('conversations.markRead should invoke with mark-read', async () => {
+    await inboxApi.conversations.markRead('comp-1', 'conv-1');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'mark-read', companyId: 'comp-1', conversationId: 'conv-1' },
+    });
+  });
+
+  it('conversations.bulkUpdateStatus should invoke with bulk-update-status', async () => {
+    await inboxApi.conversations.bulkUpdateStatus('comp-1', ['c1', 'c2'], 'closed');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'bulk-update-status', companyId: 'comp-1', conversationIds: ['c1', 'c2'], status: 'closed' },
+    });
+  });
+
+  it('messages.list should invoke with get-messages', async () => {
+    await inboxApi.messages.list('comp-1', 'conv-1', { limit: 25 });
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'get-messages', companyId: 'comp-1', conversationId: 'conv-1', limit: 25 },
+    });
+  });
+
+  it('messages.replyComment should invoke with reply-comment', async () => {
+    await inboxApi.messages.replyComment('comp-1', 'conv-1', 'Hello!');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'reply-comment', companyId: 'comp-1', conversationId: 'conv-1', content: 'Hello!', parentCommentId: undefined },
+    });
+  });
+
+  it('messages.replyDM should invoke with reply-dm', async () => {
+    await inboxApi.messages.replyDM('comp-1', 'conv-1', 'Hi there');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'reply-dm', companyId: 'comp-1', conversationId: 'conv-1', content: 'Hi there', mediaUrl: undefined },
+    });
+  });
+
+  it('messages.addNote should invoke with add-note', async () => {
+    await inboxApi.messages.addNote('comp-1', 'conv-1', 'Internal note');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'add-note', companyId: 'comp-1', conversationId: 'conv-1', content: 'Internal note' },
+    });
+  });
+
+  it('labels.list should invoke with list-labels', async () => {
+    await inboxApi.labels.list('comp-1');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'list-labels', companyId: 'comp-1' },
+    });
+  });
+
+  it('labels.create should invoke with create-label', async () => {
+    await inboxApi.labels.create('comp-1', 'VIP', '#ff0000');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'create-label', companyId: 'comp-1', name: 'VIP', color: '#ff0000' },
+    });
+  });
+
+  it('cannedReplies.list should invoke with list-canned-replies', async () => {
+    await inboxApi.cannedReplies.list('comp-1');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'list-canned-replies', companyId: 'comp-1' },
+    });
+  });
+
+  it('search.messages should invoke with search action', async () => {
+    await inboxApi.search.messages('comp-1', 'hello world');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'search', companyId: 'comp-1', query: 'hello world' },
+    });
+  });
+
+  it('should return success: false on error', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: { message: 'Network error' } });
+    const result = await inboxApi.conversations.list('comp-1');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Network error');
+  });
+
+  it('automationRules.list should invoke with list-auto-rules', async () => {
+    await inboxApi.automationRules.list('comp-1');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'list-auto-rules', companyId: 'comp-1' },
+    });
+  });
+
+  it('automationRules.delete should invoke with delete-auto-rule', async () => {
+    await inboxApi.automationRules.delete('comp-1', 'rule-1');
+    expect(mockInvoke).toHaveBeenCalledWith('getlate-inbox', {
+      body: { action: 'delete-auto-rule', companyId: 'comp-1', id: 'rule-1' },
+    });
+  });
+});
+
 describe('Demo data integrity', () => {
   it('should import demo data without errors', async () => {
     const demoData = await import('@/lib/demo/demo-data');

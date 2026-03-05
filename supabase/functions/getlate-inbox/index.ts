@@ -8,12 +8,21 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let action = 'unknown';
+  let companyId = '';
+  let userId = '';
+
   try {
     const body = await req.json();
-    const { action, companyId, ...params } = body;
+    ({ action, companyId } = body);
+    const params = { ...body };
+    delete params.action;
+    delete params.companyId;
 
     // Authorize user for this company
     const auth = await authorize(req, { companyId });
+    userId = auth.userId;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -114,12 +123,51 @@ Deno.serve(async (req) => {
         });
     }
 
+    // Log successful action
+    try {
+      await supabase.from('api_call_logs' as any).insert({
+        function_name: 'getlate-inbox',
+        action,
+        request_summary: JSON.stringify({ action, companyId, params: Object.keys(params) }).slice(0, 500),
+        response_summary: JSON.stringify(result).slice(0, 500),
+        success: true,
+        duration_ms: Date.now() - startTime,
+        company_id: companyId,
+        user_id: userId,
+        platform: params.platform || null,
+      });
+    } catch (logErr) {
+      console.error('Failed to log api call:', logErr);
+    }
+
     return new Response(JSON.stringify({ success: true, ...result }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     if (error instanceof Response) return error;
     console.error('getlate-inbox error:', error);
+
+    // Log failed action
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const logClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      await logClient.from('api_call_logs' as any).insert({
+        function_name: 'getlate-inbox',
+        action,
+        request_summary: JSON.stringify({ action, companyId }).slice(0, 500),
+        response_summary: String(error).slice(0, 500),
+        success: false,
+        duration_ms: Date.now() - startTime,
+        company_id: companyId || null,
+        user_id: userId || null,
+      });
+    } catch (logErr) {
+      console.error('Failed to log api call error:', logErr);
+    }
+
     return new Response(JSON.stringify({ success: false, error: String(error) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -210,7 +258,7 @@ async function replyToComment(
   if (!conv) throw new Error('Conversation not found');
 
   // Send reply via GetLate API
-  const response = await fetch(`${GETLATE_API_URL}/comments/reply`, {
+  const response = await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -270,11 +318,12 @@ async function replyToDM(
 
   const dmConvId = conv.platform_conversation_id?.replace(`dm-${conv.platform}-`, '');
 
-  const response = await fetch(`${GETLATE_API_URL}/conversations/${dmConvId}/messages`, {
+  const response = await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       profileId,
+      conversationId: dmConvId,
       text: params.content,
       mediaUrl: params.mediaUrl,
       platform: conv.platform,
@@ -317,11 +366,14 @@ async function likeComment(
   apiKey: string,
   params: { commentId: string; platform: string; unlike?: boolean }
 ) {
-  const endpoint = params.unlike ? 'unlike' : 'like';
-  const response = await fetch(`${GETLATE_API_URL}/comments/${params.commentId}/${endpoint}`, {
-    method: 'POST',
+  const url = params.unlike
+    ? `${GETLATE_API_URL}/inbox/comments/${params.commentId}/unlike`
+    : `${GETLATE_API_URL}/inbox/comments/${params.commentId}/like`;
+  const method = params.unlike ? 'DELETE' : 'POST';
+  const response = await fetch(url, {
+    method,
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ profileId, platform: params.platform }),
+    body: JSON.stringify({ profileId, commentId: params.commentId, platform: params.platform }),
   });
 
   return await response.json();

@@ -61,6 +61,7 @@ const WizardVariations = React.lazy(() => import("./pages/WizardVariations"));
 const EmailBranding = React.lazy(() => import("./pages/EmailBranding"));
 const PlatformSettings = React.lazy(() => import("./pages/PlatformSettings"));
 const Progress = React.lazy(() => import("./pages/Progress"));
+const OperationsCenter = React.lazy(() => import("./pages/OperationsCenter"));
 const DesignPreview = React.lazy(() => import("./pages/DesignPreview"));
 const NivoShowcase = React.lazy(() => import("./pages/NivoShowcase"));
 
@@ -142,6 +143,7 @@ const App = () => (
               <Route path="/app/admin/wizard" element={<ProtectedRoute><SuperAdminRoute><WizardVariations /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/progress" element={<ProtectedRoute><SuperAdminRoute><Progress /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/automation-logs" element={<ProtectedRoute><SuperAdminRoute><AutomationLogsPage /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/operations" element={<ProtectedRoute><SuperAdminRoute><Suspense fallback={<LazyFallback />}><OperationsCenter /></Suspense></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/ag-grid-showcase" element={<ProtectedRoute><SuperAdminRoute><AgGridShowcase /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/ag-grid-showcase-v1" element={<ProtectedRoute><SuperAdminRoute><AgGridShowcaseV1 /></SuperAdminRoute></ProtectedRoute>} />
 

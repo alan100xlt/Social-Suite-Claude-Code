@@ -189,13 +189,13 @@ async function sendAutoResponse(
   // Send via GetLate API
   if (conversation.type === 'dm' && conversation.platform_conversation_id) {
     const dmConvId = conversation.platform_conversation_id.replace(`dm-${conversation.platform}-`, '');
-    await fetch(`${GETLATE_API_URL}/conversations/${dmConvId}/messages`, {
+    await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ profileId, text: content, platform: conversation.platform }),
     });
   } else if (conversation.type === 'comment') {
-    await fetch(`${GETLATE_API_URL}/comments/reply`, {
+    await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ profileId, postId: conversation.post_id, text: content, platform: conversation.platform }),
