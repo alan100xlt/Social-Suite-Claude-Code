@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const monitor = new CronMonitor('rss-poll', supabase)
+    const monitor = new CronMonitor('rss-poll-every-5-min', supabase)
     await monitor.start()
 
     let body: Record<string, unknown> = {}
@@ -351,7 +351,7 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
       const supabase = createClient(supabaseUrl, serviceRoleKey)
-      const errorMonitor = new CronMonitor('rss-poll', supabase)
+      const errorMonitor = new CronMonitor('rss-poll-every-5-min', supabase)
       await errorMonitor.error(error instanceof Error ? error : String(error))
     } catch (monitorErr) {
       console.error('Failed to log error to monitor:', monitorErr)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FaTwitter, FaInstagram, FaFacebook, FaLinkedin, FaTiktok, FaYoutube, FaPinterest, FaReddit } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
+import { AgGridReact } from "ag-grid-react";
+import { AllCommunityModule, type ColDef, type ICellRendererParams, type GridReadyEvent } from "ag-grid-community";
+import { gridTheme, gridThemeDark } from "@/lib/ag-grid-theme";
+import { useTheme } from "@/contexts/ThemeContext";
+import { DataGridToolbar } from "@/components/ui/data-grid-toolbar";
 
 interface GetLateProfile {
   id: string;
@@ -50,6 +55,194 @@ const platformIcons: Record<string, React.ReactNode> = {
   bluesky: <SiBluesky className="w-4 h-4 text-[#0085FF]" />,
   threads: <SiThreads className="w-4 h-4" />,
 };
+
+function MappingOverviewGrid({
+  companies,
+  getProfileName,
+  getAccountsForCompany,
+  isLoadingAccountsForCompany,
+  platformIcons: pIcons,
+}: {
+  companies: Company[];
+  getProfileName: (profileId: string | null) => string | null;
+  getAccountsForCompany: (company: Company) => GetLateAccount[];
+  isLoadingAccountsForCompany: (company: Company) => boolean;
+  platformIcons: Record<string, React.ReactNode>;
+}) {
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === 'dark-pro' || currentTheme === 'aurora';
+  const [quickFilter, setQuickFilter] = useState('');
+  const gridRef = useRef<AgGridReact<Company>>(null);
+
+  const onGridReady = useCallback((params: GridReadyEvent) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const onExportCsv = useCallback(() => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: 'getlate-mapping.csv' });
+  }, []);
+
+  const colDefs = useMemo<ColDef<Company>[]>(
+    () => [
+      {
+        headerName: 'Company',
+        field: 'name',
+        flex: 1,
+        minWidth: 150,
+        cellRenderer: (params: ICellRendererParams<Company>) => (
+          <span className="font-medium text-foreground">{params.value}</span>
+        ),
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'Slug',
+        field: 'slug',
+        width: 130,
+        cellRenderer: (params: ICellRendererParams<Company>) => (
+          <span className="text-muted-foreground">{params.value}</span>
+        ),
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'GetLate Profile',
+        field: 'getlate_profile_id',
+        width: 160,
+        cellRenderer: (params: ICellRendererParams<Company>) => {
+          const id = params.value;
+          return (
+            <span className="font-mono text-sm text-muted-foreground">
+              {id ? getProfileName(id) || (id as string).slice(0, 12) + '...' : '\u2014'}
+            </span>
+          );
+        },
+        filter: 'agTextColumnFilter',
+        filterValueGetter: (params) => {
+          const id = params.data?.getlate_profile_id;
+          return id ? getProfileName(id) || id : '';
+        },
+      },
+      {
+        headerName: 'Accounts',
+        width: 100,
+        cellRenderer: (params: ICellRendererParams<Company>) => {
+          const c = params.data;
+          if (!c || !c.getlate_profile_id) return <span className="text-muted-foreground">{'\u2014'}</span>;
+          if (isLoadingAccountsForCompany(c)) return <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />;
+          const accts = getAccountsForCompany(c);
+          return (
+            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+              <Users className="w-3 h-3" />
+              {accts.length}
+            </Badge>
+          );
+        },
+        type: 'rightAligned',
+        sortable: false,
+        filter: false,
+      },
+      {
+        headerName: 'Connected Accounts',
+        width: 180,
+        cellRenderer: (params: ICellRendererParams<Company>) => {
+          const c = params.data;
+          if (!c || !c.getlate_profile_id) return <span className="text-muted-foreground">{'\u2014'}</span>;
+          if (isLoadingAccountsForCompany(c)) return <span className="text-muted-foreground text-sm">Loading...</span>;
+          const accts = getAccountsForCompany(c);
+          if (accts.length === 0) return <span className="text-muted-foreground text-sm">No accounts</span>;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1">
+                  View {accts.length} account{accts.length !== 1 ? 's' : ''}
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64 bg-background border border-border z-50">
+                {accts.map((account) => (
+                  <DropdownMenuItem key={account._id} className="flex items-center gap-3 py-2">
+                    {pIcons[account.platform] || <div className="w-4 h-4 rounded-full bg-muted" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{account.name || account.username}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{account.platform}</p>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+        sortable: false,
+        filter: false,
+      },
+      {
+        headerName: 'Status',
+        width: 100,
+        cellRenderer: (params: ICellRendererParams<Company>) => {
+          const c = params.data;
+          if (!c) return null;
+          return c.getlate_profile_id ? (
+            <Badge variant="default" className="bg-success/10 text-success border-0">
+              <Check className="w-3 h-3 mr-1" />
+              Linked
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground">
+              Not linked
+            </Badge>
+          );
+        },
+        filter: 'agTextColumnFilter',
+        filterValueGetter: (params) => params.data?.getlate_profile_id ? 'Linked' : 'Not linked',
+      },
+    ],
+    [getProfileName, getAccountsForCompany, isLoadingAccountsForCompany, pIcons]
+  );
+
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      resizable: true,
+      cellStyle: { display: 'flex', alignItems: 'center', overflow: 'hidden' },
+    }),
+    []
+  );
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Mapping Overview</CardTitle>
+        <CardDescription>
+          Quick view of all company-profile associations and connected accounts
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <DataGridToolbar
+          quickFilter={quickFilter}
+          onQuickFilterChange={setQuickFilter}
+          onExport={onExportCsv}
+          quickFilterPlaceholder="Search companies..."
+        />
+        <div className="relative">
+          <style>{`.ag-cell-wrapper { width: 100%; } .ag-cell-value { width: 100%; }`}</style>
+          <AgGridReact<Company>
+            ref={gridRef}
+            theme={isDark ? gridThemeDark : gridTheme}
+            modules={[AllCommunityModule]}
+            rowData={companies}
+            columnDefs={colDefs}
+            defaultColDef={defaultColDef}
+            quickFilterText={quickFilter}
+            domLayout="autoHeight"
+            suppressCellFocus
+            animateRows
+            onGridReady={onGridReady}
+            getRowId={(params) => params.data.id}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function GetLateMappingPage() {
   const { data: companies, isLoading: companiesLoading } = useAllCompanies();
@@ -363,120 +556,13 @@ export default function GetLateMappingPage() {
 
       {/* Summary Table */}
       {companies && companies.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Mapping Overview</CardTitle>
-            <CardDescription>
-              Quick view of all company-profile associations and connected accounts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Company</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Slug</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">GetLate Profile</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Accounts</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Connected Accounts</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {companies.map((company) => {
-                    const accounts = getAccountsForCompany(company);
-                    const isLoadingAcc = isLoadingAccountsForCompany(company);
-                    
-                    return (
-                      <tr key={company.id} className="hover:bg-muted/50">
-                        <td className="py-3 px-4">
-                          <span className="font-medium text-foreground">{company.name}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-muted-foreground">{company.slug}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-sm text-muted-foreground">
-                            {company.getlate_profile_id 
-                              ? getProfileName(company.getlate_profile_id) || company.getlate_profile_id.slice(0, 12) + '...'
-                              : '—'
-                            }
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          {!company.getlate_profile_id ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : isLoadingAcc ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                          ) : (
-                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                              <Users className="w-3 h-3" />
-                              {accounts.length}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          {!company.getlate_profile_id ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : isLoadingAcc ? (
-                            <span className="text-muted-foreground text-sm">Loading...</span>
-                          ) : accounts.length === 0 ? (
-                            <span className="text-muted-foreground text-sm">No accounts</span>
-                          ) : (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 gap-1">
-                                  View {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-                                  <ChevronDown className="w-3 h-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent 
-                                align="start" 
-                                className="w-64 bg-background border border-border z-50"
-                              >
-                                {accounts.map((account) => (
-                                  <DropdownMenuItem 
-                                    key={account._id} 
-                                    className="flex items-center gap-3 py-2"
-                                  >
-                                    {platformIcons[account.platform] || (
-                                      <div className="w-4 h-4 rounded-full bg-muted" />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate">
-                                        {account.name || account.username}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground capitalize">
-                                        {account.platform}
-                                      </p>
-                                    </div>
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          {company.getlate_profile_id ? (
-                            <Badge variant="default" className="bg-success/10 text-success border-0">
-                              <Check className="w-3 h-3 mr-1" />
-                              Linked
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Not linked
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        <MappingOverviewGrid
+          companies={companies}
+          getProfileName={getProfileName}
+          getAccountsForCompany={getAccountsForCompany}
+          isLoadingAccountsForCompany={isLoadingAccountsForCompany}
+          platformIcons={platformIcons}
+        />
       )}
     </DashboardLayout>
   );

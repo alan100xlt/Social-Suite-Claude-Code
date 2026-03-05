@@ -1,0 +1,223 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent';
+const GETLATE_API_URL = 'https://getlate.dev/api/v1';
+
+interface AutoRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  trigger_type: string;
+  trigger_value: string | null;
+  trigger_platform: string | null;
+  trigger_conversation_type: string | null;
+  action_type: string;
+  canned_reply_id: string | null;
+  ai_prompt_template: string | null;
+}
+
+interface NewMessage {
+  id: string;
+  conversation_id: string;
+  company_id: string;
+  content: string;
+  sender_type: string;
+  contact_id: string | null;
+}
+
+interface Conversation {
+  id: string;
+  platform: string;
+  type: string;
+  platform_conversation_id: string | null;
+  post_id: string | null;
+  contact_id: string | null;
+}
+
+export async function checkAndAutoRespond(
+  supabase: ReturnType<typeof createClient>,
+  message: NewMessage,
+  conversation: Conversation,
+  getlateApiKey: string,
+  profileId: string | null
+): Promise<{ responded: boolean; ruleName?: string }> {
+  // Only auto-respond to contact messages
+  if (message.sender_type !== 'contact') {
+    return { responded: false };
+  }
+
+  // Fetch enabled rules for this company
+  const { data: rules, error } = await supabase
+    .from('inbox_auto_rules')
+    .select('*')
+    .eq('company_id', message.company_id)
+    .eq('enabled', true)
+    .order('created_at', { ascending: true });
+
+  if (error || !rules || rules.length === 0) {
+    return { responded: false };
+  }
+
+  for (const rule of rules as AutoRule[]) {
+    if (!matchesRule(rule, message, conversation)) continue;
+
+    try {
+      let responseContent: string | null = null;
+
+      if (rule.action_type === 'canned_reply' && rule.canned_reply_id) {
+        const { data: reply } = await supabase
+          .from('inbox_canned_replies')
+          .select('content')
+          .eq('id', rule.canned_reply_id)
+          .single();
+
+        if (reply) {
+          responseContent = reply.content;
+          // Replace template variables
+          if (message.contact_id) {
+            const { data: contact } = await supabase
+              .from('inbox_contacts')
+              .select('display_name')
+              .eq('id', message.contact_id)
+              .single();
+            if (contact?.display_name) {
+              responseContent = responseContent.replace(/\{\{contact_name\}\}/g, contact.display_name);
+            }
+          }
+        }
+      } else if (rule.action_type === 'ai_response' && rule.ai_prompt_template) {
+        responseContent = await generateAIResponse(rule.ai_prompt_template, message.content, conversation);
+      }
+
+      if (!responseContent) continue;
+
+      // Send the auto-response
+      await sendAutoResponse(supabase, message, conversation, responseContent, getlateApiKey, profileId);
+
+      return { responded: true, ruleName: rule.name };
+    } catch (err) {
+      console.error(`Auto-respond rule "${rule.name}" failed:`, err);
+    }
+  }
+
+  return { responded: false };
+}
+
+function matchesRule(rule: AutoRule, message: NewMessage, conversation: Conversation): boolean {
+  // Check platform filter
+  if (rule.trigger_platform && rule.trigger_platform !== conversation.platform) {
+    return false;
+  }
+
+  // Check conversation type filter
+  if (rule.trigger_conversation_type && rule.trigger_conversation_type !== conversation.type) {
+    return false;
+  }
+
+  switch (rule.trigger_type) {
+    case 'all_new':
+      return true;
+
+    case 'keyword': {
+      if (!rule.trigger_value) return false;
+      const keywords = rule.trigger_value.split(',').map(k => k.trim().toLowerCase());
+      const content = message.content.toLowerCase();
+      return keywords.some(k => content.includes(k));
+    }
+
+    case 'regex': {
+      if (!rule.trigger_value) return false;
+      try {
+        const regex = new RegExp(rule.trigger_value, 'i');
+        return regex.test(message.content);
+      } catch {
+        return false;
+      }
+    }
+
+    case 'sentiment':
+      // Sentiment matching would require AI analysis first — skip for now
+      return false;
+
+    default:
+      return false;
+  }
+}
+
+async function generateAIResponse(
+  promptTemplate: string,
+  messageContent: string,
+  conversation: Conversation
+): Promise<string | null> {
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!geminiApiKey) return null;
+
+  const prompt = `${promptTemplate}
+
+Platform: ${conversation.platform}
+Message type: ${conversation.type}
+Customer message: ${messageContent}
+
+Respond with ONLY the reply text, nothing else. Keep it concise and appropriate for ${conversation.platform}.`;
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 256 },
+      }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch {
+    return null;
+  }
+}
+
+async function sendAutoResponse(
+  supabase: ReturnType<typeof createClient>,
+  message: NewMessage,
+  conversation: Conversation,
+  content: string,
+  getlateApiKey: string,
+  profileId: string | null
+) {
+  // Send via GetLate API
+  if (conversation.type === 'dm' && conversation.platform_conversation_id) {
+    const dmConvId = conversation.platform_conversation_id.replace(`dm-${conversation.platform}-`, '');
+    await fetch(`${GETLATE_API_URL}/conversations/${dmConvId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId, text: content, platform: conversation.platform }),
+    });
+  } else if (conversation.type === 'comment') {
+    await fetch(`${GETLATE_API_URL}/comments/reply`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId, postId: conversation.post_id, text: content, platform: conversation.platform }),
+    });
+  }
+
+  // Store the bot message
+  await supabase.from('inbox_messages').insert({
+    conversation_id: message.conversation_id,
+    company_id: message.company_id,
+    sender_type: 'bot',
+    content,
+    content_type: 'text',
+    metadata: { auto_response: true },
+  });
+
+  // Update conversation
+  await supabase
+    .from('inbox_conversations')
+    .update({
+      last_message_at: new Date().toISOString(),
+      last_message_preview: content.slice(0, 200),
+    })
+    .eq('id', message.conversation_id);
+}

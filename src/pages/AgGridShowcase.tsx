@@ -14,7 +14,7 @@ import {
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Search, X, Pencil, Trash2, FileDown } from "lucide-react";
+import { Download, Search, X, Pencil, Trash2, FileDown, Sun, Moon } from "lucide-react";
 import { gridTheme, gridThemeDark } from "@/lib/ag-grid-theme";
 import {
   formatNumber,
@@ -203,6 +203,7 @@ export default function AgGridShowcase() {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [selectedCount, setSelectedCount] = useState(0);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [darkOverride, setDarkOverride] = useState<boolean | null>(null);
 
   // Build rowData with detail rows inserted after expanded parents
   const rowData = useMemo(() => {
@@ -232,7 +233,8 @@ export default function AgGridShowcase() {
     return () => document.removeEventListener("toggle-expand", handler);
   }, []);
 
-  const isDark = currentTheme === "dark-pro" || currentTheme === "aurora";
+  const globalDark = currentTheme === "dark-pro" || currentTheme === "aurora";
+  const isDark = darkOverride !== null ? darkOverride : globalDark;
 
   const toggleFilter = (id: string) => {
     setActiveFilters((prev) => {
@@ -516,6 +518,15 @@ export default function AgGridShowcase() {
           <Button variant="outline" size="sm" onClick={onExportCsv} className="h-9 border-gray-200">
             <Download className="h-4 w-4 mr-2" />
             Export
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 border-gray-200"
+            onClick={() => setDarkOverride((prev) => (prev === null ? !globalDark : !prev))}
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </div>
 

@@ -126,6 +126,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
 
   // Reset selections when company changes (prevents cross-company posting)
   const prevCompanyIdRef = useRef(company?.id);
+  const draftLoadedRef = useRef(false);
   useEffect(() => {
     if (company?.id && prevCompanyIdRef.current && company.id !== prevCompanyIdRef.current) {
       console.log('[ComposeTab] Company switched, clearing selections');
@@ -144,7 +145,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
 
   // Load draft data when draftId changes
   useEffect(() => {
-    if (loadedDraft) {
+    if (loadedDraft && !draftLoadedRef.current) {
       // If draft belongs to a different company, auto-switch for superadmin or block
       if (company?.id && loadedDraft.company_id !== company.id) {
         if (isSuperAdmin) {
@@ -161,7 +162,9 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
         return;
       }
 
-      setPostSource(loadedDraft.post_source as PostSource);
+      // Ensure post_source is set — default to "scratch" if missing
+      const resolvedSource = (loadedDraft.post_source || (loadedDraft.selected_article_id ? "article" : "scratch")) as PostSource;
+      setPostSource(resolvedSource);
       setSelectedArticleId(loadedDraft.selected_article_id || "");
       setObjective(loadedDraft.objective || "reach");
       setSelectedAccountIds(loadedDraft.selected_account_ids || []);
@@ -173,8 +176,41 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
       }
       setStrategy(loadedDraft.strategy || null);
       setImageUrl(loadedDraft.image_url || null);
-      setStep(loadedDraft.current_step || 0);
-      const phase = loadedDraft.compose_phase === "review" ? "editing" : (loadedDraft.compose_phase as ComposePhase) || "strategy";
+
+      // Determine the furthest valid step based on what data the draft has
+      const hasDraftContent = Object.keys(loadedDraft.platform_contents || {}).filter(k => k !== "link_as_comment").length > 0;
+      const hasStrategy = !!loadedDraft.strategy;
+      const hasObjective = !!loadedDraft.objective;
+      const hasChannels = (loadedDraft.selected_account_ids || []).length > 0;
+      const hasArticle = !!loadedDraft.selected_article_id;
+
+      // Calculate step indices for this source type
+      const isArticleSource = resolvedSource === "article" || resolvedSource === "automation";
+      // article: [source=0, article=1, objective=2, channels=3, compose=4]
+      // scratch: [source=0, objective=1, channels=2, compose=3]
+      const composeStepIdx = isArticleSource ? 4 : 3;
+      const channelsStepIdx = isArticleSource ? 3 : 2;
+      const objectiveStepIdx = isArticleSource ? 2 : 1;
+
+      // Jump to the furthest step the draft has data for
+      let targetStep = 0;
+      if (hasDraftContent || hasStrategy) {
+        targetStep = composeStepIdx;
+      } else if (hasChannels) {
+        targetStep = composeStepIdx; // channels filled = ready for compose
+      } else if (hasObjective) {
+        targetStep = channelsStepIdx;
+      } else if (isArticleSource && hasArticle) {
+        targetStep = objectiveStepIdx;
+      } else if (resolvedSource) {
+        targetStep = isArticleSource ? 1 : 1; // skip source selection
+      }
+
+      // Use whichever is further: the calculated target or the saved step
+      const savedStep = loadedDraft.current_step || 0;
+      setStep(Math.max(targetStep, savedStep));
+
+      const phase = loadedDraft.compose_phase === "review" ? "editing" : (loadedDraft.compose_phase as ComposePhase) || (hasDraftContent ? "editing" : "strategy");
       setComposePhase(phase);
       setCurrentDraftId(loadedDraft.id);
       if (loadedDraft.strategy) {
@@ -183,8 +219,14 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
       if (loadedDraft.compose_phase === "editing" || loadedDraft.compose_phase === "review") {
         setStrategyApproved(true);
       }
+      draftLoadedRef.current = true;
     }
   }, [loadedDraft, company?.id]);
+
+  // Reset draft loaded flag when draftId changes (new draft opened)
+  useEffect(() => {
+    draftLoadedRef.current = false;
+  }, [draftId]);
 
   // Pre-select article from URL param
   useEffect(() => {
@@ -237,7 +279,9 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
   const prevStepRef = useRef(step);
   useEffect(() => {
     if (step > 0 && step !== prevStepRef.current) {
-      saveDraft();
+      saveDraft().catch((err) => {
+        console.warn('[ComposeTab] Auto-save failed:', err);
+      });
     }
     prevStepRef.current = step;
   }, [step]);
@@ -245,7 +289,9 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
   // Auto-save when compose phase reaches editing (content generated)
   useEffect(() => {
     if (composePhase === "editing" && Object.keys(platformContents).length > 0) {
-      saveDraft();
+      saveDraft().catch((err) => {
+        console.warn('[ComposeTab] Auto-save failed:', err);
+      });
     }
   }, [composePhase]);
 
@@ -699,6 +745,8 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
     setPlatformContents({});
     setStrategy(null);
     setStrategyRequested(false);
+    // Auto-advance to next step after selecting an article
+    setStep(s => s + 1);
   };
 
   // Debounced auto-save when platformContents change during editing phase
@@ -1401,7 +1449,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
         <div className="space-y-6 max-w-3xl">
           <div>
             <h2 className="font-display text-xl font-bold text-foreground">Select an Article</h2>
-            <p className="text-muted-foreground text-sm mt-1">Choose the article you'd like to create a post for</p>
+            <p className="text-muted-foreground text-sm mt-1">Click an article to select it and continue</p>
           </div>
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {(!feedItems || feedItems.length === 0) ? (
@@ -1472,7 +1520,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
             </Card>
           )}
 
-          <RadioGroup value={objective} onValueChange={setObjective} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <RadioGroup value={objective} onValueChange={(val) => { setObjective(val); setStep(s => s + 1); }} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {objectives.map(obj => {
               const Icon = obj.icon;
               return (
@@ -1632,10 +1680,10 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
 
       {/* Navigation footer */}
       {steps.length > 1 && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-border sticky bottom-0 bg-background pb-4 z-10">
           <div>
             {step > 0 ? (
-              <Button variant="ghost" onClick={() => { setStep(s => s - 1); if (currentStepKey === "compose") { setComposePhase("strategy"); setStrategyApproved(false); } }} className="gap-2">
+              <Button type="button" variant="ghost" onClick={() => { setStep(s => s - 1); if (currentStepKey === "compose") { setComposePhase("strategy"); setStrategyApproved(false); } }} className="gap-2">
                 <ArrowLeft className="w-4 h-4" />
                 Back
               </Button>
@@ -1645,7 +1693,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
           </div>
           <div className="flex gap-3">
             {step > 0 && (
-              <Button variant="ghost" size="sm" onClick={handleReset} className="text-muted-foreground">
+              <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="text-muted-foreground">
                 Start over
               </Button>
             )}
@@ -1680,6 +1728,7 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
               )
             ) : (
               <Button
+                type="button"
                 onClick={() => setStep(s => s + 1)}
                 disabled={!canProceed}
                 className="gap-2"

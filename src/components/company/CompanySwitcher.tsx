@@ -1,4 +1,5 @@
-import { Check, ChevronsUpDown, Plus, Building2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Building2, Star } from 'lucide-react';
+import { DEMO_COMPANY_ID, isDemoCompany } from '@/lib/demo/demo-constants';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +39,12 @@ export function CompanySwitcher({ collapsed }: CompanySwitcherProps) {
   // Show for all users who have at least one company (allows access to "Create New Company")
   if (!allCompanies || allCompanies.length === 0) return null;
 
+  // Inject demo company at top of list (superadmins only)
+  const demoEntry = { id: DEMO_COMPANY_ID, name: 'Longtale Demo', slug: 'demo' };
+  const companiesWithDemo = isSuperAdmin
+    ? [demoEntry, ...allCompanies.filter(c => c.id !== DEMO_COMPANY_ID)]
+    : allCompanies;
+
   const handleSelectCompany = (companyId: string) => {
     setSelectedCompanyId(companyId);
     // Invalidate queries that depend on company
@@ -69,7 +76,7 @@ export function CompanySwitcher({ collapsed }: CompanySwitcherProps) {
         </PopoverTrigger>
         <PopoverContent className="w-64 p-0" side="right" align="start">
           <CompanySwitcherContent
-            companies={allCompanies || []}
+            companies={companiesWithDemo}
             currentCompany={currentCompany}
             onSelect={handleSelectCompany}
             onCreate={handleCreateCompany}
@@ -98,7 +105,7 @@ export function CompanySwitcher({ collapsed }: CompanySwitcherProps) {
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" side="right" align="start">
         <CompanySwitcherContent
-          companies={allCompanies || []}
+          companies={companiesWithDemo}
           currentCompany={currentCompany}
           onSelect={handleSelectCompany}
           onCreate={handleCreateCompany}
@@ -143,6 +150,9 @@ function CompanySwitcherContent({
                   currentCompany?.id === company.id ? 'opacity-100' : 'opacity-0'
                 )}
               />
+              {isDemoCompany(company.id) && (
+                <Star className="h-3 w-3 text-amber-500 fill-amber-500 mr-1" />
+              )}
               <span>{company.name}</span>
             </CommandItem>
           ))}

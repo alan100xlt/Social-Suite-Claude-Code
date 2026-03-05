@@ -3,8 +3,14 @@
 # Starts the listener + ngrok if not already active.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NGROK="/c/Users/alana/AppData/Local/ngrok/ngrok.exe"
-NGROK_DOMAIN="https://sherika-halterlike-savanna.ngrok-free.dev/"
+
+# Load config from .env
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+fi
+
+NGROK="/c/Users/alana/AppData/Local/Microsoft/WinGet/Packages/Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe/ngrok"
+NGROK_DOMAIN="${NGROK_DOMAIN:-}"
 PID_FILE="$SCRIPT_DIR/.listener.pid"
 
 # Clean up stale state files (older than 24h)
@@ -25,7 +31,11 @@ echo "$LISTENER_PID" > "$PID_FILE"
 echo "Listener started (PID: $LISTENER_PID)"
 
 # Start ngrok in background (detached)
-"$NGROK" http --url="$NGROK_DOMAIN" 3001 > /dev/null 2>&1 &
+if [ -n "$NGROK_DOMAIN" ]; then
+  "$NGROK" http --url="$NGROK_DOMAIN" 3001 > /dev/null 2>&1 &
+else
+  "$NGROK" http 3001 > /dev/null 2>&1 &
+fi
 NGROK_PID=$!
 echo "ngrok started (PID: $NGROK_PID)"
 

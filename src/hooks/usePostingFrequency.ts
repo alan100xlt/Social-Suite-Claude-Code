@@ -16,13 +16,18 @@ export function usePostingFrequency(params: { platform?: string } = {}) {
     queryKey: ['posting-frequency', companyId, params],
     enabled: !!companyId,
     staleTime: 60 * 60 * 1000,
+    retry: 1,
     queryFn: async (): Promise<PostingFrequencyRow[]> => {
-      const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-        body: { action: 'posting-frequency', companyId, ...params },
+      const { data, error } = await supabase.rpc('get_posting_frequency_analysis', {
+        _company_id: companyId!,
+        _platform: params.platform ?? null,
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to get posting frequency');
-      return (data.data as PostingFrequencyRow[]) ?? [];
+      return (data ?? []).map((row: any) => ({
+        platform: row.platform,
+        posts_per_week: Number(row.posts_per_week),
+        average_engagement_rate: Number(row.average_engagement_rate),
+      }));
     },
   });
 }

@@ -7,7 +7,7 @@ export interface ContentDecayBucket {
   engagementPercentage: number; // 0-100
 }
 
-export function useContentDecay(params: { platform?: string; accountId?: string; postId?: string } = {}) {
+export function useContentDecay(params: { platform?: string } = {}) {
   const { data: company } = useCompany();
   const companyId = company?.id;
 
@@ -15,13 +15,22 @@ export function useContentDecay(params: { platform?: string; accountId?: string;
     queryKey: ['content-decay', companyId, params],
     enabled: !!companyId,
     staleTime: 60 * 60 * 1000,
+    retry: 1,
     queryFn: async (): Promise<ContentDecayBucket[]> => {
-      const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-        body: { action: 'content-decay', companyId, ...params },
-      });
+      let query = supabase
+        .from('content_decay_cache')
+        .select('data')
+        .eq('company_id', companyId!);
+
+      if (params.platform) {
+        query = query.eq('platform', params.platform);
+      } else {
+        query = query.is('platform', null);
+      }
+
+      const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to get content decay');
-      return (data.buckets as ContentDecayBucket[]) ?? [];
+      return (data?.data as ContentDecayBucket[]) ?? [];
     },
   });
 }

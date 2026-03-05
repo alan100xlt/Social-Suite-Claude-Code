@@ -3,8 +3,14 @@
 # Run this before starting autonomous Claude Code sessions
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NGROK="/c/Users/alana/AppData/Local/ngrok/ngrok.exe"
-NGROK_DOMAIN="sherika-halterlike-savanna.ngrok-free.dev"
+
+# Load config from .env
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+fi
+
+NGROK="${NGROK_PATH:-$(which ngrok 2>/dev/null || echo ngrok)}"
+NGROK_DOMAIN="${NGROK_DOMAIN:-}"
 
 echo "Starting Slack Agent Bridge..."
 
@@ -14,8 +20,13 @@ LISTENER_PID=$!
 echo "Listener started (PID: $LISTENER_PID)"
 
 # Start the ngrok tunnel
-echo "Starting ngrok tunnel ($NGROK_DOMAIN)..."
-"$NGROK" http --url="$NGROK_DOMAIN" 3001
+if [ -n "$NGROK_DOMAIN" ]; then
+  echo "Starting ngrok tunnel ($NGROK_DOMAIN)..."
+  "$NGROK" http --url="$NGROK_DOMAIN" 3001
+else
+  echo "Starting ngrok tunnel (random domain)..."
+  "$NGROK" http 3001
+fi
 
 # If tunnel exits, kill the listener
 kill $LISTENER_PID 2>/dev/null

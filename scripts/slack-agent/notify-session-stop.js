@@ -1,11 +1,12 @@
 // scripts/slack-agent/notify-session-stop.js
-// Stop hook: posts a rich Slack message summarizing what changed during the session.
+// Stop hook: posts a short one-liner to the channel, full details in thread.
 
 import { WebClient } from '@slack/web-api';
 import { config } from 'dotenv';
 import { execSync } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { writeState, STATUSES } from './state.js';
 import { parseHookInput } from './stdin.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,9 @@ config({ path: join(__dirname, '.env') });
 const input = await parseHookInput();
 const sessionId = input.session_id || null;
 const cwd = input.cwd || process.cwd();
+
+const USER_ID = process.env.SLACK_USER_ID;
+const mention = USER_ID ? `<@${USER_ID}> ` : '';
 
 function run(cmd) {
   try {
@@ -37,67 +41,100 @@ const recentSessionCommits = run('git log --since="1 hour ago" --format="• %h 
 // Diff stats
 const diffStat = run('git diff --stat HEAD 2>/dev/null');
 
-// Build summary sections
-const sections = [];
+// Build plain English summary for thread
+const detailParts = [];
 
-// Commits made this session
 if (recentSessionCommits) {
-  sections.push(`*Commits this session:*\n${recentSessionCommits}`);
+  const commitCount = recentSessionCommits.split('\n').filter(Boolean).length;
+  detailParts.push(`*Commits this session (${commitCount}):*\n${recentSessionCommits}`);
 } else {
-  sections.push('_No commits made this session_');
+  detailParts.push('_No commits made this session._');
 }
 
 // Uncommitted changes
-const uncommitted = [];
-if (stagedFiles) uncommitted.push(`*Staged:* ${stagedFiles.split('\n').length} file(s)`);
-if (modifiedFiles) uncommitted.push(`*Modified:* ${modifiedFiles.split('\n').length} file(s)`);
-if (untrackedNew) uncommitted.push(`*New files:* ${untrackedNew.split('\n').length} file(s)`);
+const uncommittedFiles = [
+  ...(stagedFiles ? stagedFiles.split('\n') : []),
+  ...(modifiedFiles ? modifiedFiles.split('\n') : []),
+  ...(untrackedNew ? untrackedNew.split('\n') : []),
+].filter(Boolean);
+const uniqueUncommitted = [...new Set(uncommittedFiles)];
 
-if (uncommitted.length > 0) {
-  sections.push(`*Uncommitted changes:*\n${uncommitted.join('\n')}`);
+if (uniqueUncommitted.length > 0) {
+  const fileList = uniqueUncommitted.length > 10
+    ? uniqueUncommitted.slice(0, 10).join('\n') + `\n_...and ${uniqueUncommitted.length - 10} more_`
+    : uniqueUncommitted.join('\n');
+  detailParts.push(`*Uncommitted files (${uniqueUncommitted.length}):*\n\`\`\`${fileList}\`\`\``);
 }
 
-// Diff stats (insertions/deletions)
 if (diffStat) {
   const lastLine = diffStat.split('\n').pop();
-  if (lastLine) sections.push(`*Diff summary:* ${lastLine}`);
+  if (lastLine) detailParts.push(`*Diff:* ${lastLine}`);
 }
 
-// Changed file list (truncated)
-const allChanged = [stagedFiles, modifiedFiles, untrackedNew].filter(Boolean).join('\n');
-if (allChanged) {
-  const files = [...new Set(allChanged.split('\n'))];
-  const display = files.length > 15
-    ? files.slice(0, 15).join('\n') + `\n... and ${files.length - 15} more`
-    : files.join('\n');
-  sections.push(`*Files touched:*\n\`\`\`${display}\`\`\``);
-}
+const threadDetails = detailParts.join('\n\n');
+
+// Build short one-liner for the channel
+const commitCount = recentSessionCommits ? recentSessionCommits.split('\n').filter(Boolean).length : 0;
+const uncommittedCount = uniqueUncommitted.length;
+const parts = [];
+if (commitCount > 0) parts.push(`${commitCount} commit${commitCount > 1 ? 's' : ''}`);
+if (uncommittedCount > 0) parts.push(`${uncommittedCount} uncommitted file${uncommittedCount > 1 ? 's' : ''}`);
+const shortSummary = parts.length > 0 ? parts.join(', ') : 'no changes';
+
+const headline = `\ud83c\udfc1 Session complete on \`${branch || 'detached'}\` — ${shortSummary}.`;
 
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 const CHANNEL = process.env.SLACK_CHANNEL_ID;
 
 try {
+  // Short top-level message
+  const result = await slack.chat.postMessage({
+    channel: CHANNEL,
+    text: `${mention}${headline}`,
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `${mention}${headline}` },
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: '_Reply in this thread with questions or follow-ups._',
+          },
+        ],
+      },
+    ],
+    attachments: [{ color: '#4A90D9' }],
+  });
+
+  // Full details as thread reply
   await slack.chat.postMessage({
     channel: CHANNEL,
-    text: `🏁 SESSION COMPLETE on branch ${branch}`,
+    thread_ts: result.ts,
+    text: threadDetails,
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: [
-            `🏁 *SESSION COMPLETE*${sessionId ? ` _(${sessionId.slice(0, 8)})_` : ''}`,
-            `*Branch:* \`${branch || '(detached)'}\``,
-            lastCommit ? `*Latest commit:* ${lastCommit}` : '',
-          ].filter(Boolean).join('\n'),
+          text: `*Branch:* \`${branch || '(detached)'}\`${lastCommit ? `\n*Latest commit:* ${lastCommit}` : ''}`,
         },
       },
-      ...sections.map((text) => ({
+      {
         type: 'section',
-        text: { type: 'mrkdwn', text },
-      })),
+        text: { type: 'mrkdwn', text: threadDetails },
+      },
     ],
-    attachments: [{ color: '#4A90D9' }],
+  });
+
+  // Write state so follow-up replies can be picked up
+  writeState(sessionId, {
+    status: STATUSES.WAITING_REPLY,
+    event: 'summary',
+    context: threadDetails,
+    thread_ts: result.ts,
   });
 
   console.log('Session stop notification sent');

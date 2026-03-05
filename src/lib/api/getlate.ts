@@ -322,46 +322,6 @@ export const getlatePosts = {
 
 // Analytics API
 export const getlateAnalytics = {
-  // Get analytics for a single post
-  async getPostAnalytics(postId: string): Promise<ApiResponse<{ analytics: PostAnalytics }>> {
-    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-      body: { action: 'get', postId },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: data.success, data: { analytics: data.analytics }, error: data.error };
-  },
-
-  // Get analytics for multiple posts
-  async getBatchAnalytics(postIds: string[]): Promise<ApiResponse<{ analytics: PostAnalytics[] }>> {
-    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-      body: { action: 'get', postIds },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: data.success, data: { analytics: data.analytics }, error: data.error };
-  },
-
-  // Get overview analytics
-  async getOverview(params?: {
-    accountIds?: string[];
-    startDate?: string;
-    endDate?: string;
-  }): Promise<ApiResponse<{ overview: Record<string, unknown> }>> {
-    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-      body: { action: 'overview', ...params },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: data.success, data: { overview: data.overview }, error: data.error };
-  },
-
   // Sync external post analytics
   async syncExternalPost(accountId: string, postUrl: string): Promise<ApiResponse<{ analytics: PostAnalytics }>> {
     const { data, error } = await supabase.functions.invoke('getlate-analytics', {
@@ -391,20 +351,6 @@ export const getlateAnalytics = {
     return { success: data.success, data: { metrics: data.metrics }, error: data.error };
   },
 
-  // Get post timeline (engagement over time for a single post)
-  async getPostTimeline(postId: string, params?: {
-    fromDate?: string;
-    toDate?: string;
-  }): Promise<ApiResponse<{ timeline: Array<{ date: string; impressions: number; likes: number; comments: number; shares: number }> }>> {
-    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-      body: { action: 'post-timeline', postId, ...params },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: data.success, data: { timeline: data.timeline }, error: data.error };
-  },
 };
 
 // Unified API export

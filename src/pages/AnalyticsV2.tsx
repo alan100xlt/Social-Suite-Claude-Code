@@ -153,7 +153,7 @@ export default function AnalyticsV2() {
           />
         </div>
 
-        {/* Stat sparkline row — derived from publish-date metrics for consistency with area trend */}
+        {/* Stat sparkline row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatSparklineWidget
             title="Total Views"
@@ -236,7 +236,7 @@ export default function AnalyticsV2() {
 
         {/* Optimal Posting Times */}
         {company && (
-          <OptimalPostingWidget 
+          <OptimalPostingWidget
             companyId={company.id}
           />
         )}

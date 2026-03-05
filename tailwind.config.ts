@@ -112,6 +112,18 @@ export default {
           from: { backgroundPosition: "200% 0" },
           to: { backgroundPosition: "-200% 0" },
         },
+        "chart-enter": {
+          from: { opacity: "0", transform: "translateY(16px) scale(0.98)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "priority-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(251, 191, 36, 0.4)" },
+          "50%": { boxShadow: "0 0 0 4px rgba(251, 191, 36, 0)" },
+        },
+        "drawer-peek": {
+          "0%, 85%, 100%": { transform: "translateX(0)" },
+          "90%, 95%": { transform: "translateX(-15px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -120,6 +132,9 @@ export default {
         "slide-in-right": "slide-in-right 0.4s ease-out forwards",
         "scale-in": "scale-in 0.3s ease-out forwards",
         "shimmer": "shimmer 2s linear infinite",
+        "chart-enter": "chart-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "priority-pulse": "priority-pulse 2s ease-in-out infinite",
+        "drawer-peek": "drawer-peek 10s ease-in-out infinite",
       },
     },
   },

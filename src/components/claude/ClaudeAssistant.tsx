@@ -175,7 +175,7 @@ export function ClaudeAssistant({ context, className }: ClaudeAssistantProps) {
 
   if (isMinimized) {
     return (
-      <div className={`fixed bottom-4 right-4 z-50 ${className}`}>
+      <div className={`fixed bottom-20 right-4 z-40 ${className}`}>
         <Button
           onClick={() => setIsMinimized(false)}
           className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg"
@@ -189,7 +189,7 @@ export function ClaudeAssistant({ context, className }: ClaudeAssistantProps) {
   }
 
   return (
-    <div className={`fixed bottom-4 right-4 w-96 h-[600px] bg-white dark:bg-gray-900 border rounded-lg shadow-2xl flex flex-col z-50 ${className}`}>
+    <div className={`fixed bottom-20 right-4 w-96 h-[600px] bg-white dark:bg-gray-900 border rounded-lg shadow-2xl flex flex-col z-40 ${className}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-lg flex items-center justify-between">
         <div className="flex items-center space-x-2">

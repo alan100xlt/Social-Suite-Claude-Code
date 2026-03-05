@@ -133,7 +133,7 @@ export function DataStatsDialog({ children }: DataStatsDialogProps) {
     data: bestTimes,
     isLoading: bestTimesLoading,
     refetch: refetchBestTimes,
-  } = useBestTimeToPost({ profileId: profileId || undefined });
+  } = useBestTimeToPost();
 
   const {
     data: contentDecay,

@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const monitor = new CronMonitor('analytics-sync', supabase);
+    const monitor = new CronMonitor('analytics-sync-hourly', supabase);
     await monitor.start();
 
     const today = new Date().toISOString().split('T')[0];
@@ -325,6 +325,7 @@ Deno.serve(async (req) => {
       postsSkippedNoAccount: 0,
       postsDiscovered: 0,
       postsSynced: 0,
+      contentDecayCached: 0,
       errors: [] as string[],
     };
 
@@ -651,6 +652,51 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Step 7: Cache content decay data from GetLate API
+        try {
+          const decayResponse = await fetch(
+            `${GETLATE_API_URL}/analytics/get-content-decay?profileId=${company.getlate_profile_id}`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          if (decayResponse.ok) {
+            const decayData = await decayResponse.json();
+            const buckets = decayData?.buckets ?? [];
+
+            if (buckets.length > 0) {
+              const { error: upsertError } = await supabase
+                .from('content_decay_cache')
+                .upsert(
+                  {
+                    company_id: company.id,
+                    platform: null, // aggregate across all platforms
+                    data: buckets,
+                    synced_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'company_id,platform' }
+                );
+
+              if (upsertError) {
+                console.error(`Error caching content decay for ${company.id}:`, upsertError);
+              } else {
+                results.contentDecayCached++;
+                console.log(`Cached content decay for company ${company.id} (${buckets.length} buckets)`);
+              }
+            }
+          } else {
+            console.log(`Content decay API returned ${decayResponse.status} for company ${company.id} — skipping cache`);
+          }
+        } catch (decayError) {
+          console.log(`Content decay cache failed for ${company.id}:`, decayError instanceof Error ? decayError.message : decayError);
+          // Non-fatal — don't add to results.errors
+        }
+
         results.companiesSynced++;
         console.log(`Completed sync for company ${company.id}`);
 
@@ -692,7 +738,7 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, serviceRoleKey);
-      const errorMonitor = new CronMonitor('analytics-sync', supabase);
+      const errorMonitor = new CronMonitor('analytics-sync-hourly', supabase);
       await errorMonitor.error(error instanceof Error ? error : String(error));
     } catch (monitorErr) {
       console.error('Failed to log error to monitor:', monitorErr);

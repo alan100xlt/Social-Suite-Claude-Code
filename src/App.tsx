@@ -10,6 +10,9 @@ import { CourierTokenProvider } from "@/contexts/CourierContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { DemoDataProvider } from "@/lib/demo/DemoDataProvider";
+import { KokoProvider } from "@/contexts/KokoContext";
+import { KokoFab } from "@/components/koko/KokoFab";
+import { KokoCopilot } from "@/components/koko/KokoCopilot";
 
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SuperAdminRoute } from "@/components/auth/SuperAdminRoute";
@@ -55,6 +58,7 @@ import CronHealth from "./pages/CronHealth";
 import AgGridShowcase from "./pages/AgGridShowcase";
 import AgGridShowcaseV1 from "./pages/AgGridShowcaseV1";
 import Progress from "./pages/Progress";
+import Inbox from "./pages/Inbox";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
 import { MediaCompanyWorkspace } from "./pages/MediaCompanyWorkspace";
 
@@ -73,8 +77,11 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <KokoProvider>
             <PostHogPageviewTracker />
             <VersionSwitcher />
+            <KokoFab />
+            <KokoCopilot />
             <Routes>
               {/* Marketing (public, root level) */}
               <Route path="/" element={<LandingPage />} />
@@ -100,6 +107,7 @@ const App = () => (
 
               {/* Protected: App core */}
               <Route path="/app" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/app/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
               <Route path="/app/content" element={<ProtectedRoute><ContentV2 /></ProtectedRoute>} />
               <Route path="/app/content/sources" element={<ProtectedRoute><ContentSources /></ProtectedRoute>} />
               <Route path="/app/content-legacy" element={<ProtectedRoute><Content /></ProtectedRoute>} />
@@ -168,6 +176,7 @@ const App = () => (
 
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </KokoProvider>
           </BrowserRouter>
         </TooltipProvider>
         </ThemeProvider>

@@ -3,6 +3,88 @@ import { authorize, corsHeaders } from '../_shared/authorize.ts';
 
 const GETLATE_API_URL = 'https://getlate.dev/api/v1';
 
+// ── Action registry ─────────────────────────────────────────────────────────
+// Each action defines its endpoint, HTTP method, which body fields become
+// query params (GET) or JSON body (POST), and how to shape the success response.
+// Adding a new GetLate analytics action = adding one entry here.
+
+interface ActionConfig {
+  /** API path appended to GETLATE_API_URL (e.g. "/analytics/best-time") */
+  path: string;
+  method: 'GET' | 'POST';
+  /** Body fields forwarded as query params (GET) or JSON body (POST). */
+  forwardFields: string[];
+  /** Whether this action needs the company's getlate_profile_id resolved and sent as `profileId`. */
+  needsProfileId: boolean;
+  /** Key used to wrap the response data in the success payload (e.g. "analytics", "overview"). Omit to spread data into the root. */
+  responseKey?: string;
+}
+
+const ACTIONS: Record<string, ActionConfig> = {
+  'get': {
+    path: '/analytics',
+    method: 'GET',
+    forwardFields: ['postId', 'postIds'],
+    needsProfileId: false,
+    responseKey: 'analytics',
+  },
+  'sync': {
+    path: '/analytics/sync',
+    method: 'POST',
+    forwardFields: ['accountId', 'postUrl'],
+    needsProfileId: false,
+    responseKey: 'analytics',
+  },
+  'youtube-daily': {
+    path: '/analytics/youtube/daily-views',
+    method: 'GET',
+    forwardFields: ['postId'],
+    needsProfileId: false,
+    responseKey: 'dailyViews',
+  },
+  'overview': {
+    path: '/analytics/overview',
+    method: 'GET',
+    forwardFields: ['accountIds', 'startDate', 'endDate'],
+    needsProfileId: false,
+    responseKey: 'overview',
+  },
+  'best-time': {
+    path: '/analytics/best-time',
+    method: 'GET',
+    forwardFields: ['platform', 'profileId'],
+    needsProfileId: true,
+  },
+  'content-decay': {
+    path: '/analytics/get-content-decay',
+    method: 'GET',
+    forwardFields: ['platform', 'accountId', 'postId'],
+    needsProfileId: true,
+  },
+  'posting-frequency': {
+    path: '/analytics/get-posting-frequency',
+    method: 'GET',
+    forwardFields: ['platform'],
+    needsProfileId: true,
+  },
+  'daily-metrics': {
+    path: '/analytics/daily-metrics',
+    method: 'GET',
+    forwardFields: ['profileId', 'startDate', 'endDate', 'platform'],
+    needsProfileId: true,
+    responseKey: 'dailyMetrics',
+  },
+  'post-timeline': {
+    path: '/analytics/post-timeline',
+    method: 'GET',
+    forwardFields: ['postId', 'fromDate', 'toDate'],
+    needsProfileId: false,
+    responseKey: 'timeline',
+  },
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 async function safeJsonParse(response: Response): Promise<{ data: unknown; error: string | null }> {
   const contentType = response.headers.get('content-type') || '';
   const text = await response.text();
@@ -42,6 +124,21 @@ async function logApiCall(
   } catch (e) { console.error('Failed to log API call:', e); }
 }
 
+async function resolveProfileId(
+  supabase: ReturnType<typeof createClient>,
+  companyId?: string,
+): Promise<string | null> {
+  if (!companyId) return null;
+  const { data } = await supabase
+    .from('companies')
+    .select('getlate_profile_id')
+    .eq('id', companyId)
+    .single();
+  return data?.getlate_profile_id || null;
+}
+
+// ── Main handler ────────────────────────────────────────────────────────────
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -52,7 +149,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Authenticate: require valid JWT or service role
+    // Authenticate
     try {
       await authorize(req, { allowServiceRole: true });
     } catch (authError) {
@@ -64,7 +161,7 @@ Deno.serve(async (req) => {
     if (!apiKey) {
       return new Response(
         JSON.stringify({ success: false, error: 'GetLate API key not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -76,415 +173,123 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action } = body;
+    const { action, companyId } = body;
+    const config = ACTIONS[action];
+
+    if (!config) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Invalid action: ${action}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const startTime = Date.now();
 
-    // Helper: check for 429 rate limit before generic error handling
-    const checkRateLimit = (response: Response): Response | null => {
-      if (response.status === 429) {
-        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
-        console.warn('Rate limited. Retry-After:', retryAfter);
-        return new Response(
-          JSON.stringify({ success: false, error: `Rate limited. Please try again in ${retryAfter} seconds.`, errorType: 'rate_limit', retryAfter }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      return null;
-    };
-
-    // Get analytics for post(s)
-    if (action === 'get') {
-      const { postId, postIds } = body;
-      let url = `${GETLATE_API_URL}/analytics`;
-      if (postId) url += `?postId=${postId}`;
-      else if (postIds && postIds.length > 0) url += `?postIds=${postIds.join(',')}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitResponse = checkRateLimit(response);
-      if (rateLimitResponse) return rateLimitResponse;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get analytics';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'get',
-          request_body: { postId, postIds }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'get',
-        request_body: { postId, postIds },
-        response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId,
-      });
-      return new Response(
-        JSON.stringify({ success: true, analytics: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Resolve profileId from companyId when the action needs it
+    let profileId: string | null = null;
+    if (config.needsProfileId) {
+      // Prefer an explicitly-passed profileId, fall back to company lookup
+      profileId = body.profileId || await resolveProfileId(supabase, companyId);
     }
 
-    // Sync analytics from external posts
-    if (action === 'sync') {
-      const { accountId, postUrl } = body;
-      const response = await fetch(`${GETLATE_API_URL}/analytics/sync`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, postUrl }),
-      });
+    // Build the fetch request
+    const apiHeaders = { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+    let url: string;
+    let fetchInit: RequestInit;
 
-      const rateLimitSync = checkRateLimit(response);
-      if (rateLimitSync) return rateLimitSync;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to sync analytics';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'sync',
-          request_body: { accountId, postUrl }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId, account_ids: accountId ? [accountId] : [],
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'sync',
-        request_body: { accountId, postUrl }, response_body: data,
-        status_code: response.status, success: true, duration_ms: duration,
-        user_id: userId, account_ids: accountId ? [accountId] : [],
-      });
-      return new Response(
-        JSON.stringify({ success: true, analytics: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get YouTube daily views breakdown
-    if (action === 'youtube-daily') {
-      const { postId } = body;
-      const response = await fetch(`${GETLATE_API_URL}/analytics/youtube/daily-views?postId=${postId}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitYt = checkRateLimit(response);
-      if (rateLimitYt) return rateLimitYt;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get YouTube daily views';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'youtube-daily',
-          request_body: { postId }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'youtube-daily',
-        request_body: { postId }, response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId,
-      });
-      return new Response(
-        JSON.stringify({ success: true, dailyViews: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get account overview analytics
-    if (action === 'overview') {
-      const { accountIds, startDate, endDate } = body;
+    if (config.method === 'GET') {
       const params = new URLSearchParams();
-      if (accountIds) params.append('accountIds', accountIds.join(','));
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
 
-      const response = await fetch(`${GETLATE_API_URL}/analytics/overview?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitOv = checkRateLimit(response);
-      if (rateLimitOv) return rateLimitOv;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get analytics overview';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'overview',
-          request_body: { accountIds, startDate, endDate }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId, account_ids: accountIds,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      // Inject resolved profileId for actions that need it
+      if (config.needsProfileId && profileId) {
+        params.append('profileId', profileId);
       }
 
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'overview',
-        request_body: { accountIds, startDate, endDate },
-        response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration,
-        user_id: userId, account_ids: accountIds,
-      });
+      for (const field of config.forwardFields) {
+        // Skip profileId if we already set it from resolution
+        if (field === 'profileId' && config.needsProfileId) continue;
+
+        const value = body[field];
+        if (value !== undefined && value !== null) {
+          params.append(field, Array.isArray(value) ? value.join(',') : String(value));
+        }
+      }
+
+      const qs = params.toString();
+      url = `${GETLATE_API_URL}${config.path}${qs ? `?${qs}` : ''}`;
+      fetchInit = { method: 'GET', headers: apiHeaders };
+    } else {
+      // POST — forward fields as JSON body
+      const postBody: Record<string, unknown> = {};
+      if (config.needsProfileId && profileId) {
+        postBody.profileId = profileId;
+      }
+      for (const field of config.forwardFields) {
+        if (body[field] !== undefined) postBody[field] = body[field];
+      }
+      url = `${GETLATE_API_URL}${config.path}`;
+      fetchInit = { method: 'POST', headers: apiHeaders, body: JSON.stringify(postBody) };
+    }
+
+    // Execute
+    const response = await fetch(url, fetchInit);
+
+    // Rate limit check
+    if (response.status === 429) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+      console.warn('Rate limited. Retry-After:', retryAfter);
       return new Response(
-        JSON.stringify({ success: true, overview: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: `Rate limited. Please try again in ${retryAfter} seconds.`, errorType: 'rate_limit', retryAfter }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Get best times to post (by day/hour)
-    if (action === 'best-time') {
-      const { platform, profileId } = body;
-      const params = new URLSearchParams();
-      if (platform) params.append('platform', platform);
-      if (profileId) params.append('profileId', profileId);
+    const { data, error: parseError } = await safeJsonParse(response);
+    const duration = Date.now() - startTime;
 
-      const response = await fetch(`${GETLATE_API_URL}/analytics/best-time?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
+    // Build log context from body
+    const logContext: Record<string, unknown> = {};
+    for (const field of config.forwardFields) {
+      if (body[field] !== undefined) logContext[field] = body[field];
+    }
 
-      const rateLimitBt = checkRateLimit(response);
-      if (rateLimitBt) return rateLimitBt;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get best times';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'best-time',
-          request_body: { platform, profileId }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId, platform,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+    if (parseError || !response.ok) {
+      const errMsg = parseError || (data as { message?: string })?.message || `Failed: ${action}`;
       await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'best-time',
-        request_body: { platform, profileId }, response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
+        function_name: 'getlate-analytics', action,
+        request_body: logContext, response_body: data,
+        status_code: response.status, success: false, error_message: errMsg,
+        duration_ms: duration, user_id: userId,
+        profile_id: profileId || undefined,
+        account_ids: body.accountIds || (body.accountId ? [body.accountId] : []),
+        platform: body.platform,
       });
       return new Response(
-        JSON.stringify({ success: true, ...(data as object) }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: errMsg }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Get content decay (engagement accumulation over time after publish)
-    if (action === 'content-decay') {
-      const { platform, accountId, postId } = body;
-      const params = new URLSearchParams();
-      if (platform) params.append('platform', platform);
-      if (accountId) params.append('accountId', accountId);
-      if (postId) params.append('postId', postId);
+    // Success
+    await logApiCall(supabase, {
+      function_name: 'getlate-analytics', action,
+      request_body: logContext,
+      response_body: { hasData: !!data },
+      status_code: response.status, success: true, duration_ms: duration,
+      user_id: userId,
+      profile_id: profileId || undefined,
+      account_ids: body.accountIds || (body.accountId ? [body.accountId] : []),
+      platform: body.platform,
+    });
 
-      const response = await fetch(`${GETLATE_API_URL}/analytics/get-content-decay?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitCd = checkRateLimit(response);
-      if (rateLimitCd) return rateLimitCd;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get content decay';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'content-decay',
-          request_body: { platform, accountId, postId }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId, platform,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'content-decay',
-        request_body: { platform, accountId, postId }, response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
-      });
-      return new Response(
-        JSON.stringify({ success: true, ...(data as object) }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get posting frequency vs engagement correlation
-    if (action === 'posting-frequency') {
-      const { platform } = body;
-      const params = new URLSearchParams();
-      if (platform) params.append('platform', platform);
-
-      const response = await fetch(`${GETLATE_API_URL}/analytics/get-posting-frequency?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitPf = checkRateLimit(response);
-      if (rateLimitPf) return rateLimitPf;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get posting frequency';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'posting-frequency',
-          request_body: { platform }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId, platform,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'posting-frequency',
-        request_body: { platform }, response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
-      });
-      return new Response(
-        JSON.stringify({ success: true, ...(data as object) }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get daily metrics (aggregated per day)
-    if (action === 'daily-metrics') {
-      const { profileId, startDate, endDate, platform } = body;
-      const params = new URLSearchParams();
-      if (profileId) params.append('profileId', profileId);
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-      if (platform) params.append('platform', platform);
-
-      const response = await fetch(`${GETLATE_API_URL}/analytics/daily-metrics?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitDm = checkRateLimit(response);
-      if (rateLimitDm) return rateLimitDm;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get daily metrics';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'daily-metrics',
-          request_body: { profileId, startDate, endDate, platform }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId, platform,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'daily-metrics',
-        request_body: { profileId, startDate, endDate, platform },
-        response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId, platform,
-      });
-      return new Response(
-        JSON.stringify({ success: true, dailyMetrics: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get post timeline (engagement over time for a specific post)
-    if (action === 'post-timeline') {
-      const { postId, fromDate, toDate } = body;
-      const params = new URLSearchParams();
-      if (postId) params.append('postId', postId);
-      if (fromDate) params.append('fromDate', fromDate);
-      if (toDate) params.append('toDate', toDate);
-
-      const response = await fetch(`${GETLATE_API_URL}/analytics/post-timeline?${params}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      });
-
-      const rateLimitPt = checkRateLimit(response);
-      if (rateLimitPt) return rateLimitPt;
-
-      const { data, error: parseError } = await safeJsonParse(response);
-      const duration = Date.now() - startTime;
-
-      if (parseError || !response.ok) {
-        const errMsg = parseError || (data as { message?: string })?.message || 'Failed to get post timeline';
-        await logApiCall(supabase, {
-          function_name: 'getlate-analytics', action: 'post-timeline',
-          request_body: { postId, fromDate, toDate }, response_body: data,
-          status_code: response.status, success: false, error_message: errMsg,
-          duration_ms: duration, user_id: userId,
-        });
-        return new Response(
-          JSON.stringify({ success: false, error: errMsg }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      await logApiCall(supabase, {
-        function_name: 'getlate-analytics', action: 'post-timeline',
-        request_body: { postId, fromDate, toDate },
-        response_body: { hasData: !!data },
-        status_code: response.status, success: true, duration_ms: duration, user_id: userId,
-      });
-      return new Response(
-        JSON.stringify({ success: true, timeline: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Shape the success response: either wrap under a key or spread
+    const payload = config.responseKey
+      ? { success: true, [config.responseKey]: data }
+      : { success: true, ...(data as object) };
 
     return new Response(
-      JSON.stringify({ success: false, error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(payload),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
     console.error('Error in getlate-analytics:', error);
@@ -495,7 +300,7 @@ Deno.serve(async (req) => {
     });
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

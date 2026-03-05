@@ -17,8 +17,12 @@ const formatNumber = (n: number) => {
   return n.toString();
 };
 
-export function TopPostSpotlight() {
-  const { data: topPosts, isLoading } = useTopPerformingPosts({ days: 7, limit: 1, metric: "impressions" });
+interface TopPostSpotlightProps {
+  days?: number;
+}
+
+export function TopPostSpotlight({ days = 14 }: TopPostSpotlightProps = {}) {
+  const { data: topPosts, isLoading } = useTopPerformingPosts({ days, limit: 1, metric: "impressions" });
   const post = topPosts?.[0];
 
   if (isLoading) {
@@ -40,7 +44,7 @@ export function TopPostSpotlight() {
       <div className="rounded-xl border border-border bg-card p-5 animate-fade-in">
         <div className="flex items-center gap-2 mb-3">
           <Trophy className="w-4 h-4 text-warning" />
-          <h3 className="font-display font-semibold text-sm text-card-foreground">Top Post This Week</h3>
+          <h3 className="font-display font-semibold text-sm text-card-foreground">Top Post</h3>
         </div>
         <p className="text-sm text-muted-foreground">No posts published this week yet.</p>
       </div>
@@ -54,7 +58,7 @@ export function TopPostSpotlight() {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-warning" />
-          <h3 className="font-display font-semibold text-sm text-card-foreground">Top Post This Week</h3>
+          <h3 className="font-display font-semibold text-sm text-card-foreground">Top Post</h3>
         </div>
         <Badge variant="secondary" className="text-[10px] bg-warning/10 text-warning border-0">
           <PlatformIcon className="w-3 h-3 mr-1" />

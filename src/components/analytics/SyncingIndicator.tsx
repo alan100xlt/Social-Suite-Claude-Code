@@ -64,7 +64,7 @@ export function SyncingIndicator({ isSyncing, lastSyncResult }: SyncingIndicator
   return (
     <div
       className={cn(
-        "fixed bottom-6 right-6 z-50 w-80 rounded-xl border bg-card shadow-lg transition-all duration-300",
+        "fixed bottom-6 right-24 z-40 w-80 rounded-xl border bg-card shadow-lg transition-all duration-300",
         isSyncing ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       )}
     >

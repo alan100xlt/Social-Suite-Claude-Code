@@ -78,8 +78,8 @@ export function PostingFrequencyWidget() {
         {!isLoading && isError && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <BarChart2 className="w-8 h-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">Analytics add-on required</p>
-            <p className="text-xs text-muted-foreground mt-1">Upgrade to access frequency insights</p>
+            <p className="text-sm text-muted-foreground">Unable to load frequency data</p>
+            <p className="text-xs text-muted-foreground mt-1">Check your analytics connection and try again</p>
           </div>
         )}
 

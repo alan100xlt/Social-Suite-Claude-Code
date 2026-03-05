@@ -13,17 +13,18 @@ import {
   ChevronDown,
   Loader2,
   Newspaper,
+  Rss,
   Settings,
   ScrollText,
   Plus,
   Zap,
   ClipboardList,
-  Mail,
   Wrench,
   Building2,
   HeartPulse,
   Users,
-  Palette,
+  Shield,
+  Inbox,
 } from "lucide-react";
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
@@ -47,19 +48,27 @@ type NavItem = { name: string; href: string; icon: React.ElementType; addAction?
 
 const mainNavigation: NavItem[] = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard },
-  { name: "Content", href: "/app/content", icon: Newspaper, addAction: "/app/content?tab=posts" },
+  { name: "Inbox", href: "/app/inbox", icon: Inbox },
+  { name: "Content", href: "/app/content", icon: Newspaper },
+  { name: "Content Sources", href: "/app/content/sources", icon: Rss },
   { name: "Connections", href: "/app/connections", icon: Link2 },
+  { name: "Settings", href: "/app/settings", icon: Settings },
 ];
 
-const analyticsNavigation: NavItem[] = [
-  { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
+const analyticsChildren: NavItem[] = [
+  { name: "Overview", href: "/app/analytics", icon: BarChart3 },
   { name: "Insights", href: "/app/analytics-v2", icon: Sparkles },
   { name: "Advanced", href: "/app/analytics-v3", icon: Zap },
+  { name: "Premium", href: "/app/analytics-v4", icon: ClipboardList },
 ];
 
-const manageNavigation: NavItem[] = [
-  { name: "Settings", href: "/app/settings", icon: Settings },
-  { name: "Theme", href: "/app/theme", icon: Palette },
+const superadminChildren: NavItem[] = [
+  { name: "Platform Config", href: "/app/admin/platform-config", icon: Wrench },
+  { name: "Data Management", href: "/app/admin/data", icon: Building2 },
+  { name: "API Logs", href: "/app/admin/api-logs", icon: ScrollText },
+  { name: "Automation Logs", href: "/app/admin/automation-logs", icon: ClipboardList },
+  { name: "API Mapping", href: "/app/admin/mapping", icon: Link2 },
+  { name: "Cron Health", href: "/app/admin/cron-health", icon: HeartPulse },
 ];
 
 // Platform icon and color mapping
@@ -160,6 +169,225 @@ function NavSection({ label, items, collapsed, location }: {
   );
 }
 
+function AnalyticsAccordion({ collapsed, location }: { collapsed: boolean; location: { pathname: string } }) {
+  const isAnyActive = analyticsChildren.some(
+    (item) => location.pathname === item.href || location.pathname.startsWith(item.href)
+  );
+  const [open, setOpen] = useState(isAnyActive);
+
+  return (
+    <div className="space-y-1">
+      {!collapsed && (
+        <div className="px-3 pt-4 pb-1">
+          <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Analytics</p>
+        </div>
+      )}
+      {collapsed && <div className="pt-2" />}
+
+      {/* Toggle button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+          isAnyActive && !open
+            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+            : "text-sidebar-foreground hover:bg-sidebar-accent"
+        )}
+      >
+        <BarChart3
+          size={20}
+          className={cn(
+            "flex-shrink-0 transition-transform group-hover:scale-110",
+            isAnyActive && !open && "drop-shadow-sm"
+          )}
+        />
+        {!collapsed && (
+          <>
+            <span className="font-medium text-sm flex-1 text-left">Analytics</span>
+            <ChevronDown
+              size={16}
+              className={cn(
+                "transition-transform duration-200",
+                open && "rotate-180"
+              )}
+            />
+          </>
+        )}
+      </button>
+
+      {/* Children — visible when expanded (or always in collapsed mode via tooltip) */}
+      {open && !collapsed && (
+        <div className="ml-3 pl-3 border-l border-sidebar-border/50 space-y-0.5">
+          {analyticsChildren.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                <item.icon
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-transform group-hover:scale-110",
+                    isActive && "drop-shadow-sm"
+                  )}
+                />
+                <span className="font-medium text-sm">{item.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Collapsed mode: show children in a flyout */}
+      {collapsed && open && (
+        <div className="space-y-0.5">
+          {analyticsChildren.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                title={item.name}
+                className={cn(
+                  "flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 group",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                <item.icon
+                  size={18}
+                  className={cn(
+                    "flex-shrink-0 transition-transform group-hover:scale-110",
+                    isActive && "drop-shadow-sm"
+                  )}
+                />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SuperadminAccordion({ collapsed, location }: { collapsed: boolean; location: { pathname: string } }) {
+  const isAnyActive = superadminChildren.some(
+    (item) => location.pathname === item.href || location.pathname.startsWith(item.href)
+  );
+  const [open, setOpen] = useState(isAnyActive);
+
+  return (
+    <div className="space-y-1">
+      {!collapsed && (
+        <div className="px-3 pt-4 pb-1 flex items-center gap-2">
+          <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Superadmin</p>
+          <span className="text-xs font-bold text-primary">CC</span>
+        </div>
+      )}
+      {collapsed && <div className="pt-2" />}
+
+      {/* Toggle button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+          isAnyActive && !open
+            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+            : "text-sidebar-foreground hover:bg-sidebar-accent"
+        )}
+      >
+        <Shield
+          size={20}
+          className={cn(
+            "flex-shrink-0 transition-transform group-hover:scale-110",
+            isAnyActive && !open && "drop-shadow-sm"
+          )}
+        />
+        {!collapsed && (
+          <>
+            <span className="font-medium text-sm flex-1 text-left">Admin Tools</span>
+            <ChevronDown
+              size={16}
+              className={cn(
+                "transition-transform duration-200",
+                open && "rotate-180"
+              )}
+            />
+          </>
+        )}
+      </button>
+
+      {/* Children — visible when expanded */}
+      {open && !collapsed && (
+        <div className="ml-3 pl-3 border-l border-sidebar-border/50 space-y-0.5">
+          {superadminChildren.map((item) => {
+            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                <item.icon
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-transform group-hover:scale-110",
+                    isActive && "drop-shadow-sm"
+                  )}
+                />
+                <span className="font-medium text-sm">{item.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Collapsed mode: show children */}
+      {collapsed && open && (
+        <div className="space-y-0.5">
+          {superadminChildren.map((item) => {
+            const isActive = location.pathname === item.href || location.pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                title={item.name}
+                className={cn(
+                  "flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 group",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+              >
+                <item.icon
+                  size={18}
+                  className={cn(
+                    "flex-shrink-0 transition-transform group-hover:scale-110",
+                    isActive && "drop-shadow-sm"
+                  )}
+                />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(false);
@@ -209,8 +437,8 @@ export function Sidebar() {
         {/* Main */}
         <NavSection label="Main" items={mainNavigation} collapsed={collapsed} location={location} />
 
-        {/* Analytics */}
-        <NavSection label="Analytics" items={analyticsNavigation} collapsed={collapsed} location={location} />
+        {/* Analytics (accordion) */}
+        <AnalyticsAccordion collapsed={collapsed} location={location} />
 
         {/* My Channels Flyout */}
         <DropdownMenu open={channelsOpen} onOpenChange={setChannelsOpen}>
@@ -315,8 +543,6 @@ export function Sidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Manage */}
-        <NavSection label="Manage" items={manageNavigation} collapsed={collapsed} location={location} />
 
         {/* Media Companies */}
         {(isOwnerOrAdmin || isSuperAdmin || (mediaCompanies && mediaCompanies.length > 0)) && (
@@ -374,136 +600,9 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Superadmin Only */}
+        {/* Superadmin Only (accordion) */}
         {isSuperAdmin && (
-          <>
-            {!collapsed && (
-              <div className="pt-4 pb-1 px-3 flex items-center gap-2">
-                <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Superadmin</p>
-                <span className="text-xs font-bold text-primary">CC</span>
-              </div>
-            )}
-            {collapsed && <div className="pt-2" />}
-            <Link
-              to="/app/admin/api-logs"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/api-logs"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <ScrollText
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">API Logs</span>
-              )}
-            </Link>
-            <Link
-              to="/app/admin/mapping"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/mapping"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Link2
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">API Mapping</span>
-              )}
-            </Link>
-            <Link
-              to="/app/admin/email-branding"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/email-branding"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Mail
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">Email Branding</span>
-              )}
-            </Link>
-            <Link
-              to="/app/admin/platform"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/platform"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Wrench
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">Platform Settings</span>
-              )}
-            </Link>
-            <Link
-              to="/app/admin/companies"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/companies"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Building2
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">Companies</span>
-              )}
-            </Link>
-            <Link
-              to="/app/admin/users"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/users"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Users
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">Users</span>
-              )}
-            </Link>
-            <Link
-              to="/app/admin/cron-health"
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                location.pathname === "/app/admin/cron-health"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <HeartPulse
-                size={20}
-                className="flex-shrink-0 transition-transform group-hover:scale-110"
-              />
-              {!collapsed && (
-                <span className="font-medium text-sm">Cron Health</span>
-              )}
-            </Link>
-          </>
+          <SuperadminAccordion collapsed={collapsed} location={location} />
         )}
       </nav>
 

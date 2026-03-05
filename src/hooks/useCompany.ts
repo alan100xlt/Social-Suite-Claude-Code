@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
 import { useToast } from '@/hooks/use-toast';
+import { DEMO_COMPANY_ID, DEMO_COMPANY, isDemoCompany } from '@/lib/demo/demo-constants';
 
 export interface Company {
   id: string;
@@ -82,6 +83,11 @@ export function useCompany() {
     queryKey: ['company', user?.id, selectedCompanyId, isSuperAdmin],
     queryFn: async () => {
       if (!user?.id) return null;
+
+      // Demo company — return static data, no Supabase call
+      if (isDemoCompany(selectedCompanyId)) {
+        return DEMO_COMPANY;
+      }
 
       // If a specific company is selected (by superadmin or multi-company user), use that
       if (selectedCompanyId) {

@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { RefreshCw, Search, CheckCircle2, XCircle, SkipForward, ChevronLeft, ChevronRight, ExternalLink, Building2 } from 'lucide-react';
+import { RefreshCw, CheckCircle2, XCircle, SkipForward, ChevronLeft, ChevronRight, ExternalLink, Building2 } from 'lucide-react';
 import { useCompanies } from '@/hooks/useCompanies';
 import { format } from 'date-fns';
+import { AgGridReact } from 'ag-grid-react';
+import { AllCommunityModule, type ColDef, type ICellRendererParams, type GridReadyEvent, type RowClickedEvent } from 'ag-grid-community';
+import { gridTheme, gridThemeDark } from '@/lib/ag-grid-theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { DataGridToolbar } from '@/components/ui/data-grid-toolbar';
 
 interface AutomationLog {
   id: string;
@@ -48,18 +51,25 @@ const actionLabels: Record<string, string> = {
 
 export function AutomationLogsContent() {
   const { isSuperAdmin } = useAuth();
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === 'dark-pro' || currentTheme === 'aurora';
+
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [resultFilter, setResultFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [quickFilter, setQuickFilter] = useState("");
   const [page, setPage] = useState(0);
   const [selectedLog, setSelectedLog] = useState<AutomationLog | null>(null);
+  const gridRef = useRef<AgGridReact<AutomationLog>>(null);
 
   const { data: companies } = useCompanies();
-  const companyNameMap = new Map(companies?.map(c => [c.id, c.name]) || []);
+  const companyNameMap = useMemo(
+    () => new Map(companies?.map(c => [c.id, c.name]) || []),
+    [companies]
+  );
 
   const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
-    queryKey: ["automation-logs", companyFilter, resultFilter, actionFilter, searchQuery, page],
+    queryKey: ["automation-logs", companyFilter, resultFilter, actionFilter, page],
     queryFn: async () => {
       let query = supabase
         .from("automation_logs" as any)
@@ -70,9 +80,6 @@ export function AutomationLogsContent() {
       if (companyFilter !== "all") query = query.eq("company_id", companyFilter);
       if (resultFilter !== "all") query = query.eq("result", resultFilter);
       if (actionFilter !== "all") query = query.eq("action", actionFilter);
-      if (searchQuery) {
-        query = query.or(`rule_name.ilike.%${searchQuery}%,article_title.ilike.%${searchQuery}%,error_message.ilike.%${searchQuery}%`);
-      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -80,19 +87,129 @@ export function AutomationLogsContent() {
     },
   });
 
+  const onGridReady = useCallback((params: GridReadyEvent) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const onExportCsv = useCallback(() => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: 'automation-logs.csv' });
+  }, []);
+
+  const onRowClicked = useCallback((event: RowClickedEvent<AutomationLog>) => {
+    if (event.data) setSelectedLog(event.data);
+  }, []);
+
+  const colDefs = useMemo<ColDef<AutomationLog>[]>(() => {
+    const cols: ColDef<AutomationLog>[] = [
+      {
+        headerName: 'Result',
+        field: 'result',
+        width: 80,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => {
+          const config = resultConfig[params.value as keyof typeof resultConfig] || resultConfig.error;
+          const ResultIcon = config.icon;
+          return <ResultIcon className={`w-4 h-4 ${config.className}`} />;
+        },
+        filter: 'agTextColumnFilter',
+      },
+    ];
+
+    if (isSuperAdmin) {
+      cols.push({
+        headerName: 'Company',
+        width: 140,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => (
+          <span className="text-xs text-muted-foreground">
+            {companyNameMap.get(params.data?.company_id || '') || '\u2014'}
+          </span>
+        ),
+        filterValueGetter: (params) => companyNameMap.get(params.data?.company_id || '') || '',
+        filter: 'agTextColumnFilter',
+      });
+    }
+
+    cols.push(
+      {
+        headerName: 'Rule',
+        field: 'rule_name',
+        flex: 1,
+        minWidth: 140,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => (
+          <span className="text-sm font-medium">{params.value}</span>
+        ),
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'Article',
+        field: 'article_title',
+        flex: 2,
+        minWidth: 200,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => (
+          params.value
+            ? <span className="text-sm truncate block" title={params.value}>{params.value}</span>
+            : <span className="text-xs text-muted-foreground">{'\u2014'}</span>
+        ),
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'Action',
+        field: 'action',
+        width: 150,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => (
+          <Badge variant="outline" className="text-xs">
+            {actionLabels[params.value] || params.value}
+          </Badge>
+        ),
+        filter: 'agTextColumnFilter',
+        filterValueGetter: (params) => actionLabels[params.data?.action || ''] || params.data?.action || '',
+      },
+      {
+        headerName: 'Error',
+        field: 'error_message',
+        flex: 1,
+        minWidth: 150,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => (
+          params.value
+            ? <span className="text-xs text-destructive truncate block">{params.value}</span>
+            : null
+        ),
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'Time',
+        field: 'created_at',
+        width: 130,
+        cellRenderer: (params: ICellRendererParams<AutomationLog>) => (
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {format(new Date(params.value), "MMM d, HH:mm:ss")}
+          </span>
+        ),
+        comparator: (a: string, b: string) => new Date(a).getTime() - new Date(b).getTime(),
+      },
+    );
+
+    return cols;
+  }, [isSuperAdmin, companyNameMap]);
+
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      resizable: true,
+      cellStyle: { display: 'flex', alignItems: 'center', overflow: 'hidden' },
+    }),
+    []
+  );
+
   return (
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search rules, articles, errors..."
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-            className="pl-9"
-          />
-        </div>
+        <DataGridToolbar
+          quickFilter={quickFilter}
+          onQuickFilterChange={setQuickFilter}
+          onExport={onExportCsv}
+          quickFilterPlaceholder="Search rules, articles, errors..."
+        />
         {isSuperAdmin && companies && companies.length > 1 && (
           <Select value={companyFilter} onValueChange={(v) => { setCompanyFilter(v); setPage(0); }}>
             <SelectTrigger className="w-[180px]">
@@ -133,71 +250,34 @@ export function AutomationLogsContent() {
         </Button>
       </div>
 
-      {/* Logs Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">Result</TableHead>
-              {isSuperAdmin && <TableHead>Company</TableHead>}
-              <TableHead>Rule</TableHead>
-              <TableHead>Article</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Error</TableHead>
-              <TableHead>Time</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logsLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading logs...</TableCell>
-              </TableRow>
-            ) : !logs?.length ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No automation logs yet. Logs will appear here when automation rules are triggered by RSS feed polls.
-                </TableCell>
-              </TableRow>
-            ) : (
-              logs.map((log) => {
-                const config = resultConfig[log.result] || resultConfig.error;
-                const ResultIcon = config.icon;
-                return (
-                  <TableRow key={log.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedLog(log)}>
-                    <TableCell><ResultIcon className={`w-4 h-4 ${config.className}`} /></TableCell>
-                    {isSuperAdmin && (
-                      <TableCell><span className="text-xs text-muted-foreground">{companyNameMap.get(log.company_id) || '—'}</span></TableCell>
-                    )}
-                    <TableCell><span className="text-sm font-medium">{log.rule_name}</span></TableCell>
-                    <TableCell className="max-w-[250px]">
-                      {log.article_title ? (
-                        <span className="text-sm truncate block" title={log.article_title}>{log.article_title}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">{actionLabels[log.action] || log.action}</Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px]">
-                      {log.error_message && (
-                        <span className="text-xs text-destructive truncate block">{log.error_message}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {format(new Date(log.created_at), "MMM d, HH:mm:ss")}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {/* AG Grid */}
+      {logsLoading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground">Loading logs...</div>
+      ) : (
+        <div className="relative">
+          <style>{`.ag-cell-wrapper { width: 100%; } .ag-cell-value { width: 100%; }`}</style>
+          <AgGridReact<AutomationLog>
+            ref={gridRef}
+            theme={isDark ? gridThemeDark : gridTheme}
+            modules={[AllCommunityModule]}
+            rowData={logs || []}
+            columnDefs={colDefs}
+            defaultColDef={defaultColDef}
+            quickFilterText={quickFilter}
+            domLayout="autoHeight"
+            suppressCellFocus
+            animateRows
+            onGridReady={onGridReady}
+            onRowClicked={onRowClicked}
+            getRowId={(params) => params.data.id}
+            overlayNoRowsTemplate="No automation logs yet. Logs will appear here when automation rules are triggered by RSS feed polls."
+          />
+        </div>
+      )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Page {page + 1} • Showing {logs?.length || 0} results</p>
+        <p className="text-sm text-muted-foreground">Page {page + 1} &bull; Showing {logs?.length || 0} results</p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
             <ChevronLeft className="w-4 h-4" />
@@ -218,7 +298,7 @@ export function AutomationLogsContent() {
                 const ResultIcon = config.icon;
                 return <ResultIcon className={`w-5 h-5 ${config.className}`} />;
               })()}
-              {selectedLog?.rule_name} → {actionLabels[selectedLog?.action || ""] || selectedLog?.action}
+              {selectedLog?.rule_name} &rarr; {actionLabels[selectedLog?.action || ""] || selectedLog?.action}
             </DialogTitle>
           </DialogHeader>
           {selectedLog && (

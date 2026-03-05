@@ -1,74 +1,208 @@
+import { useMemo, useCallback, useRef, useState, useEffect } from "react";
+import { AgGridReact } from "ag-grid-react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { Eye, Heart, MessageCircle, Share2, Loader2, ExternalLink, ChevronDown, ChevronRight, FileText } from "lucide-react";
-import { useAllPostsWithAnalytics, PostWithPlatforms, PlatformAnalytics } from "@/hooks/useAllPostsWithAnalytics";
+  AllCommunityModule,
+  type ColDef,
+  type ICellRendererParams,
+  type ValueFormatterParams,
+  type IsFullWidthRowParams,
+  type RowHeightParams,
+  type GridReadyEvent,
+} from "ag-grid-community";
+import { gridTheme, gridThemeDark } from "@/lib/ag-grid-theme";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Loader2, FileText } from "lucide-react";
+import { useAllPostsWithAnalytics, PostWithPlatforms } from "@/hooks/useAllPostsWithAnalytics";
 import { format } from "date-fns";
-import { FaInstagram, FaTwitter, FaLinkedin, FaFacebook, FaTiktok } from "react-icons/fa";
-import { SiBluesky } from "react-icons/si";
-import { useState } from "react";
+import {
+  formatNumber,
+  PlatformIconsRenderer,
+  DotStatusRenderer,
+  ExpandToggleRenderer,
+  DetailRowRenderer,
+} from "@/components/ui/data-grid-cells";
 
-const platformIcons: Record<string, React.ElementType> = {
-  twitter: FaTwitter,
-  instagram: FaInstagram,
-  linkedin: FaLinkedin,
-  tiktok: FaTiktok,
-  facebook: FaFacebook,
-  bluesky: SiBluesky,
-};
+// Row type for AG Grid with detail row support
+interface RecentPostRow {
+  id: number;
+  type: "parent" | "detail";
+  parentId?: number;
+  content: string;
+  publishedAt?: string;
+  platform: string[];
+  status: string;
+  views: number;
+  likes: number;
+  isExpanded?: boolean;
+  // Detail row fields
+  detailPlatform?: string;
+  detailLikes?: number;
+  detailComments?: number;
+  detailShares?: number;
+  detailViews?: number;
+}
 
-const platformNames: Record<string, string> = {
-  twitter: "Twitter",
-  instagram: "Instagram",
-  linkedin: "LinkedIn",
-  tiktok: "TikTok",
-  facebook: "Facebook",
-  youtube: "YouTube",
-  "google-business": "Google",
-  bluesky: "Bluesky",
-  threads: "Threads",
-};
+function mapPostsToRows(posts: PostWithPlatforms[], expandedIds: Set<number>): RecentPostRow[] {
+  const rows: RecentPostRow[] = [];
+  posts.forEach((post, i) => {
+    const platforms = post._platforms || [];
+    const uniquePlatforms = [...new Set(platforms.map((p) => p.platform))];
+    const hasMultiple = platforms.length > 1;
+    const rowId = i + 1;
 
-const formatNumber = (n: number) => {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return n.toString();
-};
+    rows.push({
+      id: rowId,
+      type: "parent",
+      content: post.content?.slice(0, 80) || "—",
+      publishedAt: post.publishedAt || undefined,
+      platform: uniquePlatforms,
+      status: post._status || "published",
+      views: post.views || post.impressions || 0,
+      likes: post.likes || 0,
+      isExpanded: hasMultiple && expandedIds.has(rowId),
+    });
 
-function PlatformBadges({ platforms }: { platforms?: PlatformAnalytics[] }) {
-  if (!platforms || platforms.length === 0) return null;
-  const unique = [...new Set(platforms.map(p => p.platform))];
-  return (
-    <div className="flex items-center gap-1">
-      {unique.map(p => {
-        const Icon = platformIcons[p] || FaTwitter;
-        return <Icon key={p} className="w-3 h-3 text-muted-foreground" title={platformNames[p] || p} />;
-      })}
-    </div>
-  );
+    if (hasMultiple && expandedIds.has(rowId)) {
+      platforms.forEach((entry, j) => {
+        rows.push({
+          id: rowId * 1000 + j,
+          type: "detail",
+          parentId: rowId,
+          content: "",
+          platform: [entry.platform],
+          status: entry.status,
+          views: entry.views || entry.impressions || 0,
+          likes: entry.likes || 0,
+          detailPlatform: entry.platform,
+          detailLikes: entry.likes || 0,
+          detailComments: entry.comments || 0,
+          detailShares: entry.shares || 0,
+          detailViews: entry.views || entry.impressions || 0,
+        });
+      });
+    }
+  });
+  return rows;
 }
 
 export function RecentPostsTable() {
-  const { data: allPosts, isLoading } = useAllPostsWithAnalytics({ days: 30 });
-  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
-  
-  const posts = allPosts?.slice(0, 8) || [];
+  const { data: allPosts, isLoading } = useAllPostsWithAnalytics({ days: 14 });
+  const gridRef = useRef<AgGridReact<RecentPostRow>>(null);
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === "dark-pro" || currentTheme === "aurora";
 
-  const toggleExpand = (postId: string) => {
-    setExpandedPosts(prev => {
-      const next = new Set(prev);
-      if (next.has(postId)) next.delete(postId);
-      else next.add(postId);
-      return next;
-    });
-  };
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  const onGridReady = useCallback((params: GridReadyEvent) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const posts = useMemo(() => (allPosts || []).slice(0, 8), [allPosts]);
+  const rowData = useMemo(() => mapPostsToRows(posts, expandedIds), [posts, expandedIds]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail.id as number;
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+    document.addEventListener("toggle-expand", handler);
+    return () => document.removeEventListener("toggle-expand", handler);
+  }, []);
+
+  const colDefs = useMemo<ColDef<RecentPostRow>[]>(
+    () => [
+      {
+        headerName: "",
+        field: "id",
+        width: 40,
+        cellRenderer: ExpandToggleRenderer,
+        sortable: false,
+        filter: false,
+        suppressHeaderMenuButton: true,
+        resizable: false,
+      },
+      {
+        headerName: "Content",
+        field: "content",
+        flex: 2,
+        minWidth: 200,
+        cellRenderer: (params: ICellRendererParams<RecentPostRow>) => {
+          const data = params.data;
+          if (!data) return null;
+          return (
+            <div className="flex flex-col min-w-0 leading-tight py-1">
+              <span className="truncate text-sm font-medium">{data.content}</span>
+              {data.publishedAt && (
+                <span className="text-xs text-gray-400">
+                  {format(new Date(data.publishedAt), "MMM d, h:mm a")}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Platforms",
+        field: "platform",
+        width: 120,
+        cellRenderer: PlatformIconsRenderer,
+      },
+      {
+        headerName: "Status",
+        field: "status",
+        width: 100,
+        cellRenderer: DotStatusRenderer,
+      },
+      {
+        headerName: "Views",
+        field: "views",
+        width: 90,
+        valueFormatter: (params: ValueFormatterParams) => formatNumber(params.value || 0),
+        type: "rightAligned",
+      },
+      {
+        headerName: "Likes",
+        field: "likes",
+        width: 90,
+        valueFormatter: (params: ValueFormatterParams) => formatNumber(params.value || 0),
+        type: "rightAligned",
+      },
+    ],
+    []
+  );
+
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: false,
+      resizable: false,
+      filter: false,
+      cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
+    }),
+    []
+  );
+
+  const isFullWidthRow = useCallback(
+    (params: IsFullWidthRowParams<RecentPostRow>) => params.rowNode.data?.type === "detail",
+    []
+  );
+
+  const getRowHeight = useCallback(
+    (params: RowHeightParams<RecentPostRow>) => (params.data?.type === "detail" ? 64 : undefined),
+    []
+  );
+
+  const getRowClass = useCallback(
+    (params: { data?: RecentPostRow }) => {
+      if (params.data?.type === "detail") return "ag-full-width-detail";
+      return undefined;
+    },
+    []
+  );
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden animate-fade-in">
@@ -96,114 +230,28 @@ export function RecentPostsTable() {
           </p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[40%]">Content</TableHead>
-              <TableHead>Platforms</TableHead>
-              <TableHead className="text-right">
-                <Eye className="w-3.5 h-3.5 inline mr-1" />Views
-              </TableHead>
-              <TableHead className="text-right">
-                <Heart className="w-3.5 h-3.5 inline mr-1" />Likes
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {posts.map((post) => {
-              const platforms = post._platforms || [];
-              const hasMultiple = platforms.length > 1;
-              const isExpanded = expandedPosts.has(post.postId);
-
-              return (
-                <>
-                  <TableRow
-                    key={post.postId}
-                    className={cn("group", hasMultiple && "cursor-pointer")}
-                    onClick={hasMultiple ? () => toggleExpand(post.postId) : undefined}
-                  >
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {hasMultiple && (
-                          isExpanded
-                            ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="line-clamp-1 text-card-foreground text-sm">
-                              {post.content?.slice(0, 80) || "—"}
-                            </p>
-                            {post.postUrl && (
-                              <a
-                                href={post.postUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
-                              </a>
-                            )}
-                          </div>
-                          {post.publishedAt && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {format(new Date(post.publishedAt), "MMM d, h:mm a")}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <PlatformBadges platforms={platforms} />
-                      {platforms.length === 0 && (
-                        <span className="text-sm text-muted-foreground">{platformNames[post.platform] || post.platform}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {formatNumber(post.views)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {formatNumber(post.likes)}
-                    </TableCell>
-                  </TableRow>
-
-                  {/* Expanded per-platform rows */}
-                  {isExpanded && platforms.map((entry, idx) => {
-                    const Icon = platformIcons[entry.platform] || FaTwitter;
-                    return (
-                      <TableRow key={`${post.postId}-${entry.platform}-${idx}`} className="bg-muted/30 border-l-2 border-l-muted-foreground/20">
-                        <TableCell>
-                          <div className="flex items-center gap-2 pl-8">
-                            <Icon className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              {platformNames[entry.platform] || entry.platform}
-                              {entry.accountName && ` · ${entry.accountName}`}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className={cn("text-[10px]",
-                            entry.status === 'published' ? "bg-success/10 text-success" :
-                            entry.status === 'failed' ? "bg-destructive/10 text-destructive" : ""
-                          )}>
-                            {entry.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                          {formatNumber(entry.views || entry.impressions)}
-                        </TableCell>
-                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                          {formatNumber(entry.likes)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <div className="relative">
+          <style>{`.ag-cell-wrapper { width: 100%; } .ag-cell-value { width: 100%; }`}</style>
+          <AgGridReact<RecentPostRow>
+            ref={gridRef}
+            theme={isDark ? gridThemeDark : gridTheme}
+            modules={[AllCommunityModule]}
+            rowData={rowData}
+            columnDefs={colDefs}
+            defaultColDef={defaultColDef}
+            domLayout="autoHeight"
+            suppressCellFocus
+            headerHeight={40}
+            rowHeight={48}
+            animateRows
+            onGridReady={onGridReady}
+            isFullWidthRow={isFullWidthRow}
+            fullWidthCellRenderer={DetailRowRenderer}
+            getRowHeight={getRowHeight}
+            getRowClass={getRowClass}
+            getRowId={(params) => String(params.data.id)}
+          />
+        </div>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useAutomationRules, useCreateAutomationRule, useUpdateAutomationRule, useDeleteAutomationRule, AutomationRule } from '@/hooks/useAutomationRules';
 import { useRssFeeds } from '@/hooks/useRssFeeds';
 import { useAccounts } from '@/hooks/useGetLateAccounts';
@@ -8,16 +8,19 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Platform } from '@/lib/api/getlate';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Zap, Plus, Loader2, Trash2, Pencil, Send, Globe, FileText } from 'lucide-react';
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube } from 'react-icons/fa';
 import { SiBluesky, SiThreads } from 'react-icons/si';
 import AutomationRuleWizard, { RuleFormData, defaultForm } from '@/components/automations/AutomationRuleWizard';
+import { AgGridReact } from 'ag-grid-react';
+import { AllCommunityModule, type ColDef, type ICellRendererParams, type GridReadyEvent } from 'ag-grid-community';
+import { gridTheme, gridThemeDark } from '@/lib/ag-grid-theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { DataGridToolbar } from '@/components/ui/data-grid-toolbar';
 
 const platformIcons: Partial<Record<Platform, React.ElementType>> = {
   instagram: FaInstagram,
@@ -37,6 +40,9 @@ export function AutomationsContent() {
   const { data: userRole } = useUserRole();
   const { data: company } = useCompany();
   const { user } = useAuth();
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === 'dark-pro' || currentTheme === 'aurora';
+
   const createRule = useCreateAutomationRule();
   const updateRule = useUpdateAutomationRule();
   const deleteRule = useDeleteAutomationRule();
@@ -66,6 +72,9 @@ export function AutomationsContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
   const [form, setForm] = useState<RuleFormData>(defaultForm);
+  const [quickFilter, setQuickFilter] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const gridRef = useRef<AgGridReact<AutomationRule>>(null);
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
 
@@ -114,9 +123,151 @@ export function AutomationsContent() {
 
   const isSaving = createRule.isPending || updateRule.isPending;
 
+  const onGridReady = useCallback((params: GridReadyEvent) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const onExportCsv = useCallback(() => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: 'automation-rules.csv' });
+  }, []);
+
+  const colDefs = useMemo<ColDef<AutomationRule>[]>(() => {
+    const cols: ColDef<AutomationRule>[] = [
+      {
+        headerName: 'Name',
+        field: 'name',
+        flex: 1,
+        minWidth: 160,
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => (
+          <span className="font-medium">{params.value}</span>
+        ),
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'Status',
+        field: 'is_active',
+        width: 100,
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => (
+          <Badge variant={params.value ? 'default' : 'secondary'}>
+            {params.value ? 'Active' : 'Inactive'}
+          </Badge>
+        ),
+        filter: 'agTextColumnFilter',
+        filterValueGetter: (params) => params.data?.is_active ? 'Active' : 'Inactive',
+      },
+      {
+        headerName: 'Feed',
+        field: 'feed_id',
+        width: 140,
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => (
+          <span className="text-muted-foreground text-sm">{getFeedName(params.value)}</span>
+        ),
+        filter: 'agTextColumnFilter',
+        filterValueGetter: (params) => getFeedName(params.data?.feed_id ?? null),
+      },
+      {
+        headerName: 'Action',
+        field: 'action',
+        width: 130,
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => {
+          const action = params.value;
+          const Icon = action === 'publish' ? Globe : action === 'draft' ? FileText : Send;
+          const label = action === 'publish' ? 'Auto-publish' : action === 'draft' ? 'Draft' : 'Approval';
+          return (
+            <span className="flex items-center gap-1 text-sm">
+              <Icon className="h-3 w-3" />
+              {label}
+            </span>
+          );
+        },
+        filter: 'agTextColumnFilter',
+      },
+      {
+        headerName: 'Platforms',
+        width: 120,
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => {
+          const rule = params.data;
+          if (!rule) return null;
+          return (
+            <div className="flex items-center gap-1">
+              {rule.account_ids.length > 0 && accounts && accounts.map(acc => {
+                if (!rule.account_ids.includes(acc.id)) return null;
+                const Icon = platformIcons[acc.platform] || Globe;
+                return <Icon key={acc.id} className="h-4 w-4 text-muted-foreground" />;
+              })}
+            </div>
+          );
+        },
+        sortable: false,
+        filter: false,
+      },
+      {
+        headerName: 'Objective',
+        field: 'objective',
+        width: 120,
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => (
+          <span className="text-sm capitalize">{params.value === 'auto' ? 'AI Decides' : params.value}</span>
+        ),
+        filter: 'agTextColumnFilter',
+      },
+    ];
+
+    if (isOwnerOrAdmin) {
+      cols.push({
+        colId: 'actions',
+        headerName: '',
+        width: 130,
+        sortable: false,
+        filter: false,
+        suppressHeaderMenuButton: true,
+        pinned: 'right',
+        cellRenderer: (params: ICellRendererParams<AutomationRule>) => {
+          const rule = params.data;
+          if (!rule) return null;
+          return (
+            <div className="flex items-center gap-1">
+              <Switch
+                checked={rule.is_active}
+                onCheckedChange={() => handleToggleActive(rule)}
+              />
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(rule)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive"
+                onClick={() => setDeleteTarget(rule.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        },
+      });
+    }
+
+    return cols;
+  }, [isOwnerOrAdmin, accounts, feeds]);
+
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      resizable: true,
+      cellStyle: { display: 'flex', alignItems: 'center', overflow: 'hidden' },
+    }),
+    []
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between">
+        <DataGridToolbar
+          quickFilter={quickFilter}
+          onQuickFilterChange={setQuickFilter}
+          onExport={onExportCsv}
+          quickFilterPlaceholder="Search rules..."
+        />
         {isOwnerOrAdmin && (
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
@@ -130,87 +281,23 @@ export function AutomationsContent() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : rules && rules.length > 0 ? (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Feed</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Platforms</TableHead>
-                <TableHead>Objective</TableHead>
-                {isOwnerOrAdmin && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rules.map((rule) => (
-                <TableRow key={rule.id}>
-                  <TableCell className="font-medium">{rule.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={rule.is_active ? 'default' : 'secondary'}>
-                      {rule.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{getFeedName(rule.feed_id)}</TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-1 text-sm">
-                      {rule.action === 'publish' ? <Globe className="h-3 w-3" /> : rule.action === 'draft' ? <FileText className="h-3 w-3" /> : <Send className="h-3 w-3" />}
-                      {rule.action === 'publish' ? 'Auto-publish' : rule.action === 'draft' ? 'Draft' : 'Approval'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {rule.account_ids.length > 0 && accounts && accounts.map(acc => {
-                        if (!rule.account_ids.includes(acc.id)) return null;
-                        const Icon = platformIcons[acc.platform] || Globe;
-                        return <Icon key={acc.id} className="h-4 w-4 text-muted-foreground" />;
-                      })}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm capitalize">{rule.objective === 'auto' ? 'AI Decides' : rule.objective}</TableCell>
-                  {isOwnerOrAdmin && (
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Switch
-                          checked={rule.is_active}
-                          onCheckedChange={() => handleToggleActive(rule)}
-                        />
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(rule)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Rule</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this automation rule? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteRule.mutateAsync(rule.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div className="relative">
+          <style>{`.ag-cell-wrapper { width: 100%; } .ag-cell-value { width: 100%; }`}</style>
+          <AgGridReact<AutomationRule>
+            ref={gridRef}
+            theme={isDark ? gridThemeDark : gridTheme}
+            modules={[AllCommunityModule]}
+            rowData={rules}
+            columnDefs={colDefs}
+            defaultColDef={defaultColDef}
+            quickFilterText={quickFilter}
+            domLayout="autoHeight"
+            suppressCellFocus
+            animateRows
+            onGridReady={onGridReady}
+            getRowId={(params) => params.data.id}
+          />
+        </div>
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -228,6 +315,27 @@ export function AutomationsContent() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Rule</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this automation rule? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteTarget) { deleteRule.mutateAsync(deleteTarget); setDeleteTarget(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AutomationRuleWizard
         open={dialogOpen}

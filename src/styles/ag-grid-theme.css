@@ -1,0 +1,69 @@
+/*
+ * AG Grid theme overrides for Social Suite
+ * Maps AG Grid CSS custom properties to Shadcn/Tailwind design tokens.
+ * Uses Quartz theme (light) and Quartz-dark (dark) as base.
+ */
+
+/* Light themes (professional, modern, minimal, vibrant) */
+.ag-theme-quartz {
+  --ag-font-family: 'Inter', system-ui, sans-serif;
+  --ag-font-size: 14px;
+  --ag-background-color: hsl(var(--background));
+  --ag-header-background-color: hsl(var(--muted));
+  --ag-header-foreground-color: hsl(var(--muted-foreground));
+  --ag-foreground-color: hsl(var(--foreground));
+  --ag-border-color: hsl(var(--border));
+  --ag-row-hover-color: hsl(var(--muted) / 0.5);
+  --ag-selected-row-background-color: hsl(var(--primary) / 0.08);
+  --ag-range-selection-background-color: hsl(var(--primary) / 0.12);
+  --ag-header-cell-hover-background-color: hsl(var(--muted) / 0.8);
+  --ag-odd-row-background-color: transparent;
+  --ag-row-border-color: hsl(var(--border));
+  --ag-card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  --ag-input-focus-border-color: hsl(var(--primary));
+  --ag-checkbox-checked-color: hsl(var(--primary));
+  --ag-border-radius: 6px;
+  --ag-wrapper-border-radius: 8px;
+  --ag-grid-size: 6px;
+  --ag-row-height: 44px;
+  --ag-header-height: 40px;
+  --ag-cell-horizontal-padding: 12px;
+}
+
+/* Dark themes (dark-pro, aurora) */
+.ag-theme-quartz-dark {
+  --ag-font-family: 'Inter', system-ui, sans-serif;
+  --ag-font-size: 14px;
+  --ag-background-color: hsl(var(--background));
+  --ag-header-background-color: hsl(var(--muted));
+  --ag-header-foreground-color: hsl(var(--muted-foreground));
+  --ag-foreground-color: hsl(var(--foreground));
+  --ag-border-color: hsl(var(--border));
+  --ag-row-hover-color: hsl(var(--muted) / 0.3);
+  --ag-selected-row-background-color: hsl(var(--primary) / 0.15);
+  --ag-range-selection-background-color: hsl(var(--primary) / 0.2);
+  --ag-header-cell-hover-background-color: hsl(var(--muted) / 0.6);
+  --ag-odd-row-background-color: transparent;
+  --ag-row-border-color: hsl(var(--border));
+  --ag-input-focus-border-color: hsl(var(--primary));
+  --ag-checkbox-checked-color: hsl(var(--primary));
+  --ag-border-radius: 6px;
+  --ag-wrapper-border-radius: 8px;
+  --ag-grid-size: 6px;
+  --ag-row-height: 44px;
+  --ag-header-height: 40px;
+  --ag-cell-horizontal-padding: 12px;
+}
+
+/* Full-width row styling for expandable detail rows */
+.ag-theme-quartz .ag-full-width-row,
+.ag-theme-quartz-dark .ag-full-width-row {
+  background-color: hsl(var(--muted) / 0.15);
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Remove default cell padding on full-width rows so our renderer controls layout */
+.ag-theme-quartz .ag-full-width-row .ag-cell-wrapper,
+.ag-theme-quartz-dark .ag-full-width-row .ag-cell-wrapper {
+  padding: 0;
+}

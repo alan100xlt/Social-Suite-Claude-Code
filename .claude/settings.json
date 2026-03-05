@@ -43,45 +43,10 @@
       "Edit(src/integrations/supabase/types.ts)"
     ]
   },
+  "worktree": {
+    "symlinkDirectories": ["node_modules", "scripts/slack-agent/node_modules"]
+  },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-permission.js"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-permission.js"
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-permission.js"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-permission.js"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
@@ -95,40 +60,6 @@
             "command": "node scripts/slack-agent/post-tool-tsc.js",
             "async": true,
             "statusMessage": "Type-checking..."
-          }
-        ]
-      },
-      {
-        "matcher": "Write(docs/plans/*)",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-plan-saved.js",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/slack-agent/ensure-listener.sh"
-          },
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-session-start.js"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/slack-agent/notify-session-stop.js"
           }
         ]
       }

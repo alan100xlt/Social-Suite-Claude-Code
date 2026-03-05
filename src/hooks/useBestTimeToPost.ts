@@ -9,21 +9,27 @@ export interface BestTimeSlot {
   post_count: number;
 }
 
-export function useBestTimeToPost(params: { platform?: string; profileId?: string } = {}) {
+export function useBestTimeToPost(params: { platform?: string } = {}) {
   const { data: company } = useCompany();
   const companyId = company?.id;
 
   return useQuery({
     queryKey: ['best-time-to-post', companyId, params],
     enabled: !!companyId,
-    staleTime: 60 * 60 * 1000, // 1 hour — matches GetLate cache TTL
+    staleTime: 60 * 60 * 1000,
     queryFn: async (): Promise<BestTimeSlot[]> => {
-      const { data, error } = await supabase.functions.invoke('getlate-analytics', {
-        body: { action: 'best-time', companyId, ...params },
+      const { data, error } = await supabase.rpc('get_optimal_posting_windows', {
+        _company_id: companyId!,
+        _platform: params.platform ?? null,
+        _timezone: 'UTC',
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to get best times');
-      return (data.slots as BestTimeSlot[]) ?? [];
+      return (data ?? []).map((row: any) => ({
+        day_of_week: Number(row.day_of_week),
+        hour: Number(row.hour),
+        avg_engagement: Number(row.avg_engagement),
+        post_count: Number(row.post_count),
+      }));
     },
   });
 }

@@ -294,7 +294,7 @@ function FlyoutEditor({
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-screen w-[480px] z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-slide-in-right">
+      <div className="fixed right-0 top-0 h-screen w-[480px] z-40 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
           <Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />

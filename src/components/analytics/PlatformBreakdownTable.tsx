@@ -1,17 +1,21 @@
+import { useMemo, useCallback, useRef, useState } from "react";
+import { AgGridReact } from "ag-grid-react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+  AllCommunityModule,
+  type ColDef,
+  type ICellRendererParams,
+  type ValueFormatterParams,
+  type GridReadyEvent,
+} from "ag-grid-community";
+import { gridTheme, gridThemeDark } from "@/lib/ag-grid-theme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { Platform } from "@/lib/api/getlate";
+import { Users } from "lucide-react";
 import { FaInstagram, FaTwitter, FaLinkedin, FaFacebook, FaTiktok, FaYoutube, FaPinterest, FaReddit, FaTelegram, FaSnapchat } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
-import { Users, FileText, Eye, Heart, MessageCircle, Share2, MousePointerClick, TrendingUp } from "lucide-react";
+import { formatNumber, RateBadgeRenderer } from "@/components/ui/data-grid-cells";
+import { DataGridToolbar } from "@/components/ui/data-grid-toolbar";
 
 interface PlatformMetrics {
   platform: Platform;
@@ -34,9 +38,9 @@ interface PlatformBreakdownTableProps {
   isLoading?: boolean;
 }
 
-const platformConfig: Record<Platform, { 
-  icon: React.ElementType; 
-  name: string; 
+const platformConfig: Record<string, {
+  icon: React.ElementType;
+  name: string;
   colorClass: string;
   bgClass: string;
 }> = {
@@ -55,13 +59,137 @@ const platformConfig: Record<Platform, {
   snapchat: { icon: FaSnapchat, name: "Snapchat", colorClass: "text-yellow-400", bgClass: "bg-yellow-400/10" },
 };
 
-const formatNumber = (num: number) => {
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-  return num.toLocaleString();
-};
+const numFormatter = (params: ValueFormatterParams) => formatNumber(params.value || 0);
 
 export function PlatformBreakdownTable({ data, isLoading }: PlatformBreakdownTableProps) {
+  const gridRef = useRef<AgGridReact<PlatformMetrics>>(null);
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === "dark-pro" || currentTheme === "aurora";
+  const [quickFilter, setQuickFilter] = useState("");
+
+  const onGridReady = useCallback((params: GridReadyEvent) => {
+    params.api.sizeColumnsToFit();
+  }, []);
+
+  const onExportCsv = useCallback(() => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: "platform-breakdown.csv" });
+  }, []);
+
+  const colDefs = useMemo<ColDef<PlatformMetrics>[]>(
+    () => [
+      {
+        headerName: "Platform",
+        field: "platform",
+        width: 160,
+        cellRenderer: (params: ICellRendererParams<PlatformMetrics>) => {
+          const platform = params.value as string;
+          const config = platformConfig[platform] || {
+            icon: Users,
+            name: platform,
+            colorClass: "text-muted-foreground",
+            bgClass: "bg-muted",
+          };
+          const Icon = config.icon;
+          return (
+            <div className="flex items-center gap-3">
+              <div className={cn("p-2 rounded-lg", config.bgClass)}>
+                <Icon className={cn("w-4 h-4", config.colorClass)} />
+              </div>
+              <span className="font-medium">{config.name}</span>
+            </div>
+          );
+        },
+        filter: "agTextColumnFilter",
+        filterValueGetter: (params) => {
+          const p = params.data?.platform;
+          return p ? (platformConfig[p]?.name || p) : "";
+        },
+      },
+      {
+        headerName: "Followers",
+        field: "followers",
+        width: 110,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        sort: "desc",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Posts",
+        field: "postsCount",
+        width: 90,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Views",
+        field: "views",
+        width: 100,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Impressions",
+        field: "impressions",
+        width: 110,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Likes",
+        field: "likes",
+        width: 90,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Comments",
+        field: "comments",
+        width: 100,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Shares",
+        field: "shares",
+        width: 90,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Clicks",
+        field: "clicks",
+        width: 90,
+        valueFormatter: numFormatter,
+        filter: "agNumberColumnFilter",
+        type: "rightAligned",
+      },
+      {
+        headerName: "Eng. Rate",
+        field: "engagementRate",
+        width: 100,
+        cellRenderer: RateBadgeRenderer,
+        filter: "agNumberColumnFilter",
+      },
+    ],
+    []
+  );
+
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      resizable: true,
+      cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
+    }),
+    []
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -83,129 +211,31 @@ export function PlatformBreakdownTable({ data, isLoading }: PlatformBreakdownTab
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-[180px]">Platform</TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <Users className="w-3.5 h-3.5" />
-                Followers
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <FileText className="w-3.5 h-3.5" />
-                Posts
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <Eye className="w-3.5 h-3.5" />
-                Views
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <Eye className="w-3.5 h-3.5" />
-                Impressions
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <Heart className="w-3.5 h-3.5" />
-                Likes
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5" />
-                Comments
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <Share2 className="w-3.5 h-3.5" />
-                Shares
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <MousePointerClick className="w-3.5 h-3.5" />
-                Clicks
-              </div>
-            </TableHead>
-            <TableHead className="text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5" />
-                Eng. Rate
-              </div>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((row) => {
-            const config = platformConfig[row.platform] || {
-              icon: Users,
-              name: row.platform,
-              colorClass: "text-muted-foreground",
-              bgClass: "bg-muted",
-            };
-            const Icon = config.icon;
+    <div className="space-y-3">
+      <DataGridToolbar
+        quickFilter={quickFilter}
+        onQuickFilterChange={setQuickFilter}
+        onExport={onExportCsv}
+        quickFilterPlaceholder="Search platforms..."
+      />
 
-            return (
-              <TableRow key={row.platform}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className={cn("p-2 rounded-lg", config.bgClass)}>
-                      <Icon className={cn("w-4 h-4", config.colorClass)} />
-                    </div>
-                    <span className="font-medium">{config.name}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatNumber(row.followers)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.postsCount)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.views || 0)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.impressions)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.likes)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.comments)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.shares)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatNumber(row.clicks)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Badge 
-                    variant="secondary" 
-                    className={cn(
-                      "font-medium",
-                      row.engagementRate >= 3 && "bg-success/10 text-success",
-                      row.engagementRate >= 1 && row.engagementRate < 3 && "bg-warning/10 text-warning",
-                      row.engagementRate < 1 && "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {row.engagementRate.toFixed(2)}%
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <div className="relative">
+        <style>{`.ag-cell-wrapper { width: 100%; } .ag-cell-value { width: 100%; }`}</style>
+        <AgGridReact<PlatformMetrics>
+          ref={gridRef}
+          theme={isDark ? gridThemeDark : gridTheme}
+          modules={[AllCommunityModule]}
+          rowData={data}
+          columnDefs={colDefs}
+          defaultColDef={defaultColDef}
+          quickFilterText={quickFilter}
+          domLayout="autoHeight"
+          suppressCellFocus
+          animateRows
+          onGridReady={onGridReady}
+          getRowId={(params) => params.data.platform}
+        />
+      </div>
     </div>
   );
 }

@@ -46,6 +46,7 @@ export function useOptimalPostingWindows({
     enabled: enabled && !!companyId,
     staleTime: 60 * 60 * 1000, // 1 hour
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
+    retry: 1,
   })
 }
 

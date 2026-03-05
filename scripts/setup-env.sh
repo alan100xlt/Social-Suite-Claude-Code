@@ -103,6 +103,7 @@ prompt_if_empty "VITE_SUPABASE_PROJECT_ID"      "Supabase project ID"
 prompt_if_empty "SLACK_BOT_TOKEN"               "Slack bot token (xoxb-...)"
 prompt_if_empty "SLACK_SIGNING_SECRET"          "Slack app signing secret"
 prompt_if_empty "SLACK_CHANNEL_ID"              "Slack channel ID (C...)"
+prompt_if_empty "SLACK_USER_ID"                "Your Slack user ID (U...)"
 echo ""
 
 # ── 2. Generate root .env (Vite vars) ───────────────────────
@@ -129,6 +130,7 @@ bold "Generating scripts/slack-agent/.env..."
 SLACK_BOT_TOKEN=$(env_get SLACK_BOT_TOKEN)
 SLACK_SIGNING_SECRET=$(env_get SLACK_SIGNING_SECRET)
 SLACK_CHANNEL_ID=$(env_get SLACK_CHANNEL_ID)
+SLACK_USER_ID=$(env_get SLACK_USER_ID)
 SLACK_NGROK_DOMAIN=$(env_get SLACK_NGROK_DOMAIN)
 
 if [[ -n "$SLACK_BOT_TOKEN" ]]; then
@@ -136,6 +138,7 @@ if [[ -n "$SLACK_BOT_TOKEN" ]]; then
 SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
 SLACK_CHANNEL_ID=${SLACK_CHANNEL_ID}
+SLACK_USER_ID=${SLACK_USER_ID}
 EOF
   green "  ✓ scripts/slack-agent/.env written"
 else

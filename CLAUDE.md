@@ -20,35 +20,41 @@ All Vite env vars use `import.meta.env.VITE_*` — never `process.env.*`.
 VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
 VITE_SUPABASE_PROJECT_ID
-VITE_FIGMA_ACCESS_TOKEN   (optional — Figma theme import feature)
 ```
 
 ## Project Structure
 
 ```
 src/
-  pages/          # Route-level components (flat, one per route)
+  pages/            # Route-level components (flat, one per route — 40+ pages)
   components/
-    ui/           # Shadcn primitives — do not modify directly
-    layout/       # DashboardLayout, Sidebar, banners
-    auth/         # ProtectedRoute, LoginForm
-    dashboard/    # Widgets, charts, briefing
-    posts/        # Compose, Calendar, Drafts tabs
-    content/      # Automations, Feeds, RSS rules
-    analytics/    # Charts, metric widgets, top posts
-    analytics-v2/ # Nivo-based widget system
-    settings/     # Profile, Company, BrandVoice tabs
-    onboarding/   # DiscoveryBoard, wizard steps
-    company/      # CompanySwitcher, InviteUser
-    theme/        # ThemeToggle, ThemePreview, FigmaThemeImport
-    landing/      # VersionSwitcher (landing page nav)
-  contexts/       # AuthContext, SelectedCompanyContext, ThemeContext, PlatformContext, CourierContext
-  hooks/          # React Query hooks wrapping Supabase calls
-  services/       # Client-side service classes (Figma, security)
+    ui/             # Shadcn primitives — do not modify directly
+    layout/         # DashboardLayout, Sidebar, banners
+    auth/           # ProtectedRoute, LoginForm
+    admin/          # Admin-specific components
+    dashboard/      # Widgets, charts, briefing
+    posts/          # Compose, Calendar, Drafts tabs
+    content/        # Automations, Feeds, RSS rules
+    analytics/      # Charts, metric widgets, top posts
+    analytics-v2/   # Nivo-based widget system (widgets/ + widgets-v2/)
+    settings/       # Profile, Company, BrandVoice tabs
+    onboarding/     # DiscoveryBoard, wizard steps
+    company/        # CompanySwitcher, InviteUser
+    connections/    # Platform OAuth connection management
+    media-company/  # Media company hierarchy features
+    collaboration/  # Collaboration features
+    landing/        # VersionSwitcher (landing page nav)
+  contexts/         # AuthContext, SelectedCompanyContext, ThemeContext, PlatformContext, CourierContext
+  hooks/            # 45+ React Query hooks wrapping Supabase calls
+  services/         # Client-side service classes (security)
   integrations/
-    supabase/     # Auto-generated client + types
-  lib/            # posthog.ts, utils.ts, nivo-theme.ts
-  utils/          # figmaThemeTranslator.ts
+    supabase/       # Auto-generated client + types
+  lib/              # posthog.ts, utils.ts, nivo-theme.ts
+    api/            # API helpers
+    charts/         # Chart utilities + presets
+    metrics/        # Metric calculation helpers
+  test/             # Unit tests (vitest, jsdom)
+  tests/            # Integration, smoke, and e2e tests
 ```
 
 ## Routing
@@ -64,6 +70,7 @@ Key routes:
 - `/discover` — Discover page
 - `/design-preview` — DesignPreview (demo)
 - `/nivo-showcase` — Nivo chart showcase (demo)
+- `/analytics-showcase` — Analytics widget showcase (demo)
 
 **Auth:**
 - `/auth/login` `/auth/signup` `/auth/reset-password` `/auth/callback`
@@ -75,9 +82,12 @@ Key routes:
 - `/app` — Dashboard (Index.tsx)
 - `/app/content` — Posts, Calendar, Drafts, Automations, Feeds tabs
 - `/app/analytics` — Recharts analytics
-- `/app/analytics-v2` — Nivo analytics
+- `/app/analytics-v2` — Nivo analytics (premium widgets)
+- `/app/analytics-v3` `/app/analytics-v4` — Experimental analytics views
 - `/app/connections` — OAuth platform connections
 - `/app/settings` — Profile, Company, BrandVoice, Notifications
+- `/app/media-company/:id` — Media company dashboard
+- `/app/media-company/:id/workspace` — Media company workspace
 
 **Onboarding (protected):**
 - `/app/onboarding/setup` — SetupCompany
@@ -89,8 +99,10 @@ Key routes:
 - `/app/admin/email-branding` — Email branding settings
 - `/app/admin/platform` — Platform settings
 - `/app/admin/companies` — Superadmin company management
+- `/app/admin/users` — User management
 - `/app/admin/cron-health` — Cron job health dashboard
 - `/app/admin/wizard` — Wizard variations
+- `/app/admin/progress` — Progress tracking
 
 **Redirects:** Many legacy paths (`/login`, `/posts`, `/automations`, etc.) redirect to their `/app/*` equivalents.
 
@@ -126,7 +138,7 @@ Use `import.meta.env.*` not `process.env.*` — this is Vite, not CRA.
 
 ## Known Issues / Watch Out For
 
-- **No lazy loading** — all pages bundled eagerly. Large bundle (~2.6MB). Add `React.lazy()` for admin/analytics routes.
+- **No lazy loading** — all pages bundled eagerly. Large bundle (~4MB after Nivo additions). Add `React.lazy()` for admin/analytics routes.
 - **`SecurityContextService`** in `src/services/security/` imports `ioredis` — this is server-only code. Never import it in client components. Only used by `MediaCompanyWorkspace.tsx` currently.
 - **`securityContextService.ts`** (lowercase, different file) also imports ioredis via the security service — same warning.
 - **HMR overlay** is enabled (`vite.config.ts`) — runtime errors show as red overlay in browser, not silent white screen.
@@ -163,13 +175,52 @@ claude mcp add --scope user supabase -- npx -y @supabase/mcp-server
 ## Commands
 
 ```bash
-npm run dev          # Start dev server (tries 8080, increments if busy)
-npm run build        # Production build
-npm run lint         # ESLint
-npm run test         # Vitest unit tests
-npm run test:e2e     # Playwright e2e tests
-npx tsc --noEmit    # Type-check without building (fast error check)
+# Core
+npm run dev              # Start dev server (port 8080, increments if busy)
+npm run build            # Production build
+npm run lint             # ESLint
+npx tsc --noEmit        # Type-check without building (fast error check)
+
+# Testing
+npm run test             # Vitest unit tests
+npm run test:watch       # Vitest watch mode
+npm run test:smoke       # Smoke tests (src/tests/smoke/)
+npm run test:integration # Integration tests (src/tests/integration/)
+npm run test:e2e         # Playwright e2e tests
+npm run test:e2e:ui      # Playwright with UI
+npm run test:coverage    # Coverage report
+
+# Database
+npm run db:migrate       # Run Supabase migrations
+npm run db:reset         # Reset local Supabase database
+
+# Deploy
+npm run deploy:preview   # Vercel preview deployment
+npm run deploy:prod      # Vercel production deployment
 ```
+
+## Testing
+
+**Unit tests** — `src/test/` (Vitest + jsdom):
+- Config: `vitest.config.ts`, setup: `src/test/setup.ts`
+- Pattern: `src/**/*.{test,spec}.{ts,tsx}`
+
+**Integration tests** — `src/tests/integration/` (Vitest):
+- Test Supabase hooks, data flows, and cross-component behavior
+
+**Smoke tests** — `src/tests/smoke/`:
+- Quick sanity checks for critical paths
+
+**E2E tests** — `src/tests/end-to-end/` (Playwright):
+- Config: `playwright.config.ts`
+- Browser-level user journey tests
+
+**Supabase edge function tests** — `supabase/functions/_shared/*_test.ts`:
+- Security and authorization tests for shared modules
+
+## CI/CD
+
+- `.github/workflows/supabase-deploy.yml` — deploys migrations + edge functions on push to `main`
 
 ## Slack Agent Bridge (remote approval & questions)
 
@@ -182,8 +233,8 @@ A bidirectional Slack integration posts to #claude-code and lets the user respon
 - **Stop** → posts session-complete notification
 - **SessionStart** → auto-starts the Slack listener + ngrok tunnel
 
-### NEVER use `AskUserQuestion` — use Slack /ask instead
-The user works remotely from their phone. `AskUserQuestion` blocks the IDE and the user can't respond unless at their computer. **Always use the Slack /ask flow for ANY question you would ask the user.**
+### Prefer Slack /ask for questions when working remotely
+When the user is working remotely from their phone, `AskUserQuestion` blocks the IDE. **Prefer the Slack /ask flow** for questions during autonomous/remote sessions. Use `AskUserQuestion` normally when the user is actively at their computer.
 
 ```bash
 node scripts/slack-agent/notify.js --event ask --context "Your question here"
@@ -232,7 +283,23 @@ Do not lecture. Offer to continue. Use the `session-hygiene` skill for full guid
 
 Whenever a plan is finalized and approved and work is about to begin, **always generate Linear issues first** using the `/linear-sync <task list>` skill. Each task in the implementation plan becomes a Linear issue. This ensures all work is tracked before the first line of code is written.
 
+## Demo Data (required for new features)
+
+A built-in "Longtale Demo" company (`DEMO_COMPANY_ID = 'demo-longtale'`) provides deterministic, client-side mock data for demoing the platform without a Supabase connection. When adding new features:
+
+1. **Add demo fixtures** to `src/lib/demo/demo-data.ts` — realistic, deterministic data matching the feature's types
+2. **Populate query cache** in `src/lib/demo/DemoDataProvider.tsx` — call `queryClient.setQueryData()` for every query key the feature uses
+3. **Guard Supabase calls** — if a new hook is created, ensure it returns demo data when `isDemoCompany(selectedCompanyId)` is true (either via the provider's cache or an early return)
+
+Key files:
+- `src/lib/demo/demo-constants.ts` — `DEMO_COMPANY_ID`, `DEMO_COMPANY`, `isDemoCompany()`
+- `src/lib/demo/demo-data.ts` — all mock fixtures (posts, accounts, feeds, stats, charts, etc.)
+- `src/lib/demo/DemoDataProvider.tsx` — context + cache population, exports `useDemo()` hook
+
 ## Subagents
 
 - `security-reviewer` — reviews auth/RLS/XSS issues; invoked automatically on security-adjacent changes
+- `code-reviewer` — reviews code for Social Suite conventions, TanStack Query patterns, multi-tenancy, and TypeScript quality
+- `performance-reviewer` — checks bundle size impact, unnecessary re-renders, missing lazy loading, and query efficiency
+- `supabase-reviewer` — reviews migrations, RLS policies, edge functions, and database queries for correctness and security
 
