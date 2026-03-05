@@ -11,16 +11,17 @@ export interface DashboardStats {
   isLoading: boolean;
 }
 
-export function useDashboardStats(platform?: string | null) {
+export function useDashboardStats(options?: { platform?: string | null; startDate?: string; endDate?: string }) {
+  const { platform, startDate, endDate } = options || {};
   const { data: company } = useCompany();
   const companyId = company?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-stats", companyId, platform],
+    queryKey: ["dashboard-stats", companyId, platform, startDate, endDate],
     queryFn: async () => {
       if (!companyId) return null;
 
-      // Get latest account snapshots for followers/reach
+      // Get latest account snapshots for followers
       const accountQuery = supabase
         .from("account_analytics_snapshots")
         .select("account_id, platform, followers, reach, views, impressions, engagement_rate, snapshot_date")
@@ -45,17 +46,15 @@ export function useDashboardStats(platform?: string | null) {
       const latestSnapshots = Array.from(latestByAccount.values());
 
       const totalFollowers = latestSnapshots.reduce((sum, s) => sum + (s.followers || 0), 0);
-      const totalReach = latestSnapshots.reduce((sum, s) => sum + (s.reach || 0), 0);
-      const totalViews = latestSnapshots.reduce((sum, s) => sum + (s.views || 0), 0);
 
       // Get post analytics totals using RPC
-      const today = new Date().toISOString().split('T')[0];
-      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const resolvedEnd = endDate || new Date().toISOString().split('T')[0];
+      const resolvedStart = startDate || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const { data: postTotals, error: postErr } = await supabase.rpc("get_post_analytics_totals", {
         _company_id: companyId,
-        _start_date: ninetyDaysAgo,
-        _end_date: today,
+        _start_date: resolvedStart,
+        _end_date: resolvedEnd,
         _platform: platform || undefined,
       });
       if (postErr) throw postErr;
@@ -63,14 +62,12 @@ export function useDashboardStats(platform?: string | null) {
       const totals = postTotals?.[0];
       const avgEngagementRate = totals?.avg_engagement_rate || 0;
       const totalPosts = Number(totals?.total_posts || 0);
-      // Use impressions from post analytics if account-level reach is 0
       const postReach = Number(totals?.total_reach || 0);
       const postImpressions = Number(totals?.total_impressions || 0);
 
       return {
         totalFollowers,
-        totalReach: totalReach || postReach || postImpressions,
-        totalViews,
+        totalReach: postReach || postImpressions,
         avgEngagementRate: Number(avgEngagementRate),
         totalPosts,
       };
