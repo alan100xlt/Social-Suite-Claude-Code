@@ -5,6 +5,8 @@ import { useCompany } from './useCompany';
 interface AccountGrowthParams {
   accountId?: string;
   days?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface GrowthDataPoint {
@@ -27,8 +29,16 @@ export function useAccountGrowth(params: AccountGrowthParams = {}) {
   const companyId = company?.id;
   const days = params.days || 30;
 
+  // Resolve date range: explicit dates take priority over `days`
+  const resolvedEnd = params.endDate || new Date().toISOString().split('T')[0];
+  const resolvedStart = params.startDate || (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split('T')[0];
+  })();
+
   return useQuery({
-    queryKey: ['account-growth', companyId, params.accountId, days],
+    queryKey: ['account-growth', companyId, params.accountId, resolvedStart, resolvedEnd],
     queryFn: async (): Promise<AccountGrowthSummary> => {
       if (!companyId) {
         return {
@@ -39,9 +49,6 @@ export function useAccountGrowth(params: AccountGrowthParams = {}) {
         };
       }
 
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
       // Fetch two things in parallel:
       // 1. Time-series data within the date range (for charts / change calc)
       // 2. The LATEST snapshot per account (for accurate total followers)
@@ -50,7 +57,8 @@ export function useAccountGrowth(params: AccountGrowthParams = {}) {
         .select('*')
         .eq('company_id', companyId)
         .eq('is_active', true)
-        .gte('snapshot_date', startDate.toISOString().split('T')[0])
+        .gte('snapshot_date', resolvedStart)
+        .lte('snapshot_date', resolvedEnd)
         .order('snapshot_date', { ascending: true });
 
       if (params.accountId) {
