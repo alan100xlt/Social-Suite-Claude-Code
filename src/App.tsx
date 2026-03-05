@@ -17,6 +17,7 @@ import { SuperAdminRoute } from "@/components/auth/SuperAdminRoute";
 
 // Eager imports — high-traffic routes that should load immediately
 import Index from "./pages/Index";
+import Inbox from "./pages/Inbox";
 import Connections from "./pages/Connections";
 import Content from "./pages/Content";
 import ContentV2 from "./pages/ContentV2";
@@ -119,6 +120,7 @@ const App = () => (
               <Route path="/app/analytics-v2" element={<ProtectedRoute><AnalyticsV2 /></ProtectedRoute>} />
               <Route path="/app/analytics-v3" element={<ProtectedRoute><AnalyticsV3 /></ProtectedRoute>} />
               <Route path="/app/analytics-v4" element={<ProtectedRoute><AnalyticsV4 /></ProtectedRoute>} />
+              <Route path="/app/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
