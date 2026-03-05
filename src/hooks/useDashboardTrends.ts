@@ -25,33 +25,32 @@ function computeTrend(current: number, previous: number): TrendData {
   return { current, previous, changePercent, direction };
 }
 
-export function useDashboardTrends(): DashboardTrends {
+export function useDashboardTrends({ startDate, endDate }: { startDate: string; endDate: string }): DashboardTrends {
   const { data: company } = useCompany();
   const companyId = company?.id;
 
-  const { data: followerGrowth } = useAccountGrowth({ days: 14 });
+  // Compute the previous period: same-length window immediately before startDate
+  const rangeMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+  const prevEnd = startDate;
+  const prevStart = new Date(new Date(startDate).getTime() - rangeMs).toISOString().split("T")[0];
+
+  const { data: followerGrowth } = useAccountGrowth({ startDate, endDate });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-trends", companyId],
+    queryKey: ["dashboard-trends", companyId, startDate, endDate],
     queryFn: async () => {
       if (!companyId) return null;
-
-      const today = new Date();
-      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
-      const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000);
-
-      const fmt = (d: Date) => d.toISOString().split("T")[0];
 
       const [currentRes, previousRes] = await Promise.all([
         supabase.rpc("get_post_analytics_totals", {
           _company_id: companyId,
-          _start_date: fmt(sevenDaysAgo),
-          _end_date: fmt(today),
+          _start_date: startDate,
+          _end_date: endDate,
         }),
         supabase.rpc("get_post_analytics_totals", {
           _company_id: companyId,
-          _start_date: fmt(fourteenDaysAgo),
-          _end_date: fmt(sevenDaysAgo),
+          _start_date: prevStart,
+          _end_date: prevEnd,
         }),
       ]);
 
