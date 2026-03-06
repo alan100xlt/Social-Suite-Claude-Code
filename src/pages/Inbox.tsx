@@ -208,8 +208,8 @@ export default function InboxPage() {
       if (result.translated) {
         setComposerContent(result.translated);
       }
-    } catch {
-      // Silently fail — translation is best-effort
+    } catch (err) {
+      console.error('Translation failed:', err);
     }
   }, [selectedConversation, translateMessage]);
 

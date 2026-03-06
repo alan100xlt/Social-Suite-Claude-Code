@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         result = await assignConversation(supabase, companyId, params.conversationId, params.assigneeId);
         break;
       case 'mark-read':
-        result = await markRead(supabase, auth.userId, params.conversationId);
+        result = await markRead(supabase, auth.userId, companyId, params.conversationId);
         break;
       case 'add-label':
         result = await addLabel(supabase, companyId, params.conversationId, params.labelId);
@@ -297,7 +297,8 @@ async function replyToComment(
       last_message_at: new Date().toISOString(),
       last_message_preview: params.content.slice(0, 200),
     })
-    .eq('id', params.conversationId);
+    .eq('id', params.conversationId)
+    .eq('company_id', companyId);
 
   return { message, apiResult };
 }
@@ -359,7 +360,8 @@ async function replyToDM(
       last_message_preview: params.content.slice(0, 200),
       status: 'pending',
     })
-    .eq('id', params.conversationId);
+    .eq('id', params.conversationId)
+    .eq('company_id', companyId);
 
   return { message, apiResult };
 }
@@ -421,8 +423,19 @@ async function assignConversation(
 async function markRead(
   supabase: ReturnType<typeof createClient>,
   userId: string,
+  companyId: string,
   conversationId: string
 ) {
+  // Verify conversation belongs to this company before marking read
+  const { data: conv } = await supabase
+    .from('inbox_conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (!conv) throw new Error('Conversation not found or does not belong to this company');
+
   const { error } = await supabase
     .from('inbox_read_status')
     .upsert({

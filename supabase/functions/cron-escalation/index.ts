@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/authorize.ts';
+import { authorize, corsHeaders } from '../_shared/authorize.ts';
 import { CronMonitor } from '../_shared/cron-monitor.ts';
 
 // ─── Configuration ───────────────────────────────────────────
@@ -210,6 +210,16 @@ async function addLinearComment(apiKey: string, issueId: string, body: string): 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    await authorize(req, { allowServiceRole: true });
+  } catch (error) {
+    if (error instanceof Response) return error;
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

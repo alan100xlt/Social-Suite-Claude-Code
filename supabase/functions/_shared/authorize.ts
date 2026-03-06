@@ -58,7 +58,8 @@ export async function authorize(
       ? authHeader.slice(7).trim()
       : authHeader.trim();
 
-    // Check if token matches service_role key only (never accept anon key as service role)
+    // Check if token matches service_role key exactly (constant-time comparison not needed
+    // since supabaseServiceKey is a secret and the comparison short-circuits on mismatch)
     if (supabaseServiceKey && token === supabaseServiceKey) {
       return {
         userId: "service_role",
@@ -66,20 +67,8 @@ export async function authorize(
         isSuperAdmin: false,
       };
     }
-
-    // Also check if the JWT payload contains "service_role" role
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.role === 'service_role') {
-        return {
-          userId: "service_role",
-          email: "service_role",
-          isSuperAdmin: false,
-        };
-      }
-    } catch {
-      // Not a valid JWT, continue to normal auth
-    }
+    // Do NOT parse JWT payload to check role — unsigned JWT payloads can be forged.
+    // Only the direct key comparison above is safe for service role verification.
   }
 
   // --- JWT validation ---
