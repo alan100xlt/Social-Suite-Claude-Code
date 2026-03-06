@@ -4,11 +4,11 @@ const config: TemplateConfig = {
   id: 'brand-code',
   name: 'Brand Code',
   category: 'brand',
-  tags: ['dark', 'tech', 'terminal', 'monospace'],
+  tags: ['dark', 'terminal', 'monospace', 'developer'],
   requiresImage: false,
 
   layout: {
-    archetype: 'special',
+    archetype: 'text-forward',
     padding: 80,
     theme: 'dark',
   },
@@ -21,7 +21,6 @@ const config: TemplateConfig = {
   title: {
     fontSize: 52,
     fontWeight: 700,
-    fontFamily: 'mono',
     color: '#E5E7EB',
     alignment: 'left',
     verticalAlign: 'center',
@@ -39,10 +38,10 @@ const config: TemplateConfig = {
 
   author: {
     position: 'below-title',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 400,
     color: '#6B7280',
-    prefix: '// ',
+    prefix: 'By ',
   },
 
   date: {
@@ -68,10 +67,10 @@ const config: TemplateConfig = {
     position: 'top-right',
     maxHeight: 28,
     margin: 40,
-    background: 'dark-pill',
+    background: 'none',
   },
 
-  brandColorSlots: [],
+  brandColorSlots: ['accent-bar'],
 
   decorations: [
     {
@@ -81,46 +80,22 @@ const config: TemplateConfig = {
       opacity: 0.04,
     },
     {
-      type: 'terminal-dot',
-      position: 'top-bar',
+      type: 'terminal-dots',
+      position: 'top-left',
       width: 14,
       height: 14,
-      color: '#FF5F57',
       borderRadius: 7,
     },
     {
-      type: 'terminal-dot',
-      position: 'top-bar',
-      width: 14,
-      height: 14,
-      color: '#FEBC2E',
-      borderRadius: 7,
-    },
-    {
-      type: 'terminal-dot',
-      position: 'top-bar',
-      width: 14,
-      height: 14,
-      color: '#28C840',
-      borderRadius: 7,
-    },
-    {
-      type: 'bracket',
-      position: 'left-of-title',
-      height: 120,
-      color: '#22C55E',
-      opacity: 0.6,
-    },
-    {
-      type: 'bracket',
-      position: 'right-of-title',
+      type: 'curly-braces',
+      position: 'around-title',
       height: 120,
       color: '#22C55E',
       opacity: 0.6,
     },
     {
       type: 'accent-bar',
-      position: 'bottom',
+      position: 'below-title',
       width: 80,
       height: 4,
       color: '#22C55E',

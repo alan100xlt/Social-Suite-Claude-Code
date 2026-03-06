@@ -3,6 +3,7 @@ import { corsHeaders } from '../_shared/authorize.ts';
 import { CronMonitor } from '../_shared/cron-monitor.ts';
 import { checkAndAutoRespond } from './auto-respond.ts';
 import { classifyConversation, setFallbackClassification } from '../_shared/classify.ts';
+import { upsertContact, upsertConversation, insertMessageIfNew, linkArticleToConversation } from '../_shared/inbox-processing.ts';
 
 const GETLATE_API_URL = 'https://getlate.dev/api/v1';
 
@@ -211,17 +212,17 @@ Deno.serve(async (req) => {
               try {
                 await classifyConversation(supabase, geminiApiKey, targetCompany.id, conv.id);
                 classificationsSucceeded++;
-                // Increment AI call counter (R3)
+                // Increment AI call counter (R3) — best-effort, non-atomic
                 try {
-                  const { data: aiSettings } = await supabase
+                  const { data: counterRow } = await supabase
                     .from('inbox_ai_settings')
                     .select('ai_calls_count')
                     .eq('company_id', targetCompany.id)
-                    .single();
-                  if (aiSettings) {
+                    .maybeSingle();
+                  if (counterRow) {
                     await supabase
                       .from('inbox_ai_settings')
-                      .update({ ai_calls_count: (aiSettings.ai_calls_count || 0) + 1 })
+                      .update({ ai_calls_count: (counterRow.ai_calls_count || 0) + 1 })
                       .eq('company_id', targetCompany.id);
                   }
                 } catch { /* non-fatal */ }
@@ -392,97 +393,54 @@ async function syncComments(
               });
 
               const convKey = `${post.platform}-${post.postId}`;
-              const { data: existingConv } = await supabase
-                .from('inbox_conversations')
-                .select('id')
-                .eq('company_id', company.id)
-                .eq('platform_conversation_id', convKey)
-                .maybeSingle();
-
-              let conversationId: string;
-
-              if (existingConv) {
-                conversationId = existingConv.id;
-                await supabase.from('inbox_conversations').update({
-                  last_message_at: comment.createdAt || new Date().toISOString(),
-                  last_message_preview: (comment.text || '').slice(0, 200),
-                }).eq('id', conversationId);
-              } else {
-                const { data: newConv, error: convError } = await supabase.from('inbox_conversations').insert({
-                  company_id: company.id,
+              let convResult;
+              try {
+                convResult = await upsertConversation(supabase, company.id, {
                   platform: post.platform || 'unknown',
-                  platform_conversation_id: convKey,
+                  platformConversationId: convKey,
                   type: 'comment',
-                  status: 'open',
                   subject: post.content ? post.content.slice(0, 100) : 'Comment thread',
-                  contact_id: contactId,
-                  post_id: post.postId,
-                  post_url: post.platformPostUrl,
-                  last_message_at: comment.createdAt || new Date().toISOString(),
-                  last_message_preview: (comment.text || '').slice(0, 200),
-                }).select('id').single();
+                  contactId,
+                  postId: post.postId,
+                  postUrl: post.platformPostUrl,
+                  lastMessageAt: comment.createdAt || new Date().toISOString(),
+                  lastMessagePreview: (comment.text || '').slice(0, 200),
+                });
+              } catch (convErr) {
+                result.errors.push(`Conv insert: ${String(convErr)}`);
+                continue;
+              }
 
-                if (convError) { result.errors.push(`Conv insert: ${convError.message}`); continue; }
-                conversationId = newConv.id;
-
-                // Phase 1B-article: Wire article join for comment conversations
-                if (post.postId) {
-                  try {
-                    const { data: feedItem } = await supabase
-                      .from('rss_feed_items')
-                      .select('link, title')
-                      .eq('post_id', post.postId)
-                      .maybeSingle();
-
-                    if (feedItem?.link) {
-                      await supabase.from('inbox_conversations').update({
-                        article_url: feedItem.link,
-                        article_title: feedItem.title,
-                      }).eq('id', conversationId);
-                    }
-                  } catch {
-                    // Non-fatal — article linking is best-effort (R8)
-                  }
-                }
+              if (convResult.isNew && post.postId) {
+                await linkArticleToConversation(supabase, post.postId, convResult.id);
               }
 
               const platformMsgId = comment.id;
               if (!platformMsgId) continue;
 
-              const { data: existingMsg } = await supabase
-                .from('inbox_messages')
-                .select('id')
-                .eq('platform_message_id', platformMsgId)
-                .eq('conversation_id', conversationId)
-                .maybeSingle();
+              const msgResult = await insertMessageIfNew(supabase, company.id, convResult.id, {
+                platformMessageId: platformMsgId,
+                contactId,
+                senderType: 'contact',
+                content: comment.text || '',
+                metadata: {
+                  likeCount: comment.likeCount,
+                  replyCount: comment.replyCount,
+                  hidden: comment.hidden,
+                  canReply: comment.canReply,
+                  canDelete: comment.canDelete,
+                  canLike: comment.canLike,
+                  accountId: post.accountId,
+                },
+                createdAt: comment.createdAt || new Date().toISOString(),
+              });
 
-              if (!existingMsg) {
-                const { data: insertedMsg } = await supabase.from('inbox_messages').insert({
-                  conversation_id: conversationId,
-                  company_id: company.id,
-                  platform_message_id: platformMsgId,
-                  contact_id: contactId,
-                  sender_type: 'contact',
-                  content: comment.text || '',
-                  content_type: 'text',
-                  metadata: {
-                    likeCount: comment.likeCount,
-                    replyCount: comment.replyCount,
-                    hidden: comment.hidden,
-                    canReply: comment.canReply,
-                    canDelete: comment.canDelete,
-                    canLike: comment.canLike,
-                    accountId: post.accountId,
-                  },
-                  created_at: comment.createdAt || new Date().toISOString(),
-                }).select('id, conversation_id, company_id, content, sender_type, contact_id').single();
-
+              if (msgResult.inserted) {
                 result.new_items++;
-
-                if (insertedMsg) {
+                if (msgResult.message) {
                   try {
-                    await checkAndAutoRespond(supabase, insertedMsg, {
-                      id: conversationId,
+                    await checkAndAutoRespond(supabase, msgResult.message, {
+                      id: convResult.id,
                       platform: post.platform || 'unknown',
                       type: 'comment' as const,
                       platform_conversation_id: convKey,
@@ -569,37 +527,21 @@ async function syncDMs(
           });
 
           const convKey = `dm-${conv.platform}-${conv.id}`;
-          const { data: existingConv } = await supabase
-            .from('inbox_conversations')
-            .select('id')
-            .eq('company_id', company.id)
-            .eq('platform_conversation_id', convKey)
-            .maybeSingle();
-
-          let conversationId: string;
-
-          if (existingConv) {
-            conversationId = existingConv.id;
-            await supabase.from('inbox_conversations').update({
-              last_message_at: conv.lastMessageTime || new Date().toISOString(),
-              last_message_preview: (conv.lastMessage || '').slice(0, 200),
-            }).eq('id', conversationId);
-          } else {
-            const { data: newConv, error: convError } = await supabase.from('inbox_conversations').insert({
-              company_id: company.id,
+          let convResult;
+          try {
+            convResult = await upsertConversation(supabase, company.id, {
               platform: conv.platform || 'unknown',
-              platform_conversation_id: convKey,
+              platformConversationId: convKey,
               type: 'dm',
-              status: 'open',
               subject: conv.participantName || 'DM',
-              contact_id: contactId,
-              last_message_at: conv.lastMessageTime || new Date().toISOString(),
-              last_message_preview: (conv.lastMessage || '').slice(0, 200),
-              unread_count: conv.unreadCount || 0,
-            }).select('id').single();
-
-            if (convError) { result.errors.push(`DM conv insert: ${convError.message}`); continue; }
-            conversationId = newConv.id;
+              contactId,
+              lastMessageAt: conv.lastMessageTime || new Date().toISOString(),
+              lastMessagePreview: (conv.lastMessage || '').slice(0, 200),
+              unreadCount: conv.unreadCount || 0,
+            });
+          } catch (convErr) {
+            result.errors.push(`DM conv insert: ${String(convErr)}`);
+            continue;
           }
 
           if (pastDeadline()) break;
@@ -620,34 +562,25 @@ async function syncDMs(
 
           for (const msg of messages) {
             const platformMsgId = msg.id || msg._id || `${conv.id}-${msg.createdAt}`;
-            const { data: existingMsg } = await supabase
-              .from('inbox_messages')
-              .select('id')
-              .eq('platform_message_id', platformMsgId)
-              .eq('conversation_id', conversationId)
-              .maybeSingle();
+            const isFromUs = msg.isFromBrand || msg.direction === 'outbound' || msg.isOwn === true;
 
-            if (!existingMsg) {
-              const isFromUs = msg.isFromBrand || msg.direction === 'outbound' || msg.isOwn === true;
-              const { data: insertedDmMsg } = await supabase.from('inbox_messages').insert({
-                conversation_id: conversationId,
-                company_id: company.id,
-                platform_message_id: platformMsgId,
-                contact_id: isFromUs ? null : contactId,
-                sender_type: isFromUs ? 'agent' : 'contact',
-                content: msg.text || msg.content || msg.message || '',
-                content_type: msg.mediaUrl || msg.attachments?.length ? 'image' : 'text',
-                media_url: msg.mediaUrl,
-                metadata: { raw: msg },
-                created_at: msg.createdAt || msg.timestamp || new Date().toISOString(),
-              }).select('id, conversation_id, company_id, content, sender_type, contact_id').single();
+            const msgResult = await insertMessageIfNew(supabase, company.id, convResult.id, {
+              platformMessageId: platformMsgId,
+              contactId: isFromUs ? null : contactId,
+              senderType: isFromUs ? 'agent' : 'contact',
+              content: msg.text || msg.content || msg.message || '',
+              contentType: msg.mediaUrl || msg.attachments?.length ? 'image' : 'text',
+              mediaUrl: msg.mediaUrl,
+              metadata: { raw: msg },
+              createdAt: msg.createdAt || msg.timestamp || new Date().toISOString(),
+            });
 
+            if (msgResult.inserted) {
               result.new_items++;
-
-              if (insertedDmMsg && !isFromUs) {
+              if (msgResult.message && !isFromUs) {
                 try {
-                  await checkAndAutoRespond(supabase, insertedDmMsg, {
-                    id: conversationId,
+                  await checkAndAutoRespond(supabase, msgResult.message, {
+                    id: convResult.id,
                     platform: conv.platform || 'unknown',
                     type: 'dm' as const,
                     platform_conversation_id: convKey,
@@ -682,39 +615,3 @@ async function syncDMs(
   return result;
 }
 
-// ─── Helpers ────────────────────────────────────────────────
-
-async function upsertContact(
-  supabase: ReturnType<typeof createClient>,
-  companyId: string,
-  contact: { platform: string; platformUserId: string; username?: string; displayName?: string; avatarUrl?: string }
-): Promise<string> {
-  const { data: existing } = await supabase
-    .from('inbox_contacts')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('platform', contact.platform)
-    .eq('platform_user_id', contact.platformUserId)
-    .maybeSingle();
-
-  if (existing) {
-    await supabase.from('inbox_contacts').update({
-      username: contact.username || undefined,
-      display_name: contact.displayName || undefined,
-      avatar_url: contact.avatarUrl || undefined,
-    }).eq('id', existing.id);
-    return existing.id;
-  }
-
-  const { data: newContact, error } = await supabase.from('inbox_contacts').insert({
-    company_id: companyId,
-    platform: contact.platform,
-    platform_user_id: contact.platformUserId,
-    username: contact.username,
-    display_name: contact.displayName,
-    avatar_url: contact.avatarUrl,
-  }).select('id').single();
-
-  if (error) throw error;
-  return newContact.id;
-}

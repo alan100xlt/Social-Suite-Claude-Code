@@ -94,6 +94,7 @@ interface ConversationListProps {
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
   onSelectAll?: () => void;
+  onToggleFlag?: (id: string) => void;
 }
 
 export function ConversationList({
@@ -103,6 +104,7 @@ export function ConversationList({
   isLoading,
   selectedIds,
   onToggleSelect,
+  onToggleFlag,
 }: ConversationListProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -284,6 +286,31 @@ export function ConversationList({
                   <span className="flex-1" />
 
                   {/* Message count */}
+                  {(conv.message_count || 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <MessageSquare className="h-3.5 w-3.5 opacity-50" />
+                      {conv.message_count}
+                    </span>
+                  )}
+
+                  {/* Flag for reply */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFlag?.(conv.id);
+                    }}
+                    className={cn(
+                      'inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors',
+                      conv.flagged
+                        ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400'
+                        : 'border-transparent text-muted-foreground hover:bg-muted hover:border-border'
+                    )}
+                  >
+                    <Flag className="h-3.5 w-3.5" fill={conv.flagged ? 'currentColor' : 'none'} />
+                    {conv.flagged ? 'Flagged' : 'Flag'}
+                  </button>
+
+                  {/* Unread count */}
                   {conv.unread_count > 0 && (
                     <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
                       {conv.unread_count}

@@ -372,6 +372,7 @@ export type Database = {
       companies: {
         Row: {
           branding: Json | null
+          company_tier: string
           created_at: string
           created_by: string | null
           getlate_profile_id: string | null
@@ -384,6 +385,7 @@ export type Database = {
         }
         Insert: {
           branding?: Json | null
+          company_tier?: string
           created_at?: string
           created_by?: string | null
           getlate_profile_id?: string | null
@@ -396,6 +398,7 @@ export type Database = {
         }
         Update: {
           branding?: Json | null
+          company_tier?: string
           created_at?: string
           created_by?: string | null
           getlate_profile_id?: string | null
@@ -876,9 +879,159 @@ export type Database = {
         }
         Relationships: []
       }
+      inbox_ai_feedback: {
+        Row: {
+          company_id: string
+          conversation_id: string
+          corrected_value: Json
+          created_at: string
+          feedback_type: string
+          id: string
+          original_value: Json | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          conversation_id: string
+          corrected_value: Json
+          created_at?: string
+          feedback_type: string
+          id?: string
+          original_value?: Json | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          conversation_id?: string
+          corrected_value?: Json
+          created_at?: string
+          feedback_type?: string
+          id?: string
+          original_value?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_ai_feedback_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbox_ai_feedback_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbox_ai_results: {
+        Row: {
+          company_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+          model_version: string | null
+          result_data: Json
+          result_type: string
+        }
+        Insert: {
+          company_id: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          model_version?: string | null
+          result_data?: Json
+          result_type: string
+        }
+        Update: {
+          company_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          model_version?: string | null
+          result_data?: Json
+          result_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_ai_results_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbox_ai_results_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbox_ai_settings: {
+        Row: {
+          ai_calls_count: number
+          ai_calls_reset_at: string
+          auto_classify: boolean
+          auto_translate: boolean
+          company_id: string
+          company_type: string
+          content_recycling: boolean
+          created_at: string
+          crisis_detection: boolean
+          crisis_threshold: number
+          crisis_window_minutes: number
+          smart_acknowledgment: boolean
+          updated_at: string
+        }
+        Insert: {
+          ai_calls_count?: number
+          ai_calls_reset_at?: string
+          auto_classify?: boolean
+          auto_translate?: boolean
+          company_id: string
+          company_type?: string
+          content_recycling?: boolean
+          created_at?: string
+          crisis_detection?: boolean
+          crisis_threshold?: number
+          crisis_window_minutes?: number
+          smart_acknowledgment?: boolean
+          updated_at?: string
+        }
+        Update: {
+          ai_calls_count?: number
+          ai_calls_reset_at?: string
+          auto_classify?: boolean
+          auto_translate?: boolean
+          company_id?: string
+          company_type?: string
+          content_recycling?: boolean
+          created_at?: string
+          crisis_detection?: boolean
+          crisis_threshold?: number
+          crisis_window_minutes?: number
+          smart_acknowledgment?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_ai_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_auto_rules: {
         Row: {
           action_type: string
+          after_hours_config: Json | null
           ai_prompt_template: string | null
           canned_reply_id: string | null
           company_id: string
@@ -887,6 +1040,8 @@ export type Database = {
           enabled: boolean | null
           id: string
           name: string
+          notify_user_ids: string[] | null
+          notify_via: string[] | null
           trigger_conversation_type: string | null
           trigger_platform: string | null
           trigger_type: string
@@ -895,6 +1050,7 @@ export type Database = {
         }
         Insert: {
           action_type: string
+          after_hours_config?: Json | null
           ai_prompt_template?: string | null
           canned_reply_id?: string | null
           company_id: string
@@ -903,6 +1059,8 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           name: string
+          notify_user_ids?: string[] | null
+          notify_via?: string[] | null
           trigger_conversation_type?: string | null
           trigger_platform?: string | null
           trigger_type: string
@@ -911,6 +1069,7 @@ export type Database = {
         }
         Update: {
           action_type?: string
+          after_hours_config?: Json | null
           ai_prompt_template?: string | null
           canned_reply_id?: string | null
           company_id?: string
@@ -919,6 +1078,8 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           name?: string
+          notify_user_ids?: string[] | null
+          notify_via?: string[] | null
           trigger_conversation_type?: string | null
           trigger_platform?: string | null
           trigger_type?: string
@@ -935,6 +1096,62 @@ export type Database = {
           },
           {
             foreignKeyName: "inbox_auto_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbox_backfill_jobs: {
+        Row: {
+          analyzed_posts: number | null
+          classified_conversations: number | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          report_data: Json | null
+          started_at: string | null
+          status: string
+          total_conversations: number | null
+          total_posts: number | null
+          updated_at: string
+        }
+        Insert: {
+          analyzed_posts?: number | null
+          classified_conversations?: number | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          report_data?: Json | null
+          started_at?: string | null
+          status?: string
+          total_conversations?: number | null
+          total_posts?: number | null
+          updated_at?: string
+        }
+        Update: {
+          analyzed_posts?: number | null
+          classified_conversations?: number | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          report_data?: Json | null
+          started_at?: string | null
+          status?: string
+          total_conversations?: number | null
+          total_posts?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_backfill_jobs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -1065,13 +1282,21 @@ export type Database = {
       }
       inbox_conversations: {
         Row: {
+          ai_classified_at: string | null
+          article_title: string | null
+          article_url: string | null
           assigned_to: string | null
           company_id: string
           contact_id: string | null
+          correction_status: string | null
           created_at: string | null
+          detected_language: string | null
+          editorial_value: number | null
           id: string
           last_message_at: string | null
           last_message_preview: string | null
+          message_subtype: string | null
+          message_type: string | null
           metadata: Json | null
           platform: string
           platform_conversation_id: string | null
@@ -1087,13 +1312,21 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ai_classified_at?: string | null
+          article_title?: string | null
+          article_url?: string | null
           assigned_to?: string | null
           company_id: string
           contact_id?: string | null
+          correction_status?: string | null
           created_at?: string | null
+          detected_language?: string | null
+          editorial_value?: number | null
           id?: string
           last_message_at?: string | null
           last_message_preview?: string | null
+          message_subtype?: string | null
+          message_type?: string | null
           metadata?: Json | null
           platform: string
           platform_conversation_id?: string | null
@@ -1109,13 +1342,21 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ai_classified_at?: string | null
+          article_title?: string | null
+          article_url?: string | null
           assigned_to?: string | null
           company_id?: string
           contact_id?: string | null
+          correction_status?: string | null
           created_at?: string | null
+          detected_language?: string | null
+          editorial_value?: number | null
           id?: string
           last_message_at?: string | null
           last_message_preview?: string | null
+          message_subtype?: string | null
+          message_type?: string | null
           metadata?: Json | null
           platform?: string
           platform_conversation_id?: string | null
@@ -1143,6 +1384,65 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "inbox_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbox_crisis_events: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          negative_count: number
+          resolved_at: string | null
+          resolved_by: string | null
+          sample_conversation_ids: string[] | null
+          severity: string
+          status: string
+          summary: string | null
+          threshold: number
+          topics: string[] | null
+          updated_at: string
+          window_minutes: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          negative_count?: number
+          resolved_at?: string | null
+          resolved_by?: string | null
+          sample_conversation_ids?: string[] | null
+          severity?: string
+          status?: string
+          summary?: string | null
+          threshold?: number
+          topics?: string[] | null
+          updated_at?: string
+          window_minutes?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          negative_count?: number
+          resolved_at?: string | null
+          resolved_by?: string | null
+          sample_conversation_ids?: string[] | null
+          severity?: string
+          status?: string
+          summary?: string | null
+          threshold?: number
+          topics?: string[] | null
+          updated_at?: string
+          window_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_crisis_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1488,6 +1788,77 @@ export type Database = {
             columns: ["media_company_id"]
             isOneToOne: false
             referencedRelation: "media_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      og_company_settings: {
+        Row: {
+          brand_color: string | null
+          brand_color_secondary: string | null
+          company_id: string
+          created_at: string | null
+          disabled_template_ids: string[] | null
+          font_family: string | null
+          font_family_title: string | null
+          logo_dark_url: string | null
+          logo_url: string | null
+          preferred_template_ids: string[] | null
+          show_author: boolean
+          show_category_tag: boolean
+          show_date: boolean
+          show_description: boolean
+          show_logo: boolean
+          show_source_name: boolean
+          show_title: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          brand_color?: string | null
+          brand_color_secondary?: string | null
+          company_id: string
+          created_at?: string | null
+          disabled_template_ids?: string[] | null
+          font_family?: string | null
+          font_family_title?: string | null
+          logo_dark_url?: string | null
+          logo_url?: string | null
+          preferred_template_ids?: string[] | null
+          show_author?: boolean
+          show_category_tag?: boolean
+          show_date?: boolean
+          show_description?: boolean
+          show_logo?: boolean
+          show_source_name?: boolean
+          show_title?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          brand_color?: string | null
+          brand_color_secondary?: string | null
+          company_id?: string
+          created_at?: string | null
+          disabled_template_ids?: string[] | null
+          font_family?: string | null
+          font_family_title?: string | null
+          logo_dark_url?: string | null
+          logo_url?: string | null
+          preferred_template_ids?: string[] | null
+          show_author?: boolean
+          show_category_tag?: boolean
+          show_date?: boolean
+          show_description?: boolean
+          show_logo?: boolean
+          show_source_name?: boolean
+          show_title?: boolean
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "og_company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1945,6 +2316,98 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_event_log: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          event_id: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processing_status: string
+          provider: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          event_id?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          processing_status?: string
+          provider?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processing_status?: string
+          provider?: string
+        }
+        Relationships: []
+      }
+      webhook_registrations: {
+        Row: {
+          company_id: string
+          consecutive_failures: number
+          created_at: string | null
+          events: string[]
+          id: string
+          is_active: boolean
+          last_failure_at: string | null
+          last_success_at: string | null
+          provider: string
+          secret: string
+          updated_at: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          company_id: string
+          consecutive_failures?: number
+          created_at?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          provider?: string
+          secret: string
+          updated_at?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          consecutive_failures?: number
+          created_at?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          provider?: string
+          secret?: string
+          updated_at?: string | null
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_registrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2099,6 +2562,7 @@ export type Database = {
         Returns: boolean
       }
       inbox_resurface_snoozed: { Args: never; Returns: undefined }
+      increment_ai_calls: { Args: { _company_id: string }; Returns: undefined }
       is_media_company_admin: {
         Args: { _media_company_id: string; _user_id: string }
         Returns: boolean

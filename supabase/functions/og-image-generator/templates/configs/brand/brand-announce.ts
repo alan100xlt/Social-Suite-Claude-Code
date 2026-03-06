@@ -4,7 +4,7 @@ const config: TemplateConfig = {
   id: 'brand-announce',
   name: 'Brand Announcement',
   category: 'brand',
-  tags: ['bold', 'announcement', 'centered', 'vibrant'],
+  tags: ['bold', 'centered', 'vibrant', 'announcement'],
   requiresImage: false,
 
   layout: {
@@ -55,12 +55,12 @@ const config: TemplateConfig = {
 
   categoryTag: {
     position: 'above-title',
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: 700,
-    color: '#ffffff',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 4,
-    padding: '3px 10px',
+    color: 'brandColor',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 40,
+    padding: '10px 28px',
     textTransform: 'uppercase',
   },
 
@@ -71,7 +71,7 @@ const config: TemplateConfig = {
     background: 'white-pill',
   },
 
-  brandColorSlots: ['background'],
+  brandColorSlots: ['background', 'category-badge'],
 
   decorations: [
     {
@@ -98,7 +98,7 @@ const config: TemplateConfig = {
 
   staticLabels: [
     {
-      text: 'ANNOUNCEMENT',
+      text: 'Announcement',
       position: 'above-title',
       fontSize: 16,
       fontWeight: 700,

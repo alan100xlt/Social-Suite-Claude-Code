@@ -1,6 +1,6 @@
 /** @jsxImportSource https://esm.sh/react@18.2.0 */
 import type { TemplateConfig, TemplateInput } from '../types.ts';
-import { resolveColor } from './brand-color.ts';
+import { resolveColor, resolveFont } from './brand-color.ts';
 
 /** Build alternating highlighted/plain word segments (for quote-highlight) */
 function buildHighlightSegments(text: string, highlightColor: string): any[] {
@@ -32,6 +32,7 @@ export function renderTitle(config: TemplateConfig['title'], input: TemplateInpu
   if (!input.visibility.showTitle) return null;
 
   const color = resolveColor(config.color, input);
+  const fontFamily = resolveFont(input, config.fontFamily);
   const maxHeight = Math.round(config.fontSize * config.lineHeight * config.maxLines);
 
   if (config.treatment === 'highlight-segments' && brandHighlightColor) {
@@ -40,6 +41,7 @@ export function renderTitle(config: TemplateConfig['title'], input: TemplateInpu
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
+        fontFamily,
         fontSize: config.fontSize,
         fontWeight: config.fontWeight,
         color,
@@ -56,6 +58,7 @@ export function renderTitle(config: TemplateConfig['title'], input: TemplateInpu
   return (
     <div style={{
       display: 'flex',
+      fontFamily,
       fontSize: config.fontSize,
       fontWeight: config.fontWeight,
       color,
@@ -63,8 +66,6 @@ export function renderTitle(config: TemplateConfig['title'], input: TemplateInpu
       lineHeight: config.lineHeight,
       maxHeight,
       overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      textShadow: config.textShadow || 'none',
     }}>
       {input.title}
     </div>

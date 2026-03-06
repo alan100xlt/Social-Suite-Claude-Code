@@ -194,6 +194,20 @@ export function ContactDetailPanel({
                   )}
                 </div>
               )}
+
+              {/* Topic tags (from AI classification) */}
+              {conversation.ai_topics && conversation.ai_topics.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {conversation.ai_topics.map((topic: string, i: number) => (
+                    <span
+                      key={i}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-violet-50 text-violet-600 border border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/30"
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </>

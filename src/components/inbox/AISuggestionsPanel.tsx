@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Sparkles, Brain, FileText, Tag, X } from 'lucide-react';
@@ -29,6 +29,13 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
   const [summary, setSummary] = useState<string | null>(null);
   const [sentimentResult, setSentimentResult] = useState<{ sentiment: string; confidence: number; topics: string[] } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+
+  // Reset AI state when conversation changes
+  useEffect(() => {
+    setReplyData(null);
+    setSummary(null);
+    setSentimentResult(null);
+  }, [conversation.id]);
 
   const handleAnalyze = async () => {
     const result = await analyzeSentiment.mutateAsync(conversation.id);

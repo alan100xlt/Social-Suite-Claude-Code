@@ -1,6 +1,6 @@
 /** @jsxImportSource https://esm.sh/react@18.2.0 */
 import type { TemplateConfig, TemplateInput } from '../types.ts';
-import { resolveColor } from './brand-color.ts';
+import { resolveColor, resolveFont } from './brand-color.ts';
 
 function formatDate(iso: string, format: 'relative' | 'short' | 'long' | 'calendar-block'): string {
   const d = new Date(iso);
@@ -19,9 +19,11 @@ function formatDate(iso: string, format: 'relative' | 'short' | 'long' | 'calend
 export function renderAuthor(config: TemplateConfig['author'], input: TemplateInput): any {
   if (!config || !input.visibility.showAuthor || !input.author) return null;
   const color = resolveColor(config.color, input);
+  const fontFamily = resolveFont(input);
   return (
     <div style={{
       display: 'flex',
+      fontFamily,
       fontSize: config.fontSize,
       fontWeight: config.fontWeight,
       color,
@@ -36,9 +38,11 @@ export function renderAuthor(config: TemplateConfig['author'], input: TemplateIn
 export function renderDate(config: TemplateConfig['date'], input: TemplateInput): any {
   if (!config || !input.visibility.showDate || !input.publishedAt) return null;
   const color = resolveColor(config.color, input);
+  const fontFamily = resolveFont(input);
   return (
     <div style={{
       display: 'flex',
+      fontFamily,
       fontSize: config.fontSize,
       fontWeight: config.fontWeight,
       color,
@@ -52,9 +56,11 @@ export function renderCategoryTag(config: TemplateConfig['categoryTag'], input: 
   if (!config || !input.visibility.showCategoryTag || !input.categoryTag) return null;
   const color = resolveColor(config.color, input);
   const bg = config.backgroundColor ? resolveColor(config.backgroundColor, input) : undefined;
+  const fontFamily = resolveFont(input);
   return (
     <div style={{
       display: 'flex',
+      fontFamily,
       fontSize: config.fontSize,
       fontWeight: config.fontWeight,
       color,
@@ -71,16 +77,17 @@ export function renderCategoryTag(config: TemplateConfig['categoryTag'], input: 
 export function renderDescription(config: TemplateConfig['description'], input: TemplateInput): any {
   if (!config || !input.visibility.showDescription || !input.description) return null;
   const color = resolveColor(config.color, input);
+  const fontFamily = resolveFont(input);
   return (
     <div style={{
       display: 'flex',
+      fontFamily,
       fontSize: config.fontSize,
       fontWeight: config.fontWeight,
       color,
       lineHeight: config.lineHeight,
       maxHeight: config.maxLines * config.fontSize * config.lineHeight,
       overflow: 'hidden',
-      textOverflow: 'ellipsis',
       marginTop: config.marginTop,
     }}>
       {input.description}
