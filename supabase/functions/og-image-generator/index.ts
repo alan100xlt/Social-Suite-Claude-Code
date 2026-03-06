@@ -6,7 +6,10 @@ import satori from "npm:satori@0.12.0";
 import { initWasm, Resvg } from "npm:@resvg/resvg-wasm@2.6.2";
 import { loadFonts } from "./utils/fonts.ts";
 import { imageToBase64 } from "./utils/image-to-base64.ts";
-import { getTemplate, getAllTemplates, fallbackTemplateId } from "./templates/registry.ts";
+import { getTemplate, getAllTemplates, getAvailableTemplates, fallbackTemplateId, renderFromConfig } from "./templates/registry.ts";
+import type { TemplateInput, OgVisibilitySettings, OgFontOverride } from "./templates/types.ts";
+import { DEFAULT_VISIBILITY } from "./templates/types.ts";
+import { FONT_FAMILY_MAP } from "./utils/fonts.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -80,14 +83,25 @@ async function aiRecommend(
   title: string,
   description: string | null,
   hasImage: boolean,
-  sourceName: string | null
+  sourceName: string | null,
+  opts?: {
+    hasLogo?: boolean;
+    hasBrandColor?: boolean;
+    categoryTag?: string;
+    disabledIds?: string[];
+    preferredIds?: string[];
+  }
 ): Promise<{ templateId: string; reasoning: string; tokenUsage: unknown; costUsd: number | null }> {
-  const templates = getAllTemplates();
-  const templateList = templates
-    .map(t => `- ${t.id} (${t.category}${t.requiresImage ? ', requires image' : ''}): ${t.name}`)
+  const available = getAvailableTemplates(hasImage, opts?.disabledIds);
+  const templateList = available
+    .map(t => `- ${t.id} (${t.category}, ${t.layout.archetype}${t.requiresImage ? ', requires image' : ''}): ${t.name} [${t.tags.join(', ')}]`)
     .join('\n');
 
-  const systemPrompt = `You are an OG image template selector. Given an article's metadata, pick the best template.
+  const preferredNote = opts?.preferredIds?.length
+    ? `\n- Company prefers these templates (give them priority): ${opts.preferredIds.join(', ')}`
+    : '';
+
+  const systemPrompt = `You are an OG image template selector for media companies. Given an article's metadata, pick the best template.
 
 Available templates:
 ${templateList}
@@ -99,7 +113,11 @@ Rules:
 - Opinion pieces, quotes, interviews → prefer editorial/quote templates
 - General articles with good photos → prefer photo-* templates
 - Articles without images → prefer gradient-* or brand-* templates
+- If has_logo is true, prefer templates with prominent logo positions
+- If has_brand_color is true, prefer templates that use brand color (check brandColorSlots)
+- If category_tag is provided, prefer templates with category badge support
 - Consider the source name for brand-appropriate choices
+- Vary recommendations — avoid always picking the same template for similar articles${preferredNote}
 
 Respond with JSON only: {"template_id": "...", "reasoning": "..."}`;
 
@@ -123,6 +141,9 @@ Respond with JSON only: {"template_id": "...", "reasoning": "..."}`;
               description: (description || "").substring(0, 200),
               has_image: hasImage,
               source_name: sourceName || "Unknown",
+              has_logo: opts?.hasLogo ?? false,
+              has_brand_color: opts?.hasBrandColor ?? false,
+              category_tag: opts?.categoryTag || null,
             }),
           },
         ],
@@ -165,13 +186,60 @@ Respond with JSON only: {"template_id": "...", "reasoning": "..."}`;
   };
 }
 
-/** Render template to PNG buffer */
-async function renderTemplate(templateId: string, input: Parameters<typeof getTemplate>[0] extends string ? Parameters<ReturnType<typeof getTemplate>["render"]>[0] : never): Promise<Uint8Array> {
+/** Fetch company OG settings (returns defaults if none exist) */
+async function fetchCompanyOgSettings(
+  adminClient: ReturnType<typeof createClient>,
+  companyId: string
+): Promise<{
+  visibility: OgVisibilitySettings;
+  fontOverride?: OgFontOverride;
+  brandColor?: string;
+  brandColorSecondary?: string;
+  logoUrl?: string;
+  logoDarkUrl?: string;
+  disabledTemplateIds: string[];
+  preferredTemplateIds: string[];
+}> {
+  const { data } = await adminClient
+    .from("og_company_settings")
+    .select("*")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (!data) {
+    return { visibility: { ...DEFAULT_VISIBILITY }, disabledTemplateIds: [], preferredTemplateIds: [] };
+  }
+
+  return {
+    visibility: {
+      showTitle: data.show_title ?? true,
+      showDescription: data.show_description ?? true,
+      showAuthor: data.show_author ?? false,
+      showDate: data.show_date ?? false,
+      showLogo: data.show_logo ?? true,
+      showCategoryTag: data.show_category_tag ?? false,
+      showSourceName: data.show_source_name ?? true,
+    },
+    fontOverride: data.font_family ? {
+      fontFamily: data.font_family as 'sans' | 'serif' | 'mono',
+      fontFamilyTitle: data.font_family_title as 'sans' | 'serif' | 'mono' | undefined,
+    } : undefined,
+    brandColor: data.brand_color || undefined,
+    brandColorSecondary: data.brand_color_secondary || undefined,
+    logoUrl: data.logo_url || undefined,
+    logoDarkUrl: data.logo_dark_url || undefined,
+    disabledTemplateIds: data.disabled_template_ids || [],
+    preferredTemplateIds: data.preferred_template_ids || [],
+  };
+}
+
+/** Render template to PNG buffer using config-driven renderer */
+async function renderTemplate(templateId: string, input: TemplateInput): Promise<Uint8Array> {
   const template = getTemplate(templateId);
   if (!template) throw new Error(`Unknown template: ${templateId}`);
 
   const fonts = await fontsPromise;
-  const jsx = template.render(input);
+  const jsx = await renderFromConfig(template, input);
 
   const svg = await satori(jsx, {
     width: OG_WIDTH,
@@ -239,7 +307,7 @@ serve(async (req: Request) => {
 
     // ─── ACTION: preview ─────────────────────────────────────
     if (action === "preview") {
-      const { templateId, title, description, imageUrl, brandColor } = body;
+      const { templateId, title, description, imageUrl, brandColor, companyId: previewCompanyId } = body;
       if (!templateId || !title) {
         return new Response(JSON.stringify({ error: "templateId and title required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -251,11 +319,22 @@ serve(async (req: Request) => {
         imageBase64 = (await imageToBase64(imageUrl)) || undefined;
       }
 
+      // Optionally load company settings for preview
+      let visibility = { ...DEFAULT_VISIBILITY };
+      let fontOverride: OgFontOverride | undefined;
+      if (previewCompanyId) {
+        const settings = await fetchCompanyOgSettings(admin, previewCompanyId);
+        visibility = settings.visibility;
+        fontOverride = settings.fontOverride;
+      }
+
       const png = await renderTemplate(templateId, {
         title,
         description,
         imageBase64,
         brandColor,
+        visibility,
+        fontOverride,
       });
 
       return new Response(png, {
@@ -304,12 +383,23 @@ serve(async (req: Request) => {
       const feed = item.rss_feeds as { name: string; company_id: string };
       companyId = feed.company_id;
 
-      // Fetch article image if available
-      let imageBase64: string | undefined;
-      if (item.image_url) {
-        imageBase64 = (await imageToBase64(item.image_url)) || undefined;
-      }
+      // Fetch company OG settings + article image in parallel
+      const [ogSettings, articleImageB64] = await Promise.all([
+        fetchCompanyOgSettings(admin, companyId),
+        item.image_url ? imageToBase64(item.image_url) : Promise.resolve(null),
+      ]);
+      const imageBase64 = articleImageB64 || undefined;
       const hasImage = !!imageBase64;
+
+      // Fetch logo images if company has them
+      let logoBase64: string | undefined;
+      let logoDarkBase64: string | undefined;
+      if (ogSettings.logoUrl) {
+        logoBase64 = (await imageToBase64(ogSettings.logoUrl)) || undefined;
+      }
+      if (ogSettings.logoDarkUrl) {
+        logoDarkBase64 = (await imageToBase64(ogSettings.logoDarkUrl)) || undefined;
+      }
 
       // Determine template
       let chosenTemplateId: string;
@@ -326,7 +416,14 @@ serve(async (req: Request) => {
             item.title || "Untitled",
             item.description,
             hasImage,
-            feed.name
+            feed.name,
+            {
+              hasLogo: !!logoBase64,
+              hasBrandColor: !!ogSettings.brandColor,
+              categoryTag: item.category || undefined,
+              disabledIds: ogSettings.disabledTemplateIds,
+              preferredIds: ogSettings.preferredTemplateIds,
+            }
           );
           chosenTemplateId = aiResult.templateId;
           reasoning = aiResult.reasoning;
@@ -339,15 +436,25 @@ serve(async (req: Request) => {
         }
       }
 
-      // Render PNG
-      const png = await renderTemplate(chosenTemplateId, {
+      // Build full TemplateInput with company settings
+      const templateInput: TemplateInput = {
         title: item.title || "Untitled",
         description: item.description || undefined,
+        author: item.author || undefined,
         imageBase64,
         sourceName: feed.name,
         publishedAt: item.published_at || undefined,
-        brandColor: undefined, // TODO: pull from company settings
-      });
+        brandColor: ogSettings.brandColor,
+        brandColorSecondary: ogSettings.brandColorSecondary,
+        logoBase64,
+        logoDarkBase64,
+        categoryTag: item.category || undefined,
+        visibility: ogSettings.visibility,
+        fontOverride: ogSettings.fontOverride,
+      };
+
+      // Render PNG
+      const png = await renderTemplate(chosenTemplateId, templateInput);
 
       // Upload to storage
       const storagePath = `og/${companyId}/${feedItemId}.png`;
@@ -405,6 +512,9 @@ serve(async (req: Request) => {
         name: t.name,
         category: t.category,
         requiresImage: t.requiresImage,
+        tags: t.tags,
+        archetype: t.layout.archetype,
+        theme: t.layout.theme,
       }));
 
       return new Response(JSON.stringify({ templates }), {

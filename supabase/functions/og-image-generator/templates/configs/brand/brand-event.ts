@@ -4,11 +4,12 @@ const config: TemplateConfig = {
   id: 'brand-event',
   name: 'Brand Event',
   category: 'brand',
-  tags: ['dark', 'event', 'calendar', 'gradient'],
+  tags: ['dark', 'event', 'gradient', 'calendar'],
   requiresImage: false,
 
   layout: {
-    archetype: 'special',
+    archetype: 'split-lr',
+    splitRatio: [25, 75],
     padding: 80,
     theme: 'dark',
   },
@@ -49,7 +50,7 @@ const config: TemplateConfig = {
   },
 
   author: {
-    position: 'below-description',
+    position: 'below-title',
     fontSize: 18,
     fontWeight: 400,
     color: 'rgba(255,255,255,0.5)',
@@ -57,10 +58,10 @@ const config: TemplateConfig = {
   },
 
   date: {
-    position: 'inline-with-author',
-    fontSize: 72,
-    fontWeight: 700,
-    color: '#FFFFFF',
+    position: 'below-author',
+    fontSize: 16,
+    fontWeight: 400,
+    color: 'rgba(255,255,255,0.4)',
     format: 'calendar-block',
   },
 
@@ -69,15 +70,15 @@ const config: TemplateConfig = {
     fontSize: 12,
     fontWeight: 700,
     color: '#ffffff',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 4,
     padding: '3px 10px',
     textTransform: 'uppercase',
   },
 
   logo: {
-    position: 'top-left',
-    maxHeight: 32,
+    position: 'top-right',
+    maxHeight: 28,
     margin: 40,
     background: 'frosted',
   },
@@ -90,16 +91,16 @@ const config: TemplateConfig = {
       position: 'top-right',
       width: 500,
       height: 500,
-      color: 'rgba(255, 255, 255, 0.08)',
       borderRadius: 250,
+      color: 'rgba(255, 255, 255, 0.08)',
     },
     {
       type: 'circle',
-      position: 'top-right-inner',
+      position: 'top-right-offset',
       width: 420,
       height: 420,
-      color: 'rgba(255, 255, 255, 0.05)',
       borderRadius: 210,
+      color: 'rgba(255, 255, 255, 0.05)',
     },
     {
       type: 'divider',
@@ -109,11 +110,15 @@ const config: TemplateConfig = {
       color: 'rgba(255, 255, 255, 0.3)',
       borderRadius: 2,
     },
+    {
+      type: 'calendar-block',
+      position: 'left-panel',
+      width: 160,
+      height: 180,
+      color: 'rgba(255, 255, 255, 0.12)',
+      borderRadius: 20,
+    },
   ],
-
-  behavior: {
-    showDate: true,
-  },
 };
 
 export default config;

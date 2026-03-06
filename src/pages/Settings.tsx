@@ -5,8 +5,9 @@ import { CompanyTab } from "@/components/settings/CompanyTab";
 import { NotificationsTab } from "@/components/settings/NotificationsTab";
 import { BrandVoiceTabV2 } from "@/components/settings/BrandVoiceTabV2";
 import { BrandVoiceTab } from "@/components/settings/BrandVoiceTab";
+import { OgSettingsTab } from "@/components/settings/OgSettingsTab";
 import { useUserRole } from "@/hooks/useCompany";
-import { User, Building2, Bell, Volume2 } from "lucide-react";
+import { User, Building2, Bell, Volume2, Image } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 export default function SettingsPage() {
@@ -47,6 +48,11 @@ export default function SettingsPage() {
                 <Volume2 className="h-4 w-4" />Voice V2
               </TabsTrigger>
             )}
+            {isOwnerOrAdmin && (
+              <TabsTrigger value="og-images" className="flex items-center gap-2">
+                <Image className="h-4 w-4" />OG Images
+              </TabsTrigger>
+            )}
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />Notifications
             </TabsTrigger>
@@ -55,6 +61,7 @@ export default function SettingsPage() {
           {isOwnerOrAdmin && <TabsContent value="company"><CompanyTab /></TabsContent>}
           {isOwnerOrAdmin && <TabsContent value="voice"><BrandVoiceTab /></TabsContent>}
           {isOwnerOrAdmin && <TabsContent value="voice-v2"><BrandVoiceTabV2 /></TabsContent>}
+          {isOwnerOrAdmin && <TabsContent value="og-images"><OgSettingsTab /></TabsContent>}
           <TabsContent value="notifications"><NotificationsTab /></TabsContent>
         </Tabs>
       </div>

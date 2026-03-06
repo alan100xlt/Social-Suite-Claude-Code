@@ -1,22 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Image, RefreshCw, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
+import { Image, RefreshCw, ChevronDown, Sparkles, Loader2, Search, Check } from 'lucide-react';
 import { useRegenerateOgImage, OG_TEMPLATES } from '@/hooks/useOgImage';
 import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
 import { isDemoCompany } from '@/lib/demo/demo-constants';
@@ -44,8 +41,21 @@ export function OgImagePreview({
   const { selectedCompanyId } = useSelectedCompany();
   const isDemo = isDemoCompany(selectedCompanyId);
 
+  const [search, setSearch] = useState('');
+  const [templateOpen, setTemplateOpen] = useState(false);
+
   const currentTemplate = OG_TEMPLATES.find(t => t.id === ogTemplateId);
   const availableTemplates = OG_TEMPLATES.filter(t => !t.requiresImage || hasArticleImage);
+
+  const filteredTemplates = useMemo(() => {
+    if (!search) return availableTemplates;
+    const q = search.toLowerCase();
+    return availableTemplates.filter(t =>
+      t.name.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q) ||
+      t.id.toLowerCase().includes(q)
+    );
+  }, [availableTemplates, search]);
 
   // Append cache-buster to force browser to refetch after regeneration
   const displayUrl = ogImageUrl && cacheBuster > 0
@@ -128,36 +138,59 @@ export function OgImagePreview({
           {regenerate.isPending ? 'Generating...' : 'Regenerate'}
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <Popover open={templateOpen} onOpenChange={setTemplateOpen}>
+          <PopoverTrigger asChild>
             <Button variant="outline" size="sm" disabled={regenerate.isPending || isDemo}>
               Change Template
               <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
-            <DropdownMenuRadioGroup
-              value={ogTemplateId || ''}
-              onValueChange={handleTemplateChange}
-            >
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-0">
+            <div className="p-2 border-b">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search templates..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+            </div>
+            <div className="max-h-72 overflow-y-auto p-1">
               {CATEGORIES.map(category => {
-                const categoryTemplates = availableTemplates.filter(t => t.category === category);
+                const categoryTemplates = filteredTemplates.filter(t => t.category === category);
                 if (categoryTemplates.length === 0) return null;
                 return (
                   <div key={category}>
-                    <DropdownMenuLabel className="capitalize">{category}</DropdownMenuLabel>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground capitalize">
+                      {category} ({categoryTemplates.length})
+                    </div>
                     {categoryTemplates.map(t => (
-                      <DropdownMenuRadioItem key={t.id} value={t.id}>
-                        {t.name}
-                      </DropdownMenuRadioItem>
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          handleTemplateChange(t.id);
+                          setTemplateOpen(false);
+                          setSearch('');
+                        }}
+                        className="flex items-center w-full px-2 py-1.5 text-xs rounded-sm hover:bg-accent hover:text-accent-foreground"
+                      >
+                        {t.id === ogTemplateId && <Check className="h-3 w-3 mr-1.5 flex-shrink-0" />}
+                        <span className={t.id === ogTemplateId ? 'font-medium' : ''}>{t.name}</span>
+                      </button>
                     ))}
-                    <DropdownMenuSeparator />
                   </div>
                 );
               })}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {filteredTemplates.length === 0 && (
+                <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                  No templates match "{search}"
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
