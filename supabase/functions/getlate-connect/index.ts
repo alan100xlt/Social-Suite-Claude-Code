@@ -316,8 +316,36 @@ Deno.serve(async (req) => {
       }
 
       console.log('Created and linked profile', profile.id, 'to company', companyId);
+
+      // Auto-trigger historical inbox sync (fire-and-forget)
+      let syncJobId: string | null = null;
+      if (supabaseUrl && supabaseServiceKey) {
+        try {
+          const syncResp = await fetch(`${supabaseUrl}/functions/v1/inbox-historical-sync`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ companyId }),
+          });
+          if (syncResp.ok) {
+            const syncData = await syncResp.json();
+            syncJobId = syncData.jobId || null;
+            console.log('Historical sync triggered, jobId:', syncJobId);
+          }
+        } catch (syncErr) {
+          console.error('Failed to trigger historical sync (non-fatal):', syncErr);
+        }
+
+        // Auto-register webhooks (fire-and-forget)
+        registerWebhooks(supabaseUrl, supabaseServiceKey, apiKey, companyId, profile.id).catch(err => {
+          console.error('Failed to register webhooks (non-fatal):', err);
+        });
+      }
+
       return new Response(
-        JSON.stringify({ success: true, profileId: profile.id, created: true, profile }),
+        JSON.stringify({ success: true, profileId: profile.id, created: true, profile, syncJobId }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -571,3 +599,87 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// ─── Webhook Auto-Registration ───────────────────────────────
+
+const WEBHOOK_EVENTS = [
+  'message.received',
+  'comment.received',
+  'post.failed',
+  'post.partial',
+  'account.disconnected',
+];
+
+async function registerWebhooks(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  getlateApiKey: string,
+  companyId: string,
+  profileId: string,
+): Promise<void> {
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Check if already registered
+  const { data: existing } = await supabase
+    .from('webhook_registrations')
+    .select('id, is_active')
+    .eq('company_id', companyId)
+    .eq('provider', 'getlate')
+    .maybeSingle();
+
+  if (existing?.is_active) {
+    console.log('Webhooks already registered for company', companyId);
+    return;
+  }
+
+  // Generate HMAC secret
+  const secretBytes = new Uint8Array(32);
+  crypto.getRandomValues(secretBytes);
+  const secret = Array.from(secretBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const projectId = supabaseUrl.replace('https://', '').split('.')[0];
+  const webhookUrl = `https://${projectId}.supabase.co/functions/v1/getlate-webhook`;
+  const webhookName = `longtale-${companyId.slice(0, 8)}`;
+
+  // Register with GetLate API
+  const response = await fetch(`${GETLATE_API_URL}/webhooks/settings`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${getlateApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: webhookName,
+      url: webhookUrl,
+      secret,
+      events: WEBHOOK_EVENTS,
+      profileId,
+    }),
+  });
+
+  let webhookId: string | null = null;
+  if (response.ok) {
+    try {
+      const data = await response.json();
+      webhookId = data._id || data.id || data.webhookId || null;
+    } catch { /* ignore parse errors */ }
+  }
+  console.log(`Webhook registration for ${companyId}: status=${response.status}, webhookId=${webhookId}`);
+
+  // Store in DB
+  await supabase
+    .from('webhook_registrations')
+    .upsert({
+      company_id: companyId,
+      provider: 'getlate',
+      webhook_id: webhookId,
+      secret,
+      events: WEBHOOK_EVENTS,
+      is_active: true,
+      consecutive_failures: 0,
+    }, { onConflict: 'company_id,provider' });
+
+  console.log('Webhook registered and stored for company', companyId);
+}

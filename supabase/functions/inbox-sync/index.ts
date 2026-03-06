@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/authorize.ts';
 import { CronMonitor } from '../_shared/cron-monitor.ts';
+import { fetchWithRetry } from '../_shared/fetch-utils.ts';
 import { checkAndAutoRespond } from './auto-respond.ts';
 import { classifyConversation, setFallbackClassification } from '../_shared/classify.ts';
 import { upsertContact, upsertConversation, insertMessageIfNew, linkArticleToConversation } from '../_shared/inbox-processing.ts';
@@ -8,53 +9,7 @@ import { upsertContact, upsertConversation, insertMessageIfNew, linkArticleToCon
 const GETLATE_API_URL = 'https://getlate.dev/api/v1';
 
 // ─── Deadline guard ──────────────────────────────────────────
-// Supabase edge functions timeout at ~60s (free) or ~150s (pro).
-// Bail early at 45s to leave time for monitor.success() and response.
 const DEADLINE_MS = 45_000;
-// Per-request timeout for GetLate API calls (prevents hanging fetch from blocking past deadline)
-const FETCH_TIMEOUT_MS = 15_000;
-// Retry config for transient failures
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 1000;
-
-// ─── Retry-capable fetch ─────────────────────────────────────
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  pastDeadline: () => boolean,
-  retries = MAX_RETRIES,
-): Promise<Response> {
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    if (pastDeadline()) throw new Error('Deadline exceeded before fetch');
-    try {
-      const resp = await fetch(url, {
-        ...options,
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-      // Retry on 429/5xx, but not on 4xx client errors
-      if (resp.status === 429 || resp.status >= 500) {
-        if (attempt < retries && !pastDeadline()) {
-          const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
-          console.warn(`[inbox-sync] Retrying ${url} after ${resp.status} (attempt ${attempt + 1}/${retries}, waiting ${delay}ms)`);
-          await new Promise(r => setTimeout(r, delay));
-          continue;
-        }
-      }
-      return resp;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      // Retry on network errors / timeouts
-      if (attempt < retries && !pastDeadline()) {
-        const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
-        console.warn(`[inbox-sync] Retrying ${url} after error: ${lastError.message} (attempt ${attempt + 1}/${retries}, waiting ${delay}ms)`);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-    }
-  }
-  throw lastError || new Error(`fetchWithRetry failed for ${url}`);
-}
 
 interface SyncResult {
   company_id: string;

@@ -6,9 +6,13 @@ import { isDemoCompany } from '@/lib/demo/demo-constants';
 interface BackfillJob {
   id: string;
   company_id: string;
+  job_type: 'classification' | 'historical_sync';
   status: 'pending' | 'running' | 'completed' | 'failed';
   total_conversations: number;
   classified_conversations: number;
+  synced_conversations: number;
+  synced_messages: number;
+  cursor_state: { phase?: string; chainCount?: number } | null;
   total_posts: number;
   analyzed_posts: number;
   report_data: Record<string, unknown> | null;
@@ -61,6 +65,56 @@ export function useStartBackfill() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inbox-backfill-job', selectedCompanyId] });
+    },
+  });
+}
+
+// ─── Historical Sync Hooks ───────────────────────────────────
+
+export function useHistoricalSyncJob() {
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useQuery({
+    queryKey: ['historical-sync-job', selectedCompanyId],
+    queryFn: async () => {
+      if (!selectedCompanyId || isDemoCompany(selectedCompanyId)) return null;
+
+      const { data, error } = await supabase
+        .from('inbox_backfill_jobs' as any)
+        .select('*')
+        .eq('company_id', selectedCompanyId)
+        .eq('job_type', 'historical_sync')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) return null;
+      return data as BackfillJob | null;
+    },
+    enabled: !!selectedCompanyId,
+    refetchInterval: (query) => {
+      const job = query.state.data as BackfillJob | null;
+      if (job?.status === 'running' || job?.status === 'pending') return 3000;
+      return false;
+    },
+  });
+}
+
+export function useStartHistoricalSync() {
+  const { selectedCompanyId } = useSelectedCompany();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!selectedCompanyId) throw new Error('No company selected');
+      const { data, error } = await supabase.functions.invoke('inbox-historical-sync', {
+        body: { companyId: selectedCompanyId },
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['historical-sync-job', selectedCompanyId] });
     },
   });
 }
