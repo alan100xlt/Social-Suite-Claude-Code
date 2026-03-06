@@ -9,6 +9,7 @@ import { BulkActionBar } from '@/components/inbox/BulkActionBar';
 import { SearchResults } from '@/components/inbox/SearchResults';
 import { CannedReplyPicker } from '@/components/inbox/CannedReplyPicker';
 import { AISuggestionsPanel } from '@/components/inbox/AISuggestionsPanel';
+import { CrisisAlertBanner } from '@/components/inbox/CrisisAlertBanner';
 import {
   Search,
   PanelRight,
@@ -33,6 +34,7 @@ import { useInboxLabels, useInboxCannedReplies, useAddConversationLabel, useRemo
 import { useInboxSearch } from '@/hooks/useInboxSearch';
 import { useInboxRealtime } from '@/hooks/useInboxRealtime';
 import { useDemo } from '@/lib/demo/DemoDataProvider';
+import { useTranslateMessage } from '@/hooks/useInboxAI';
 import type { ConversationStatus, ConversationType, InboxConversation, InboxMessage } from '@/lib/api/inbox';
 
 const platformTabIcons: { key: string; icon: React.ElementType; color: string }[] = [
@@ -94,6 +96,7 @@ export default function InboxPage() {
   const addNote = useAddInternalNote();
   const addLabel = useAddConversationLabel();
   const removeLabel = useRemoveConversationLabel();
+  const translateMessage = useTranslateMessage();
 
   // Filter by search locally
   const filteredConversations = useMemo(() => {
@@ -193,6 +196,23 @@ export default function InboxPage() {
     setComposerContent(content);
   }, []);
 
+  const handleTranslateComposer = useCallback(async (content: string) => {
+    if (!selectedConversation) return;
+    const targetLang = selectedConversation.detected_language || 'es';
+    try {
+      const result = await translateMessage.mutateAsync({
+        conversationId: selectedConversation.id,
+        content,
+        targetLanguage: targetLang,
+      });
+      if (result.translated) {
+        setComposerContent(result.translated);
+      }
+    } catch {
+      // Silently fail — translation is best-effort
+    }
+  }, [selectedConversation, translateMessage]);
+
   // Bulk actions
   const handleBulkMarkRead = useCallback(() => {
     selectedIds.forEach(id => markRead.mutate(id));
@@ -283,6 +303,9 @@ export default function InboxPage() {
             </button>
           </div>
         </div>
+
+        {/* Crisis alert banner */}
+        <CrisisAlertBanner />
 
         {/* === MAIN GRID === */}
         <div
@@ -457,6 +480,8 @@ export default function InboxPage() {
                     replyTo={replyTo}
                     onCancelReply={() => setReplyTo(null)}
                     defaultContent={composerContent}
+                    onTranslate={handleTranslateComposer}
+                    detectedLanguage={selectedConversation.detected_language || undefined}
                   />
                 </div>
               </>

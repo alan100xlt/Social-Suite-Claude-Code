@@ -54,6 +54,22 @@ Deno.serve(async (req) => {
         // Increment AI call counter
         await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
         break;
+      case 'suggest-reply-v2':
+        result = await suggestReplyV2(supabase, geminiApiKey, companyId, params.conversationId);
+        // Increment AI call counter
+        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        break;
+      case 'translate':
+        result = await translateMessage(supabase, geminiApiKey, companyId, params);
+        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        break;
+      case 'crisis-check':
+        result = await crisisCheck(supabase, geminiApiKey, companyId);
+        break;
+      case 'content-recycle-check':
+        result = await contentRecycleCheck(supabase, geminiApiKey, companyId, params.conversationId);
+        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        break;
       case 'save-feedback':
         result = await saveFeedback(supabase, companyId, userId, params);
         break;
@@ -299,4 +315,295 @@ async function saveFeedback(
   }
 
   return { feedback: data };
+}
+
+// ─── Phase 3: Suggest Reply V2 (type-aware, article-aware) ─────
+
+async function suggestReplyV2(
+  supabase: ReturnType<typeof createClient>,
+  apiKey: string,
+  companyId: string,
+  conversationId: string
+) {
+  const { conversation, messages } = await getConversationContext(supabase, companyId, conversationId);
+  const thread = formatMessagesForPrompt(messages);
+
+  // Fetch canned replies for fusion
+  const { data: cannedReplies } = await supabase
+    .from('inbox_canned_replies')
+    .select('id, title, content')
+    .eq('company_id', companyId)
+    .limit(20);
+
+  const cannedContext = (cannedReplies || []).length > 0
+    ? `\nAvailable canned replies (you may adapt/fuse these into suggestions):\n${(cannedReplies || []).map((r: { title: string; content: string }) => `- "${r.title}": ${r.content}`).join('\n')}`
+    : '';
+
+  // Article context for comment threads
+  const articleContext = conversation.article_title
+    ? `\nThis comment thread is on the article: "${conversation.article_title}"${conversation.article_url ? ` (${conversation.article_url})` : ''}`
+    : '';
+
+  // Classification context
+  const classContext = conversation.message_type
+    ? `\nMessage classified as: ${conversation.message_type}${conversation.message_subtype ? `/${conversation.message_subtype}` : ''} (editorial value: ${conversation.editorial_value || 'N/A'})`
+    : '';
+
+  const detectedLang = conversation.detected_language || 'en';
+
+  const prompt = `You are a social media editorial assistant for a media company. Generate reply suggestions for this ${conversation.platform} ${conversation.type} conversation.
+${classContext}${articleContext}
+
+Conversation:
+${thread}
+${cannedContext}
+
+IMPORTANT RULES:
+1. Reply in ${detectedLang} (match the sender's language)
+2. If this is about an article, naturally reference it
+3. For editorial/business messages (high editorial value), be professional and thorough
+4. For community messages, be warm and engaging
+5. For support messages, be helpful and solution-oriented
+6. For noise/trolling, suggest a brief, dignified response or recommend ignoring
+
+Return a JSON object with:
+- "recommended": { "content": string, "label": string (2-3 words), "reasoning": string (1 sentence why this is best) }
+- "alternatives": [{ "content": string, "label": string }] (exactly 2 alternatives)
+- "language": "${detectedLang}"
+- "fused_from_canned": boolean (true if any suggestion adapted a canned reply)
+
+Return ONLY the JSON object, no markdown or explanation.`;
+
+  const response = await callGemini(apiKey, prompt);
+  let data;
+  try {
+    data = JSON.parse(response);
+  } catch {
+    data = {
+      recommended: { content: '', label: 'Unable to generate', reasoning: 'AI response parsing failed' },
+      alternatives: [],
+      language: detectedLang,
+      fused_from_canned: false,
+    };
+  }
+
+  // Persist to inbox_ai_results
+  await supabase.from('inbox_ai_results').insert({
+    conversation_id: conversationId,
+    company_id: companyId,
+    result_type: 'suggestions',
+    result_data: data,
+    model_version: 'gemini-2.5-flash-preview-04-17',
+  }).catch(() => {});
+
+  return data;
+}
+
+// ─── Phase 5: Translation ─────
+
+async function translateMessage(
+  supabase: ReturnType<typeof createClient>,
+  apiKey: string,
+  companyId: string,
+  params: {
+    conversationId?: string;
+    messageId?: string;
+    content?: string;
+    targetLanguage: string;
+  }
+) {
+  let textToTranslate = params.content || '';
+
+  // If messageId provided, fetch the message content
+  if (params.messageId && !textToTranslate) {
+    const { data: msg } = await supabase
+      .from('inbox_messages')
+      .select('content')
+      .eq('id', params.messageId)
+      .eq('company_id', companyId)
+      .single();
+    if (msg) textToTranslate = msg.content;
+  }
+
+  if (!textToTranslate) {
+    return { translated: '', targetLanguage: params.targetLanguage };
+  }
+
+  const prompt = `Translate the following text to ${params.targetLanguage}. Return ONLY the translated text, nothing else. Preserve the original tone and style.
+
+Text: ${textToTranslate}`;
+
+  const translated = await callGemini(apiKey, prompt);
+
+  // Persist to inbox_ai_results if conversation context exists
+  if (params.conversationId) {
+    await supabase.from('inbox_ai_results').insert({
+      conversation_id: params.conversationId,
+      company_id: companyId,
+      result_type: 'translation',
+      result_data: {
+        original: textToTranslate,
+        translated,
+        targetLanguage: params.targetLanguage,
+        messageId: params.messageId || null,
+      },
+      model_version: 'gemini-2.5-flash-preview-04-17',
+    }).catch(() => {});
+  }
+
+  return { translated, targetLanguage: params.targetLanguage };
+}
+
+// ─── Phase 6: Crisis Detection ─────
+
+async function crisisCheck(
+  supabase: ReturnType<typeof createClient>,
+  apiKey: string,
+  companyId: string
+) {
+  // Load company's crisis settings
+  const { data: settings } = await supabase
+    .from('inbox_ai_settings')
+    .select('crisis_detection, crisis_threshold, crisis_window_minutes')
+    .eq('company_id', companyId)
+    .single();
+
+  if (!settings?.crisis_detection) {
+    return { crisis: false, reason: 'Crisis detection not enabled' };
+  }
+
+  const threshold = settings.crisis_threshold || 5;
+  const windowMinutes = settings.crisis_window_minutes || 30;
+  const since = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+
+  // Count negative-sentiment conversations in the window
+  const { data: negativeConvos, count } = await supabase
+    .from('inbox_conversations')
+    .select('id, last_message_preview, message_type, message_subtype', { count: 'exact' })
+    .eq('company_id', companyId)
+    .eq('sentiment', 'negative')
+    .gte('last_message_at', since)
+    .limit(10);
+
+  if (!count || count < threshold) {
+    return { crisis: false, negativeCount: count || 0, threshold };
+  }
+
+  // Check for existing active crisis to avoid duplicates
+  const { data: existingCrisis } = await supabase
+    .from('inbox_crisis_events')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('status', 'active')
+    .gte('created_at', since)
+    .limit(1);
+
+  if (existingCrisis && existingCrisis.length > 0) {
+    return { crisis: true, existing: true, eventId: existingCrisis[0].id };
+  }
+
+  // Cluster topics via Gemini
+  const previews = (negativeConvos || []).map((c: { last_message_preview: string }) => c.last_message_preview).join('\n');
+  const topicPrompt = `These are negative sentiment messages received by a media company in the last ${windowMinutes} minutes. Identify 1-3 common topics or themes. Return a JSON array of short topic strings.
+
+Messages:
+${previews}
+
+Return ONLY a JSON array like ["topic1", "topic2"], nothing else.`;
+
+  let topics: string[] = [];
+  try {
+    const topicResponse = await callGemini(apiKey, topicPrompt);
+    topics = JSON.parse(topicResponse);
+  } catch {
+    topics = ['unclassified'];
+  }
+
+  // Generate summary
+  const summaryPrompt = `Summarize this potential crisis for editors in 1-2 sentences. ${count} negative messages in ${windowMinutes} minutes about: ${topics.join(', ')}. Be factual, not alarmist.`;
+  let summary = '';
+  try {
+    summary = await callGemini(apiKey, summaryPrompt);
+  } catch {
+    summary = `${count} negative sentiment messages detected in the last ${windowMinutes} minutes.`;
+  }
+
+  const severity = count >= threshold * 2 ? 'critical' : 'warning';
+  const sampleIds = (negativeConvos || []).slice(0, 5).map((c: { id: string }) => c.id);
+
+  // Insert crisis event
+  const { data: event } = await supabase
+    .from('inbox_crisis_events')
+    .insert({
+      company_id: companyId,
+      status: 'active',
+      severity,
+      negative_count: count,
+      threshold,
+      window_minutes: windowMinutes,
+      topics,
+      sample_conversation_ids: sampleIds,
+      summary,
+    })
+    .select()
+    .single();
+
+  return { crisis: true, event, topics, summary };
+}
+
+// ─── Phase 7: Content Recycling ─────
+
+async function contentRecycleCheck(
+  supabase: ReturnType<typeof createClient>,
+  apiKey: string,
+  companyId: string,
+  conversationId?: string
+) {
+  // Find high-engagement articles from inbox data
+  const query = supabase
+    .from('inbox_conversations')
+    .select('id, article_title, article_url, editorial_value, sentiment, message_type, message_subtype, last_message_preview')
+    .eq('company_id', companyId)
+    .not('article_title', 'is', null)
+    .gte('editorial_value', 3)
+    .order('editorial_value', { ascending: false })
+    .limit(10);
+
+  if (conversationId) {
+    query.eq('id', conversationId);
+  }
+
+  const { data: candidates } = await query;
+
+  if (!candidates || candidates.length === 0) {
+    return { suggestions: [], reason: 'No high-value articles found' };
+  }
+
+  const articleList = candidates.map((c: { article_title: string; editorial_value: number; sentiment: string; message_type: string }) =>
+    `- "${c.article_title}" (signal: ${c.editorial_value}/5, sentiment: ${c.sentiment}, type: ${c.message_type})`
+  ).join('\n');
+
+  const prompt = `You are a social media strategist for a media company. These articles received high engagement from the audience via inbox messages. Suggest which ones to reshare/recycle and why.
+
+Articles with high audience engagement:
+${articleList}
+
+Return a JSON object with:
+- "suggestions": array of objects, each with:
+  - "article_title": string
+  - "reason": string (1 sentence why reshare)
+  - "suggested_angle": string (new angle for the reshare post)
+  - "best_platform": string (which platform to reshare on)
+
+Return ONLY the JSON object, no markdown.`;
+
+  const response = await callGemini(apiKey, prompt);
+  let data;
+  try {
+    data = JSON.parse(response);
+  } catch {
+    data = { suggestions: [] };
+  }
+
+  return data;
 }

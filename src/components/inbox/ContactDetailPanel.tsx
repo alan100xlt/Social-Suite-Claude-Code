@@ -25,6 +25,7 @@ import {
 import { formatDistanceToNow, format } from 'date-fns';
 import { ClassificationBadge } from './ClassificationBadge';
 import { SignalScoreBadge } from './SignalScoreBadge';
+import { CorrectionStatusDropdown } from './CorrectionStatusDropdown';
 import type { InboxConversation, InboxLabel } from '@/lib/api/inbox';
 
 interface ContactDetailPanelProps {
@@ -174,7 +175,23 @@ export function ContactDetailPanel({
               {conversation.correction_status && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">Correction</span>
-                  <Badge variant="destructive" className="text-xs capitalize">{conversation.correction_status}</Badge>
+                  <CorrectionStatusDropdown
+                    conversationId={conversation.id}
+                    currentStatus={conversation.correction_status}
+                  />
+                </div>
+              )}
+
+              {conversation.article_title && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Article</span>
+                  {conversation.article_url ? (
+                    <a href={conversation.article_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate max-w-[180px]">
+                      {conversation.article_title}
+                    </a>
+                  ) : (
+                    <span className="text-xs truncate max-w-[180px]">{conversation.article_title}</span>
+                  )}
                 </div>
               )}
             </div>

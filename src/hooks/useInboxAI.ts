@@ -90,6 +90,68 @@ export function useClassifyConversation() {
   });
 }
 
+export function useSuggestReplyV2() {
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      if (!selectedCompanyId) throw new Error('No company selected');
+      return invokeInboxAI<{
+        recommended: { content: string; label: string; reasoning: string };
+        alternatives: Array<{ content: string; label: string }>;
+        language: string;
+        fused_from_canned: boolean;
+      }>({
+        action: 'suggest-reply-v2',
+        companyId: selectedCompanyId,
+        conversationId,
+      });
+    },
+  });
+}
+
+export function useTranslateMessage() {
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId?: string;
+      messageId?: string;
+      content?: string;
+      targetLanguage: string;
+    }) => {
+      if (!selectedCompanyId) throw new Error('No company selected');
+      return invokeInboxAI<{ translated: string; targetLanguage: string }>({
+        action: 'translate',
+        companyId: selectedCompanyId,
+        ...params,
+      });
+    },
+  });
+}
+
+export function useContentRecycleCheck() {
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useMutation({
+    mutationFn: async (conversationId?: string) => {
+      if (!selectedCompanyId) throw new Error('No company selected');
+      return invokeInboxAI<{
+        suggestions: Array<{
+          article_title: string;
+          reason: string;
+          suggested_angle: string;
+          best_platform: string;
+        }>;
+      }>({
+        action: 'content-recycle-check',
+        companyId: selectedCompanyId,
+        conversationId,
+      });
+    },
+  });
+}
+
 export function useSaveFeedback() {
   const { selectedCompanyId } = useSelectedCompany();
   const queryClient = useQueryClient();

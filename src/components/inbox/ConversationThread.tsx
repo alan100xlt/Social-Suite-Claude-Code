@@ -3,7 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Bot, Check, Paperclip, ExternalLink } from 'lucide-react';
+import { Bot, Check, Paperclip, ExternalLink, Languages } from 'lucide-react';
 import type { InboxMessage, InboxConversation } from '@/lib/api/inbox';
 
 interface ConversationThreadProps {
@@ -214,7 +214,7 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
           )}
         </div>
 
-        {/* Timestamp + delivery status */}
+        {/* Timestamp + delivery status + translate */}
         <div className="flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
           <span>{format(new Date(message.created_at), 'HH:mm')}</span>
           {isBot && (
@@ -222,6 +222,13 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
               <Check className="h-3 w-3" /><Check className="h-3 w-3 -ml-1.5" /> Delivered
             </span>
           )}
+          <button
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-violet-600 flex items-center gap-0.5"
+            title="Translate message"
+            onClick={() => onReply?.(message)}
+          >
+            <Languages className="h-3 w-3" />
+          </button>
         </div>
       </div>
     </div>

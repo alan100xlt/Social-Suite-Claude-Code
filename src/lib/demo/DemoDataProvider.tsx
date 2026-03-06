@@ -207,6 +207,24 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     // Inbox canned replies (empty for demo)
     queryClient.setQueryData(['inbox-canned-replies', DEMO_COMPANY_ID], DEMO_INBOX_CANNED_REPLIES);
     queryClient.setQueryData(['inbox-auto-rules', DEMO_COMPANY_ID], DEMO_INBOX_AUTO_RULES);
+
+    // Inbox AI settings (demo defaults)
+    queryClient.setQueryData(['inbox-ai-settings', DEMO_COMPANY_ID], {
+      company_id: DEMO_COMPANY_ID,
+      company_type: 'media',
+      auto_classify: true,
+      smart_acknowledgment: false,
+      crisis_detection: true,
+      crisis_threshold: 5,
+      crisis_window_minutes: 30,
+      auto_translate: false,
+      content_recycling: false,
+      ai_calls_count: 142,
+      ai_calls_reset_at: new Date().toISOString(),
+    });
+
+    // No active crisis events for demo
+    queryClient.setQueryData(['inbox-crisis-events', DEMO_COMPANY_ID], []);
   }, [isDemo, queryClient]);
 
   const value = useMemo(() => ({ isDemo }), [isDemo]);

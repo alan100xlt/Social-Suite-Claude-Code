@@ -5,7 +5,7 @@ import { Loader2, Sparkles, Brain, FileText, Tag, X } from 'lucide-react';
 import { ClassificationBadge } from './ClassificationBadge';
 import { SignalScoreBadge } from './SignalScoreBadge';
 import { SentimentBadge } from './SentimentBadge';
-import { useAnalyzeSentiment, useSuggestReply, useSummarizeThread, useClassifyConversation } from '@/hooks/useInboxAI';
+import { useAnalyzeSentiment, useSuggestReplyV2, useSummarizeThread, useClassifyConversation, useTranslateMessage } from '@/hooks/useInboxAI';
 import type { InboxConversation } from '@/lib/api/inbox';
 
 interface AISuggestionsPanelProps {
@@ -15,11 +15,17 @@ interface AISuggestionsPanelProps {
 
 export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestionsPanelProps) {
   const analyzeSentiment = useAnalyzeSentiment();
-  const suggestReply = useSuggestReply();
+  const suggestReplyV2 = useSuggestReplyV2();
   const summarizeThread = useSummarizeThread();
   const classifyConversation = useClassifyConversation();
+  const translateMessage = useTranslateMessage();
 
-  const [suggestions, setSuggestions] = useState<Array<{ tone: string; content: string; label: string }>>([]);
+  const [replyData, setReplyData] = useState<{
+    recommended: { content: string; label: string; reasoning: string };
+    alternatives: Array<{ content: string; label: string }>;
+    language: string;
+    fused_from_canned: boolean;
+  } | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [sentimentResult, setSentimentResult] = useState<{ sentiment: string; confidence: number; topics: string[] } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -30,8 +36,8 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
   };
 
   const handleSuggest = async () => {
-    const result = await suggestReply.mutateAsync(conversation.id);
-    setSuggestions(result.suggestions || []);
+    const result = await suggestReplyV2.mutateAsync(conversation.id);
+    setReplyData(result);
   };
 
   const handleSummarize = async () => {
@@ -43,7 +49,7 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
     await classifyConversation.mutateAsync(conversation.id);
   };
 
-  const isLoading = analyzeSentiment.isPending || suggestReply.isPending || summarizeThread.isPending || classifyConversation.isPending;
+  const isLoading = analyzeSentiment.isPending || suggestReplyV2.isPending || summarizeThread.isPending || classifyConversation.isPending || translateMessage.isPending;
 
   if (collapsed) {
     return (
@@ -113,7 +119,7 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
           onClick={handleSuggest}
           disabled={isLoading}
         >
-          {suggestReply.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+          {suggestReplyV2.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
           Suggest
         </Button>
         <Button
@@ -150,26 +156,32 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
         </div>
       )}
 
-      {/* Suggested replies */}
-      {suggestions.length > 0 && (
+      {/* Suggested replies (V2 format) */}
+      {replyData?.recommended?.content && (
         <div className="px-4 pb-2.5">
-          <div className="p-3 rounded-lg bg-background border border-violet-200 dark:border-violet-500/20 border-l-[3px] border-l-violet-500 mb-2">
-            <p className="text-[13px] leading-relaxed">{suggestions[0]?.content}</p>
+          <div className="p-3 rounded-lg bg-background border border-violet-200 dark:border-violet-500/20 border-l-[3px] border-l-violet-500 mb-1.5">
+            <p className="text-[13px] leading-relaxed">{replyData.recommended.content}</p>
+            {replyData.recommended.reasoning && (
+              <p className="text-[10px] text-muted-foreground mt-1 italic">{replyData.recommended.reasoning}</p>
+            )}
           </div>
+          {replyData.fused_from_canned && (
+            <p className="text-[10px] text-violet-500 mb-1.5 px-0.5">Adapted from canned reply</p>
+          )}
           <div className="flex gap-1.5 flex-wrap">
             <button
-              onClick={() => onInsertReply(suggestions[0]?.content || '')}
+              onClick={() => onInsertReply(replyData.recommended.content)}
               className="px-3 py-1.5 rounded-full bg-violet-600 text-white text-[11.5px] font-semibold hover:bg-violet-700 transition-colors flex items-center gap-1.5"
             >
-              Use this reply
+              Use: {replyData.recommended.label}
             </button>
-            {suggestions.slice(1).map((s, i) => (
+            {replyData.alternatives.map((alt, i) => (
               <button
                 key={i}
-                onClick={() => onInsertReply(s.content)}
+                onClick={() => onInsertReply(alt.content)}
                 className="px-3 py-1.5 rounded-full border border-violet-200 dark:border-violet-500/30 text-violet-600 text-[11.5px] font-semibold hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors"
               >
-                {s.label}
+                {alt.label}
               </button>
             ))}
           </div>

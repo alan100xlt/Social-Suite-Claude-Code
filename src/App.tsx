@@ -52,6 +52,7 @@ const AdminPlatformConfig = React.lazy(() => import("./pages/AdminPlatformConfig
 const AdminDataManagement = React.lazy(() => import("./pages/AdminDataManagement"));
 const SuperadminCompanies = React.lazy(() => import("./pages/SuperadminCompanies"));
 const CronHealth = React.lazy(() => import("./pages/CronHealth"));
+const AdminAIHealth = React.lazy(() => import("./pages/AdminAIHealth"));
 const GetLateMapping = React.lazy(() => import("./pages/GetLateMapping"));
 const AgGridShowcase = React.lazy(() => import("./pages/AgGridShowcase"));
 const AgGridShowcaseV1 = React.lazy(() => import("./pages/AgGridShowcaseV1"));
@@ -64,6 +65,7 @@ const Progress = React.lazy(() => import("./pages/Progress"));
 const OperationsCenter = React.lazy(() => import("./pages/OperationsCenter"));
 const DesignPreview = React.lazy(() => import("./pages/DesignPreview"));
 const NivoShowcase = React.lazy(() => import("./pages/NivoShowcase"));
+const SocialIntelligence = React.lazy(() => import("./pages/SocialIntelligence"));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-screen">
@@ -123,6 +125,7 @@ const App = () => (
               <Route path="/app/analytics-v4" element={<ProtectedRoute><AnalyticsV4 /></ProtectedRoute>} />
               <Route path="/app/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
+              <Route path="/app/intelligence" element={<ProtectedRoute><SocialIntelligence /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
 
@@ -140,6 +143,7 @@ const App = () => (
               <Route path="/app/admin/api-logs" element={<ProtectedRoute><SuperAdminRoute><ApiLogs /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/mapping" element={<ProtectedRoute><SuperAdminRoute><GetLateMapping /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/cron-health" element={<ProtectedRoute><SuperAdminRoute><CronHealth /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/ai-health" element={<ProtectedRoute><SuperAdminRoute><AdminAIHealth /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/wizard" element={<ProtectedRoute><SuperAdminRoute><WizardVariations /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/progress" element={<ProtectedRoute><SuperAdminRoute><Progress /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/automation-logs" element={<ProtectedRoute><SuperAdminRoute><AutomationLogsPage /></SuperAdminRoute></ProtectedRoute>} />

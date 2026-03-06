@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Send, StickyNote, Loader2, Paperclip, Image, X } from 'lucide-react';
+import { Send, StickyNote, Loader2, Paperclip, Image, X, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { InboxMessage } from '@/lib/api/inbox';
 
@@ -21,6 +21,8 @@ interface MessageComposerProps {
   onCancelReply?: () => void;
   onSlashTrigger?: () => void;
   defaultContent?: string;
+  onTranslate?: (content: string) => void;
+  detectedLanguage?: string;
 }
 
 export function MessageComposer({
@@ -33,6 +35,8 @@ export function MessageComposer({
   onCancelReply,
   onSlashTrigger,
   defaultContent,
+  onTranslate,
+  detectedLanguage,
 }: MessageComposerProps) {
   const [content, setContent] = useState('');
   const [isNoteMode, setIsNoteMode] = useState(false);
@@ -156,6 +160,18 @@ export function MessageComposer({
               title="Add media URL"
             >
               <Paperclip className={cn('h-4 w-4', showAttachment && 'text-primary')} />
+            </Button>
+          )}
+
+          {onTranslate && content.trim() && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => onTranslate(content.trim())}
+              title={`Translate to ${detectedLanguage || 'detected language'}`}
+            >
+              <Languages className="h-4 w-4" />
             </Button>
           )}
 
