@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/authorize.ts';
 import { CronMonitor } from '../_shared/cron-monitor.ts';
 import { checkAndAutoRespond } from './auto-respond.ts';
+import { classifyConversation, setFallbackClassification } from '../_shared/classify.ts';
 
 const GETLATE_API_URL = 'https://getlate.dev/api/v1';
 
@@ -180,6 +181,51 @@ Deno.serve(async (req) => {
       logApiCall(supabase, 'sync-dms', targetCompany, dmResult, Date.now() - dmStart);
     }
 
+    // ── Phase 1: Auto-classify unclassified conversations (R1, R11) ──
+    let classificationsAttempted = 0;
+    let classificationsSucceeded = 0;
+    if (!pastDeadline() && targetCompany) {
+      try {
+        // Check if company has auto_classify enabled (R15 — defaults to false)
+        const { data: aiSettings } = await supabase
+          .from('inbox_ai_settings')
+          .select('auto_classify')
+          .eq('company_id', targetCompany.id)
+          .maybeSingle();
+
+        if (aiSettings?.auto_classify) {
+          const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+          if (geminiApiKey) {
+            // Get unclassified conversations (R1: skip-if-classified guard)
+            const { data: unclassified } = await supabase
+              .from('inbox_conversations')
+              .select('id')
+              .eq('company_id', targetCompany.id)
+              .is('ai_classified_at', null)
+              .order('last_message_at', { ascending: false })
+              .limit(10); // Batch size to stay within deadline
+
+            for (const conv of unclassified || []) {
+              if (pastDeadline()) break;
+              classificationsAttempted++;
+              try {
+                await classifyConversation(supabase, geminiApiKey, targetCompany.id, conv.id);
+                classificationsSucceeded++;
+                // Increment AI call counter (R3)
+                await supabase.rpc('increment_ai_calls', { _company_id: targetCompany.id }).catch(() => {});
+              } catch (classifyErr) {
+                console.error(`Classification failed for ${conv.id}:`, classifyErr);
+                // Gemini-down fallback (R1)
+                await setFallbackClassification(supabase, targetCompany.id, conv.id).catch(() => {});
+              }
+            }
+          }
+        }
+      } catch (classifyErr) {
+        console.error('Classification batch error:', classifyErr);
+      }
+    }
+
     // Finalize
     const totalNew = results.reduce((s: number, r: SyncResult) => s + r.new_items, 0);
     const totalErrors = results.reduce((s: number, r: SyncResult) => s + r.errors.length, 0);
@@ -188,6 +234,8 @@ Deno.serve(async (req) => {
       company: targetCompany.id,
       totalNew,
       totalErrors,
+      classificationsAttempted,
+      classificationsSucceeded,
       bailedEarly: pastDeadline(),
       durationMs: Date.now() - startTime,
       results: results.map(r => ({
@@ -364,6 +412,26 @@ async function syncComments(
 
                 if (convError) { result.errors.push(`Conv insert: ${convError.message}`); continue; }
                 conversationId = newConv.id;
+
+                // Phase 1B-article: Wire article join for comment conversations
+                if (post.postId) {
+                  try {
+                    const { data: feedItem } = await supabase
+                      .from('rss_feed_items')
+                      .select('link, title')
+                      .eq('post_id', post.postId)
+                      .maybeSingle();
+
+                    if (feedItem?.link) {
+                      await supabase.from('inbox_conversations').update({
+                        article_url: feedItem.link,
+                        article_title: feedItem.title,
+                      }).eq('id', conversationId);
+                    }
+                  } catch {
+                    // Non-fatal — article linking is best-effort (R8)
+                  }
+                }
               }
 
               const platformMsgId = comment.id;
