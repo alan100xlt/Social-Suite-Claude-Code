@@ -86,6 +86,10 @@ export default function ContentV2() {
         feedName: fi.feed_name,
         publishedAt: fi.published_at,
         status,
+        imageUrl: fi.image_url,
+        ogImageUrl: fi.og_image_url,
+        ogTemplateId: fi.og_template_id,
+        ogAiReasoning: fi.og_ai_reasoning,
         platformStatuses,
       };
     });

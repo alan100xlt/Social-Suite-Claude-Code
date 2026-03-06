@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/tooltip';
 import { Image, RefreshCw, ChevronDown, Sparkles, Loader2 } from 'lucide-react';
 import { useRegenerateOgImage, OG_TEMPLATES } from '@/hooks/useOgImage';
+import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
+import { isDemoCompany } from '@/lib/demo/demo-constants';
 
 interface OgImagePreviewProps {
   feedItemId: string;
@@ -37,17 +39,30 @@ export function OgImagePreview({
   hasArticleImage,
 }: OgImagePreviewProps) {
   const [imgError, setImgError] = useState(false);
+  const [cacheBuster, setCacheBuster] = useState(0);
   const regenerate = useRegenerateOgImage();
+  const { selectedCompanyId } = useSelectedCompany();
+  const isDemo = isDemoCompany(selectedCompanyId);
 
   const currentTemplate = OG_TEMPLATES.find(t => t.id === ogTemplateId);
   const availableTemplates = OG_TEMPLATES.filter(t => !t.requiresImage || hasArticleImage);
 
+  // Append cache-buster to force browser to refetch after regeneration
+  const displayUrl = ogImageUrl && cacheBuster > 0
+    ? `${ogImageUrl}?t=${cacheBuster}`
+    : ogImageUrl;
+
+  const onMutationSuccess = () => {
+    setImgError(false);
+    setCacheBuster(Date.now());
+  };
+
   const handleTemplateChange = (templateId: string) => {
-    regenerate.mutate({ feedItemId, templateId });
+    regenerate.mutate({ feedItemId, templateId }, { onSuccess: onMutationSuccess });
   };
 
   const handleRegenerate = () => {
-    regenerate.mutate({ feedItemId });
+    regenerate.mutate({ feedItemId }, { onSuccess: onMutationSuccess });
   };
 
   return (
@@ -77,10 +92,10 @@ export function OgImagePreview({
       </div>
 
       {/* Image preview */}
-      {ogImageUrl && !imgError ? (
+      {(ogImageUrl || regenerate.isSuccess) && !imgError ? (
         <div className="relative rounded-lg overflow-hidden border border-border bg-muted">
           <img
-            src={ogImageUrl}
+            src={displayUrl || ogImageUrl || ''}
             alt="OG preview"
             className="w-full aspect-[1200/630] object-cover"
             onError={() => setImgError(true)}
@@ -103,7 +118,7 @@ export function OgImagePreview({
           variant="outline"
           size="sm"
           onClick={handleRegenerate}
-          disabled={regenerate.isPending}
+          disabled={regenerate.isPending || isDemo}
         >
           {regenerate.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
@@ -115,7 +130,7 @@ export function OgImagePreview({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={regenerate.isPending}>
+            <Button variant="outline" size="sm" disabled={regenerate.isPending || isDemo}>
               Change Template
               <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
             </Button>

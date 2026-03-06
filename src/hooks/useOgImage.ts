@@ -35,6 +35,7 @@ export function useGenerateOgImage() {
       callOgFunction('generate', { feedItemId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rss-feed-items'] });
+      queryClient.invalidateQueries({ queryKey: ['all-feed-items'] });
       toast({ title: 'OG Image Generated', description: 'Preview image has been created.' });
     },
     onError: (error) => {
@@ -56,6 +57,7 @@ export function useRegenerateOgImage() {
       callOgFunction('regenerate', { feedItemId, templateId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rss-feed-items'] });
+      queryClient.invalidateQueries({ queryKey: ['all-feed-items'] });
       toast({ title: 'OG Image Regenerated', description: 'Preview image has been updated.' });
     },
     onError: (error) => {

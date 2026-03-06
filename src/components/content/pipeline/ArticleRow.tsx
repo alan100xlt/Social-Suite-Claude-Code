@@ -6,6 +6,15 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { FaInstagram, FaTwitter, FaFacebook, FaLinkedin, FaTiktok, FaYoutube } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
+import { OgImagePreview } from "@/components/content/OgImagePreview";
+import { Newspaper } from "lucide-react";
+
+/** Decode HTML entities like &#8220; &#8221; &amp; etc. */
+function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = text;
+  return textarea.value;
+}
 
 const platformIcons: Record<string, React.ElementType> = {
   instagram: FaInstagram,
@@ -34,6 +43,10 @@ export interface ArticleRowData {
   feedName: string;
   publishedAt: string | null;
   status: string;
+  imageUrl: string | null;
+  ogImageUrl: string | null;
+  ogTemplateId: string | null;
+  ogAiReasoning: string | null;
   platformStatuses: Array<{
     platform: string;
     status: "success" | "error" | "not_targeted" | "draft";
@@ -69,10 +82,23 @@ export function ArticleRow({ article, onGeneratePosts }: ArticleRowProps) {
           )}
         </div>
 
+        {article.imageUrl ? (
+          <img
+            src={article.imageUrl}
+            alt=""
+            className="h-[50px] w-[50px] shrink-0 rounded-md object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-md bg-muted">
+            <Newspaper className="h-5 w-5 text-muted-foreground/50" />
+          </div>
+        )}
+
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h4 className="truncate text-sm font-medium">
-              {article.title || "Untitled Article"}
+              {article.title ? decodeHtmlEntities(article.title) : "Untitled Article"}
             </h4>
             {article.link && (
               <a
@@ -122,7 +148,7 @@ export function ArticleRow({ article, onGeneratePosts }: ArticleRowProps) {
       </div>
 
       {expanded && (
-        <div className="border-t bg-muted/20 px-4 py-3 pl-11">
+        <div className="border-t bg-muted/20 px-4 py-3 pl-11 space-y-4">
           {hasPosts ? (
             <div className="space-y-2">
               {article.platformStatuses.map((ps) => {
@@ -174,6 +200,14 @@ export function ArticleRow({ article, onGeneratePosts }: ArticleRowProps) {
               </Button>
             </div>
           )}
+
+          <OgImagePreview
+            feedItemId={article.id}
+            ogImageUrl={article.ogImageUrl}
+            ogTemplateId={article.ogTemplateId}
+            ogAiReasoning={article.ogAiReasoning}
+            hasArticleImage={!!article.imageUrl}
+          />
         </div>
       )}
     </div>
