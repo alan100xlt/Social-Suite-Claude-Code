@@ -231,6 +231,7 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const monitor = new CronMonitor('getlate-changelog-monitor', supabase);
+  await monitor.start();
 
   try {
     await authorize(req, { allowServiceRole: true });
@@ -243,19 +244,19 @@ Deno.serve(async (req) => {
   const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
 
   if (!anthropicApiKey) {
+    await monitor.error('ANTHROPIC_API_KEY not configured');
     return new Response(
       JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
   if (!slackWebhookUrl) {
+    await monitor.error('SLACK_WEBHOOK_URL not configured');
     return new Response(
       JSON.stringify({ success: false, error: 'SLACK_WEBHOOK_URL not configured' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-
-  await monitor.start();
 
   try {
     // 1. Get last processed entry ID
