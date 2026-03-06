@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,20 @@ export function OgSettingsTab() {
   const current = settings || DEFAULT_SETTINGS;
   const disabledIds = new Set(settings?.disabled_template_ids || []);
 
+  // Local state for text inputs to avoid mutate-per-keystroke
+  const [localBrandColor, setLocalBrandColor] = useState(current.brand_color || '#3B82F6');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sync local state when server data changes
+  useEffect(() => {
+    if (settings?.brand_color) setLocalBrandColor(settings.brand_color);
+  }, [settings?.brand_color]);
+
+  const debouncedMutate = useCallback((updates: Partial<OgCompanySettings>) => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => updateSettings.mutate(updates), 500);
+  }, [updateSettings]);
+
   const filteredTemplates = useMemo(() => {
     if (!search) return OG_TEMPLATES;
     const q = search.toLowerCase();
@@ -83,7 +97,8 @@ export function OgSettingsTab() {
   };
 
   const handleBrandColorChange = (color: string) => {
-    updateSettings.mutate({ brand_color: color });
+    setLocalBrandColor(color);
+    debouncedMutate({ brand_color: color });
   };
 
   const handleToggleTemplate = (templateId: string) => {
@@ -150,12 +165,12 @@ export function OgSettingsTab() {
               <div className="flex items-center gap-2">
                 <input
                   type="color"
-                  value={current.brand_color || '#3B82F6'}
+                  value={localBrandColor}
                   onChange={(e) => handleBrandColorChange(e.target.value)}
                   className="h-9 w-12 rounded border cursor-pointer"
                 />
                 <Input
-                  value={current.brand_color || '#3B82F6'}
+                  value={localBrandColor}
                   onChange={(e) => handleBrandColorChange(e.target.value)}
                   className="font-mono text-sm"
                   placeholder="#3B82F6"
@@ -168,12 +183,12 @@ export function OgSettingsTab() {
                 <input
                   type="color"
                   value={current.brand_color_secondary || '#6366F1'}
-                  onChange={(e) => updateSettings.mutate({ brand_color_secondary: e.target.value })}
+                  onChange={(e) => debouncedMutate({ brand_color_secondary: e.target.value })}
                   className="h-9 w-12 rounded border cursor-pointer"
                 />
                 <Input
                   value={current.brand_color_secondary || ''}
-                  onChange={(e) => updateSettings.mutate({ brand_color_secondary: e.target.value || null })}
+                  onChange={(e) => debouncedMutate({ brand_color_secondary: e.target.value || null })}
                   className="font-mono text-sm"
                   placeholder="Optional"
                 />
@@ -223,7 +238,7 @@ export function OgSettingsTab() {
               <Label>Logo URL (light background)</Label>
               <Input
                 value={current.logo_url || ''}
-                onChange={(e) => updateSettings.mutate({ logo_url: e.target.value || null })}
+                onChange={(e) => debouncedMutate({ logo_url: e.target.value || null })}
                 placeholder="https://..."
               />
             </div>
@@ -231,7 +246,7 @@ export function OgSettingsTab() {
               <Label>Logo URL (dark background)</Label>
               <Input
                 value={current.logo_dark_url || ''}
-                onChange={(e) => updateSettings.mutate({ logo_dark_url: e.target.value || null })}
+                onChange={(e) => debouncedMutate({ logo_dark_url: e.target.value || null })}
                 placeholder="https://..."
               />
             </div>
