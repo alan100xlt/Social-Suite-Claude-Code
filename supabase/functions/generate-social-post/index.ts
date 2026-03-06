@@ -24,8 +24,7 @@ const platformRules: Record<string, string> = {
 
 // Rough cost per 1M tokens (USD) for supported models
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  "gemini-2.5-flash": { input: 0.15, output: 0.60 },
-  "gemini-2.5-pro": { input: 1.25, output: 10.0 },
+  "gemini-3.1-flash-lite-preview": { input: 0.075, output: 0.30 },
 };
 
 function extractTokenUsage(data: Record<string, unknown>) {
@@ -120,7 +119,7 @@ serve(async (req) => {
     );
 
     const objectiveInstruction = objectivePrompts[objective] || objectivePrompts.reach;
-    const model = "gemini-2.5-flash";
+    const model = "gemini-3.1-flash-lite-preview";
     const platformList = (platforms as string[]) || [];
 
     // --- Voice Settings Resolution ---
@@ -212,6 +211,7 @@ serve(async (req) => {
             Authorization: `Bearer ${GEMINI_API_KEY}`,
             "Content-Type": "application/json",
           },
+          signal: AbortSignal.timeout(30_000),
           body: JSON.stringify(requestBody),
         }
       );

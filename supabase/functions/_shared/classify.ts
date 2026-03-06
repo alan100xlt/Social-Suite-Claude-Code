@@ -248,7 +248,7 @@ export async function classifyConversation(
       company_id: companyId,
       result_type: 'classification',
       result_data: result as unknown as Record<string, unknown>,
-      model_version: 'gemini-2.5-flash',
+      model_version: 'gemini-3.1-flash-lite-preview',
     });
 
   return result;

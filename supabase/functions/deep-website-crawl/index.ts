@@ -433,8 +433,9 @@ async function analyzeWithAI(markdown: string, url: string): Promise<AIAnalysisR
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(30_000),
       body: JSON.stringify({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.1-flash-lite-preview',
         messages: [
           { role: 'system', content: 'You are a business analyst expert. Analyze website content to extract detailed business intelligence. Be specific and accurate based only on the content provided.' },
           { role: 'user', content: `Analyze this website content and extract business intelligence:\n\nURL: ${url}\n\nWEBSITE CONTENT:\n${contentForAI}\n\nExtract:\n1. Business name (exact name)\n2. Business type\n3. Main offerings (up to 8)\n4. Blog themes\n5. Location (city, state)\n6. Value propositions\n7. Competitive differentiators\n8. Content opportunities` },

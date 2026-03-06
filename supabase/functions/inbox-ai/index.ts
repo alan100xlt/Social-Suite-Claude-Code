@@ -195,7 +195,7 @@ Return ONLY the JSON object, no markdown or explanation.`;
     company_id: companyId,
     result_type: 'sentiment',
     result_data: analysis,
-    model_version: 'gemini-2.5-flash',
+    model_version: 'gemini-3.1-flash-lite-preview',
   });
 
   return { analysis };
@@ -271,7 +271,7 @@ Return ONLY the JSON object, no markdown or explanation.`;
     company_id: companyId,
     result_type: 'summary',
     result_data: data,
-    model_version: 'gemini-2.5-flash',
+    model_version: 'gemini-3.1-flash-lite-preview',
   });
 
   return { summary: data.summary };
@@ -411,7 +411,7 @@ Return ONLY the JSON object, no markdown or explanation.`;
     company_id: companyId,
     result_type: 'suggestions',
     result_data: data,
-    model_version: 'gemini-2.5-flash',
+    model_version: 'gemini-3.1-flash-lite-preview',
   });
 
   return data;
@@ -465,7 +465,7 @@ Text: ${textToTranslate}`;
         targetLanguage: params.targetLanguage,
         messageId: params.messageId || null,
       },
-      model_version: 'gemini-2.5-flash',
+      model_version: 'gemini-3.1-flash-lite-preview',
     });
   }
 

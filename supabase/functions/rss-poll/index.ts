@@ -94,8 +94,9 @@ async function crawlArticleContent(url: string, articleTitle: string): Promise<s
             'Authorization': `Bearer ${geminiKey}`,
             'Content-Type': 'application/json',
           },
+          signal: AbortSignal.timeout(30_000),
           body: JSON.stringify({
-            model: 'gemini-2.5-flash-lite',
+            model: 'gemini-3.1-flash-lite-preview',
             messages: [
               {
                 role: 'system',
