@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
         result = await addLabel(supabase, companyId, params.conversationId, params.labelId);
         break;
       case 'remove-label':
-        result = await removeLabel(supabase, params.conversationId, params.labelId);
+        result = await removeLabel(supabase, companyId, params.conversationId, params.labelId);
         break;
       case 'add-note':
         result = await addInternalNote(supabase, companyId, params.conversationId, auth.userId, params.content);
@@ -248,14 +248,15 @@ async function replyToComment(
   apiKey: string,
   params: { conversationId: string; content: string; parentCommentId?: string }
 ) {
-  // Get conversation to find platform info
+  // Get conversation to find platform info — verify it belongs to this company
   const { data: conv } = await supabase
     .from('inbox_conversations')
     .select('platform, platform_conversation_id, post_id')
     .eq('id', params.conversationId)
+    .eq('company_id', companyId)
     .single();
 
-  if (!conv) throw new Error('Conversation not found');
+  if (!conv) throw new Error('Conversation not found or does not belong to this company');
 
   // Send reply via GetLate API
   const response = await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
@@ -308,13 +309,15 @@ async function replyToDM(
   apiKey: string,
   params: { conversationId: string; content: string; mediaUrl?: string }
 ) {
+  // Verify conversation belongs to this company
   const { data: conv } = await supabase
     .from('inbox_conversations')
     .select('platform, platform_conversation_id')
     .eq('id', params.conversationId)
+    .eq('company_id', companyId)
     .single();
 
-  if (!conv) throw new Error('Conversation not found');
+  if (!conv) throw new Error('Conversation not found or does not belong to this company');
 
   const dmConvId = conv.platform_conversation_id?.replace(`dm-${conv.platform}-`, '');
 
@@ -458,9 +461,20 @@ async function addLabel(
 
 async function removeLabel(
   supabase: ReturnType<typeof createClient>,
+  companyId: string,
   conversationId: string,
   labelId: string
 ) {
+  // Verify conversation belongs to this company before removing label
+  const { data: conv } = await supabase
+    .from('inbox_conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (!conv) throw new Error('Conversation not found or does not belong to this company');
+
   const { error } = await supabase
     .from('inbox_conversation_labels')
     .delete()

@@ -30,5 +30,8 @@ scripts/slack-agent/.listener.pid
 .claude/approval-state*.json
 supabase/functions/.env
 
+# E2E test auth state (contains session tokens)
+src/tests/end-to-end/.auth/
+
 # Worktrees
 .worktrees

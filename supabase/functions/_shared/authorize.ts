@@ -58,11 +58,8 @@ export async function authorize(
       ? authHeader.slice(7).trim()
       : authHeader.trim();
 
-    // Check if token matches service_role key or anon key
-    if (
-      (supabaseServiceKey && token === supabaseServiceKey) ||
-      (supabaseAnonKey && token === supabaseAnonKey)
-    ) {
+    // Check if token matches service_role key only (never accept anon key as service role)
+    if (supabaseServiceKey && token === supabaseServiceKey) {
       return {
         userId: "service_role",
         email: "service_role",

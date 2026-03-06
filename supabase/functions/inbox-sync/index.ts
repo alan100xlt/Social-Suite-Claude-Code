@@ -67,6 +67,18 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Auth: only service role can invoke this (called by pg_cron dispatcher)
+  try {
+    const { authorize } = await import('../_shared/authorize.ts');
+    await authorize(req, { allowServiceRole: true });
+  } catch (authErr) {
+    if (authErr instanceof Response) return authErr;
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const startTime = Date.now();
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
