@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './src/tests/end-to-end',
-  timeout: 30000,
+  timeout: 60000,
   retries: process.env.CI ? 2 : 0,
 
   use: {

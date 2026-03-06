@@ -1,6 +1,12 @@
 {
   "permissions": {
     "allow": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
       "mcp__plugin_playwright_playwright__browser_navigate",
       "mcp__plugin_playwright_playwright__browser_click",
       "mcp__plugin_supabase_supabase__list_projects",
@@ -42,7 +48,23 @@
       "mcp__playwright__browser_navigate",
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:shadcnuikit.com)",
-      "mcp__claude_ai_Linear__list_issue_labels"
+      "mcp__claude_ai_Linear__list_issue_labels",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_take_screenshot",
+      "WebFetch(domain:front.com)",
+      "WebFetch(domain:www.saasframe.io)",
+      "WebFetch(domain:bricxlabs.com)",
+      "WebFetch(domain:shadcnstudio.com)",
+      "WebFetch(domain:www.youtube.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:ogimage.io)",
+      "WebFetch(domain:og-image.org)",
+      "mcp__figma__get_metadata",
+      "mcp__figma__whoami"
     ]
   }
 }

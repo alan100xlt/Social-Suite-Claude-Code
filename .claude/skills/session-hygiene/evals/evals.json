@@ -60,6 +60,26 @@
           "description": "Warning names the specific reason (topic switch + multiple tasks) not generic advice"
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Context: session has completed 3+ tasks (research, created 8 eval files, updated memory). User now says: 'I want to build a brand new OG Image Generator tool'",
+      "expected_output": "Issues session hygiene warning and STOPS. Does not continue with brainstorming questions or any other action in the same message. Waits for user to decide whether to continue or start fresh.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "warning-fires",
+          "description": "Issues a session hygiene warning when a new major feature is requested after 3+ completed tasks"
+        },
+        {
+          "name": "stops-after-warning",
+          "description": "Does NOT continue with follow-up questions, brainstorming, or any other action after the warning — waits for user response"
+        },
+        {
+          "name": "no-steamrolling",
+          "description": "The warning is the ONLY content in the response, not a preamble before continuing work"
+        }
+      ]
     }
   ]
 }

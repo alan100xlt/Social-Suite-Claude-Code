@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Remediation System — Explained</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --card: #12121a;
+    --card-border: #1e1e2e;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --accent: #22c55e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.4rem; margin: 2.5rem 0 1rem; color: var(--accent); }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
+  p { margin-bottom: 1rem; color: var(--text); }
+  .subtitle { color: var(--muted); font-size: 1rem; margin-bottom: 2rem; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .gap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 700px) { .gap-grid { grid-template-columns: 1fr; } }
+
+  .gap-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    border-left: 3px solid var(--red);
+  }
+  .gap-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--red); margin-bottom: 0.5rem; }
+  .gap-card h4 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+  .gap-card p { font-size: 0.85rem; color: var(--muted); margin-bottom: 0; }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 1.5rem 0;
+    justify-content: center;
+  }
+  .flow-box {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 0.75rem 1.25rem;
+    text-align: center;
+    font-size: 0.85rem;
+    min-width: 120px;
+  }
+  .flow-box.highlight { border-color: var(--accent); box-shadow: 0 0 12px rgba(34,197,94,0.15); }
+  .flow-arrow { color: var(--muted); font-size: 1.2rem; }
+
+  .layer {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .layer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+  }
+  .layer.l1::before { background: var(--blue); }
+  .layer.l2::before { background: var(--purple); }
+  .layer.l3::before { background: var(--green); }
+  .layer.l4::before { background: var(--yellow); }
+  .layer-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 0.75rem;
+  }
+  .layer.l1 .layer-badge { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .layer.l2 .layer-badge { background: rgba(168,85,247,0.15); color: var(--purple); }
+  .layer.l3 .layer-badge { background: rgba(34,197,94,0.15); color: var(--green); }
+  .layer.l4 .layer-badge { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+  th { text-align: left; padding: 0.6rem; border-bottom: 1px solid var(--card-border); color: var(--muted); font-weight: 500; }
+  td { padding: 0.6rem; border-bottom: 1px solid rgba(30,30,46,0.5); }
+  tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .badge.green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge.yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge.red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge.blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge.purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+
+  .question {
+    background: rgba(234,179,8,0.05);
+    border: 1px solid rgba(234,179,8,0.2);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .question h4 { color: var(--yellow); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .question p { font-size: 0.85rem; color: var(--text); margin-bottom: 0; }
+
+  .extension {
+    background: rgba(168,85,247,0.05);
+    border: 1px solid rgba(168,85,247,0.2);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .extension h4 { color: var(--purple); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .extension p { font-size: 0.85rem; color: var(--text); margin-bottom: 0; }
+
+  .diagram {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--muted);
+    margin: 1rem 0;
+  }
+  .diagram .green { color: var(--green); }
+  .diagram .red { color: var(--red); }
+  .diagram .yellow { color: var(--yellow); }
+  .diagram .blue { color: var(--blue); }
+  .diagram .purple { color: var(--purple); }
+
+  .stat-row {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    flex: 1;
+    min-width: 140px;
+    text-align: center;
+  }
+  .stat .number { font-size: 1.5rem; font-weight: 700; }
+  .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+</style>
+</head>
+<body>
+
+<h1>Universal Remediation System</h1>
+<p class="subtitle">How we make the platform self-healing — automatically detecting, diagnosing, and fixing errors across every edge function, webhook, and API call.</p>
+
+<h2>The Problem Today</h2>
+<p>We have <strong>41 edge functions</strong>, but error handling is inconsistent. Some log errors, some don't. Some retry, most don't. When something breaks at 3am, nobody knows until a user complains.</p>
+
+<div class="stat-row">
+  <div class="stat"><div class="number" style="color: var(--red)">4</div><div class="label">Cron jobs — only 3 have alerting</div></div>
+  <div class="stat"><div class="number" style="color: var(--yellow)">9</div><div class="label">Functions log API calls (copy-pasted)</div></div>
+  <div class="stat"><div class="number" style="color: var(--red)">2</div><div class="label">Functions have ANY retry logic</div></div>
+  <div class="stat"><div class="number" style="color: var(--red)">0</div><div class="label">Inbox Slack alerts</div></div>
+</div>
+
+<div class="gap-grid">
+  <div class="gap-card">
+    <div class="label">Gap 1</div>
+    <h4>The watchdog is blind to inbox failures</h4>
+    <p>inbox-sync logs errors as "partial success" — but the watchdog only looks for "error". It never triggers remediation for the most failure-prone function.</p>
+  </div>
+  <div class="gap-card">
+    <div class="label">Gap 2</div>
+    <h4>Crashes vanish silently</h4>
+    <p>If inbox-sync crashes entirely, it returns HTTP 500 but writes nothing to the health log. The watchdog still sees the last successful run. Nobody knows.</p>
+  </div>
+  <div class="gap-card">
+    <div class="label">Gap 3</div>
+    <h4>No Slack alerts for inbox</h4>
+    <p>The alerting system exists (CronMonitor) but inbox-sync doesn't use it. Zero notifications for inbox pipeline failures, ever.</p>
+  </div>
+  <div class="gap-card">
+    <div class="label">Gap 4</div>
+    <h4>Retry = re-process everything</h4>
+    <p>When the watchdog does retry a job, it re-syncs ALL companies. One broken company causes unnecessary load on 20 healthy ones.</p>
+  </div>
+</div>
+
+<h2>The Solution: Four Layers</h2>
+<p>Instead of fixing just inbox, we build a universal system that any edge function can plug into.</p>
+
+<div class="layer l1">
+  <div class="layer-badge">Layer 1 — Shared Utilities</div>
+  <h3>The building blocks every function uses</h3>
+  <p>Three shared modules that replace copy-pasted code across the codebase:</p>
+  <table>
+    <tr><th>Module</th><th>What it does</th><th>Replaces</th></tr>
+    <tr>
+      <td><code>fetchWithRetry()</code></td>
+      <td>Wraps any external HTTP call with automatic retry. Handles 429 rate limits (waits), 5xx server errors (retries), timeouts (retries). Backs off exponentially.</td>
+      <td>Ad-hoc retry loops in 2 functions, zero retry in 39 others</td>
+    </tr>
+    <tr>
+      <td><code>logApiCall()</code></td>
+      <td>One-line logging to api_call_logs with function name, duration, success/fail, company context.</td>
+      <td>Copy-pasted logging code in 9 functions</td>
+    </tr>
+    <tr>
+      <td><code>diagnoseError()</code></td>
+      <td>Takes any error string, returns: what went wrong, why, how to fix it, and whether it can fix itself.</td>
+      <td>The client-side diagnosis engine in WebhookHealthTab (now shared)</td>
+    </tr>
+  </table>
+</div>
+
+<div class="layer l2">
+  <div class="layer-badge">Layer 2 — Remediation Engine</div>
+  <h3>The brain that decides what to do about errors</h3>
+  <p>A new edge function (<code>edge-remediation</code>) + database table that tracks every error across the platform.</p>
+
+  <p><strong>When an error happens:</strong> The failing function sends a fire-and-forget message to the remediation engine. The engine diagnoses it and decides:</p>
+
+  <table>
+    <tr><th>Error Type</th><th>Example</th><th>Automatic Action</th></tr>
+    <tr>
+      <td><span class="badge green">Auto-resolve</span></td>
+      <td>Duplicate database entry</td>
+      <td>Mark resolved immediately. These are benign.</td>
+    </tr>
+    <tr>
+      <td><span class="badge yellow">Auto-retry</span></td>
+      <td>Rate limit (429), timeout, server error (503)</td>
+      <td>Queue for retry. Re-sync just the failed company in 10 minutes. Retry up to 3 times.</td>
+    </tr>
+    <tr>
+      <td><span class="badge red">Escalate</span></td>
+      <td>Auth failure (expired API key), database schema error</td>
+      <td>Send Slack alert immediately with the reason and exact fix steps. Needs a human.</td>
+    </tr>
+    <tr>
+      <td><span class="badge red">Exhausted retries</span></td>
+      <td>Timeout that keeps happening after 3 retries</td>
+      <td>Stop retrying, escalate to Slack. Something deeper is wrong.</td>
+    </tr>
+  </table>
+
+  <p><strong>The retry is targeted, not brute-force.</strong> Instead of re-running the entire inbox-sync (which processes all 20 companies), the remediation engine calls inbox-sync with just the one failing company ID. Healthy companies are untouched.</p>
+</div>
+
+<div class="layer l3">
+  <div class="layer-badge">Layer 3 — Wiring</div>
+  <h3>Connecting existing functions to the system</h3>
+  <p>Each function gets a one-line fire-and-forget call after errors. This is not a rewrite — it's adding a single POST request at the end of error handling. The function's behavior doesn't change at all.</p>
+  <p>Priority order: inbox-sync (most failure-prone) > analytics-sync > rss-poll > getlate-* proxies</p>
+</div>
+
+<div class="layer l4">
+  <div class="layer-badge">Layer 4 — Visibility</div>
+  <h3>The Operations Center shows everything in real-time</h3>
+  <p>The Webhook Health tab becomes a "Remediation" tab showing the queue: what's open, what's being retried, what's been escalated, what resolved itself. One-click manual resolve for anything.</p>
+</div>
+
+<h2>How It Works End-to-End</h2>
+
+<div class="diagram"><span class="blue">inbox-sync runs every 5 minutes</span>
+  |
+  |-- Company A: <span class="green">success</span> (no action)
+  |-- Company B: <span class="red">2 errors</span>
+  |     |
+  |     +-- fire-and-forget --> <span class="purple">edge-remediation { diagnose }</span>
+  |           |
+  |           |-- Error 1: "GetLate API returned 429"
+  |           |     Category: <span class="yellow">rate_limit</span>
+  |           |     Reason: "Too many requests — API is throttling us"
+  |           |     Action: <span class="yellow">Queue for retry in 10 min</span>
+  |           |
+  |           |-- Error 2: "GetLate API returned 401"
+  |                 Category: <span class="red">auth_failure</span>
+  |                 Reason: "API key expired or rotated"
+  |                 Action: <span class="red">Slack alert + escalate</span>
+  |                 Message: "Verify GETLATE_API_KEY in Supabase secrets..."
+  |
+  |-- Company C: <span class="green">success</span> (no action)
+
+<span class="purple">edge-remediation cron runs every 10 minutes</span>
+  |
+  |-- Picks up Company B rate_limit entry (retry #1)
+  |     |
+  |     +-- POST inbox-sync <span class="blue">{ companyId: "B" }</span>  (only Company B, not all)
+  |           |
+  |           |-- <span class="green">Success!</span> --> Mark remediation entry as "resolved"
+  |           |   OR
+  |           |-- <span class="red">Still failing</span> --> retry_count = 2, try again in 10 min
+  |                 |
+  |                 |-- After 3 failures: <span class="red">Escalate + Slack alert</span>
+  |                     "Rate limit persists for Company B after 3 retries.
+  |                      Consider increasing cron interval or adding delay between companies."</div>
+
+<h2>Stress-Testing the Design</h2>
+<p>Here are the hard questions and honest answers about where this could break.</p>
+
+<div class="question">
+  <h4>Is one edge function managing all remediation a single point of failure?</h4>
+  <p><strong>No, because it's decoupled.</strong> If <code>edge-remediation</code> itself goes down, the inbox/analytics/rss functions continue working normally — they just fire-and-forget the diagnosis call and move on. Errors would pile up in the log table but nothing breaks. The existing watchdog also monitors the remediation cron job itself, so it would retrigger it. The remediation function is also stateless — it reads from the database each run, so there's no state to lose.</p>
+</div>
+
+<div class="question">
+  <h4>Will it work for things beyond edge functions — like webhooks, client-side errors, third-party API failures?</h4>
+  <p><strong>Yes, with one addition.</strong> The <code>diagnose</code> action accepts any error string + function name + optional company ID. A webhook handler, a React error boundary, or even a PostHog webhook destination can POST to it. The diagnosis engine pattern-matches the error text regardless of source. The table has a generic <code>function_name</code> field, not an "edge function" field — it can track <code>"posthog-client-error"</code> or <code>"slack-webhook"</code> just as well.</p>
+</div>
+
+<div class="question">
+  <h4>What if the remediation retry makes things worse? (cascading retries, retry storms)</h4>
+  <p><strong>Three safeguards:</strong> (1) Max 3 retries per error, then it stops and escalates. (2) Deduplication — the same error for the same company only gets one active entry, not N entries per cron run. (3) The 10-minute interval creates natural backoff. A rate-limited company gets retried at 10, 20, 30 minutes — not in a tight loop.</p>
+</div>
+
+<div class="question">
+  <h4>Will the remediation table grow forever?</h4>
+  <p><strong>No.</strong> Resolved/escalated entries are historical data we can clean up on the same 30-day schedule as <code>cron_health_logs</code>. Only <code>open</code> and <code>retrying</code> entries are active. The dedup index ensures there's at most one active entry per unique error pattern per company.</p>
+</div>
+
+<div class="question">
+  <h4>How does the retry know how to re-invoke the original function?</h4>
+  <p><strong>A simple registry.</strong> Each function has a registered retry strategy: inbox-sync gets called with <code>{ companyId }</code>, analytics-sync gets called with <code>{ companyId }</code>, rss-poll gets called with <code>{}</code> (full re-run, no single-target mode). User-initiated functions like <code>getlate-inbox</code> don't get auto-retried — the user will retry themselves. New functions opt in by adding one entry to the registry.</p>
+</div>
+
+<h2>What Else Can We Extend This To?</h2>
+
+<div class="extension">
+  <h4>PostHog Client-Side Error Capture</h4>
+  <p>PostHog already captures JavaScript exceptions automatically (<code>capture_exceptions: true</code> is enabled). We can create a <strong>PostHog webhook destination</strong> that forwards <code>$exception</code> events to our <code>edge-remediation</code> function. Every unhandled React error, failed API call, or runtime crash on the client would flow into the same remediation queue — diagnosed, triaged, and visible in the Operations Center alongside server errors. We'd also add a React Error Boundary to catch render-phase crashes that <code>window.onerror</code> misses.</p>
+</div>
+
+<div class="extension">
+  <h4>Supabase Database Triggers</h4>
+  <p>A Postgres trigger on <code>api_call_logs</code> could automatically call <code>edge-remediation</code> via <code>pg_notify</code> + a listener, or via <code>net.http_post()</code>, whenever a row with <code>success = false</code> is inserted. This removes the need for each edge function to explicitly fire-and-forget — the database itself becomes the error pipeline. Every failed API call, from any function, gets diagnosed automatically.</p>
+</div>
+
+<div class="extension">
+  <h4>Slack Interactive Remediation</h4>
+  <p>Instead of just alerting on Slack, the messages could include action buttons: "Retry Now", "Resolve", "View Details". Clicking "Retry Now" would call <code>edge-remediation { action: "resolve-and-retry", id: "..." }</code> directly from Slack — fixing issues from your phone without opening the Operations Center.</p>
+</div>
+
+<div class="extension">
+  <h4>AI-Powered Root Cause Analysis</h4>
+  <p>When errors repeat despite retries, feed the last N error entries for a company into Gemini/Claude: "These 5 sync failures over 2 hours all come from Company B. The errors went from rate_limit to timeout to auth_failure. What's the likely root cause?" The AI can correlate patterns humans might miss and suggest non-obvious fixes.</p>
+</div>
+
+<div class="extension">
+  <h4>Health Score per Company</h4>
+  <p>Aggregate remediation data into a per-company health score: error rate, avg resolution time, open issues. Surface this on the company dashboard and in the media company workspace. Flag companies trending toward degraded service before users notice.</p>
+</div>
+
+<div class="extension">
+  <h4>Email/SMS Escalation Tiers</h4>
+  <p>Slack is great for dev-team awareness, but for critical production issues (auth failures affecting all companies), the system could escalate beyond Slack: email the team lead after 30 minutes unresolved, SMS after 1 hour. Tier-based escalation ensures nothing falls through the cracks during off-hours.</p>
+</div>
+
+<h2>The Big Picture</h2>
+<p>Today, when something breaks, the flow is: <em>user notices → complains → developer investigates → fixes manually</em>. That's reactive.</p>
+<p>With this system, the flow becomes: <em>error happens → diagnosed in milliseconds → auto-retried or Slack alert with exact fix steps → resolved before any user notices</em>. That's proactive.</p>
+
+<div class="flow">
+  <div class="flow-box">Error occurs<br><span style="font-size:0.7rem;color:var(--muted)">Any edge function</span></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-box highlight">Diagnosed<br><span style="font-size:0.7rem;color:var(--green)">Category + Reason + Fix</span></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-box">Auto-retry<br><span style="font-size:0.7rem;color:var(--yellow)">Targeted, not brute-force</span></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-box">Resolved<br><span style="font-size:0.7rem;color:var(--green)">Or escalated to Slack</span></div>
+</div>
+
+<p style="text-align: center; color: var(--muted); margin-top: 2rem; font-size: 0.8rem;">
+  Universal Remediation System — Longtale.ai Social Suite<br>
+  Designed March 2026
+</p>
+
+</body>
+</html>
