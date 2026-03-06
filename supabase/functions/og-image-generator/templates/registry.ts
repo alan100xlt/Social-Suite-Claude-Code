@@ -1,5 +1,5 @@
 import type { TemplateConfig } from './types.ts';
-export { renderFromConfig } from './renderer.ts';
+export { renderFromConfig } from './renderer.tsx';
 
 // Brand configs
 import brandAnnounce from './configs/brand/brand-announce.ts';

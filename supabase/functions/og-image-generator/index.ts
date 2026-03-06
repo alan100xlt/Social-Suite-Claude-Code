@@ -239,7 +239,9 @@ async function renderTemplate(templateId: string, input: TemplateInput): Promise
   if (!template) throw new Error(`Unknown template: ${templateId}`);
 
   const fonts = await fontsPromise;
-  const jsx = await renderFromConfig(template, input);
+  const rawJsx = await renderFromConfig(template, input);
+  // JSON roundtrip strips $typeof Symbols — Satori needs plain objects with fontFamily
+  const jsx = JSON.parse(JSON.stringify(rawJsx));
 
   const svg = await satori(jsx, {
     width: OG_WIDTH,
@@ -305,9 +307,70 @@ serve(async (req: Request) => {
       });
     }
 
+    // ─── ACTION: test-render ─────────────────────────────────
+    if (action === "test-render") {
+      const fonts = await fontsPromise;
+      const template = body.templateId ? getTemplate(body.templateId) : null;
+
+      if (template) {
+        // Test with real config-driven renderer
+        try {
+          const { renderFromConfig: renderFn } = await import("./templates/registry.ts");
+          const testInput: TemplateInput = {
+            title: body.title || 'Test Render',
+            description: body.description,
+            visibility: { ...DEFAULT_VISIBILITY },
+          };
+          const jsx = renderFn(template, testInput);
+
+          // If ?inspect, return the JSX tree structure
+          if (body.inspect) {
+            function inspectElement(el: any, depth = 0): any {
+              if (!el || typeof el !== 'object') return el;
+              if (Array.isArray(el)) return el.map(c => inspectElement(c, depth));
+              const type = typeof el.type === 'string' ? el.type : typeof el.type === 'function' ? el.type.name : String(el.type);
+              const style = el.props?.style || {};
+              const children = el.props?.children;
+              return {
+                type, style,
+                children: Array.isArray(children) ? children.map((c: any) => inspectElement(c, depth + 1)) : inspectElement(children, depth + 1)
+              };
+            }
+            return new Response(JSON.stringify(inspectElement(jsx), null, 2), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          // JSON roundtrip strips $typeof Symbols and other non-serializable props
+          const cleanTree = JSON.parse(JSON.stringify(jsx));
+          const svg = await satori(cleanTree, { width: 1200, height: 630, fonts });
+          const resvg = new Resvg(svg, { fitTo: { mode: "width" as const, value: 1200 } });
+          const png = resvg.render().asPng();
+          return new Response(png, { headers: { ...corsHeaders, "Content-Type": "image/png" } });
+        } catch (e) {
+          return new Response(JSON.stringify({ error: String(e), stack: (e as Error).stack }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      // Minimal test with plain object
+      const testJsx = {
+        type: 'div',
+        props: {
+          style: { display: 'flex', fontFamily: 'Inter', width: 1200, height: 630, backgroundColor: '#1e293b', color: 'white', alignItems: 'center', justifyContent: 'center', fontSize: 48 },
+          children: body.title || 'Test Render'
+        }
+      };
+      const svg = await satori(testJsx as any, { width: 1200, height: 630, fonts });
+      const resvg = new Resvg(svg, { fitTo: { mode: "width" as const, value: 1200 } });
+      const png = resvg.render().asPng();
+      return new Response(png, { headers: { ...corsHeaders, "Content-Type": "image/png" } });
+    }
+
     // ─── ACTION: preview ─────────────────────────────────────
     if (action === "preview") {
-      const { templateId, title, description, imageUrl, brandColor, companyId: previewCompanyId } = body;
+      const { templateId, title, description, imageUrl, brandColor, sourceName, author, companyId: previewCompanyId } = body;
       if (!templateId || !title) {
         return new Response(JSON.stringify({ error: "templateId and title required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -328,14 +391,25 @@ serve(async (req: Request) => {
         fontOverride = settings.fontOverride;
       }
 
-      const png = await renderTemplate(templateId, {
-        title,
-        description,
-        imageBase64,
-        brandColor,
-        visibility,
-        fontOverride,
-      });
+      let png: Uint8Array;
+      try {
+        png = await renderTemplate(templateId, {
+          title,
+          description,
+          imageBase64,
+          brandColor,
+          sourceName,
+          author,
+          visibility,
+          fontOverride,
+        });
+      } catch (renderErr) {
+        const stack = renderErr instanceof Error ? renderErr.stack : String(renderErr);
+        console.error("Render error:", stack);
+        return new Response(JSON.stringify({ error: String(renderErr), stack }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       return new Response(png, {
         headers: {

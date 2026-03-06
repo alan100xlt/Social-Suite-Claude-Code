@@ -262,6 +262,7 @@ async function replyToComment(
   const response = await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       profileId,
       postId: conv.post_id,
@@ -325,6 +326,7 @@ async function replyToDM(
   const response = await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       profileId,
       conversationId: dmConvId,
@@ -378,6 +380,7 @@ async function likeComment(
   const response = await fetch(url, {
     method,
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({ profileId, commentId: params.commentId, platform: params.platform }),
   });
 

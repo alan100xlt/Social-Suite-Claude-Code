@@ -1,5 +1,18 @@
 import type { TemplateInput } from '../types.ts';
 
+/** Font family name mapping — must match fonts loaded in utils/fonts.ts */
+const FONT_MAP: Record<string, string> = {
+  sans: 'Inter',
+  serif: 'Source Serif 4',
+  mono: 'JetBrains Mono',
+};
+
+/** Resolve font family key to actual font name for Satori */
+export function resolveFont(input: TemplateInput, configFont?: 'sans' | 'serif' | 'mono'): string {
+  const key = input.fontOverride?.fontFamily || configFont || 'sans';
+  return FONT_MAP[key] || 'Inter';
+}
+
 /** Category-coded color overrides for media companies */
 const CATEGORY_COLORS: Record<string, string> = {
   BREAKING: '#DC2626',

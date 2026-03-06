@@ -96,6 +96,16 @@ export function MessageComposer({
 
   return (
     <div className="border-t bg-background p-3 space-y-2">
+      {/* Public reply warning for comments */}
+      {conversationType === 'comment' && !isNoteMode && (
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg text-[12px] font-medium text-amber-800 dark:text-amber-300">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="h-4 w-4 flex-shrink-0 opacity-70">
+            <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/>
+          </svg>
+          This reply will be <strong className="font-bold mx-0.5">publicly visible</strong> on the platform
+        </div>
+      )}
+
       {/* Reply-to indicator */}
       {replyTo && (
         <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/50 rounded-md text-xs">
@@ -189,7 +199,7 @@ export function MessageComposer({
 
           <Button
             size="icon"
-            className="h-9 w-9"
+            className="h-11 w-11 rounded-full flex-shrink-0"
             onClick={handleSubmit}
             disabled={!content.trim() || isSending}
           >

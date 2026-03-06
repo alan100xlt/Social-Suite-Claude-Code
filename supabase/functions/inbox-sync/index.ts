@@ -212,17 +212,17 @@ Deno.serve(async (req) => {
               try {
                 await classifyConversation(supabase, geminiApiKey, targetCompany.id, conv.id);
                 classificationsSucceeded++;
-                // Increment AI call counter (R3)
+                // Increment AI call counter (R3) — best-effort, non-atomic
                 try {
-                  const { data: aiSettings } = await supabase
+                  const { data: counterRow } = await supabase
                     .from('inbox_ai_settings')
                     .select('ai_calls_count')
                     .eq('company_id', targetCompany.id)
-                    .single();
-                  if (aiSettings) {
+                    .maybeSingle();
+                  if (counterRow) {
                     await supabase
                       .from('inbox_ai_settings')
-                      .update({ ai_calls_count: (aiSettings.ai_calls_count || 0) + 1 })
+                      .update({ ai_calls_count: (counterRow.ai_calls_count || 0) + 1 })
                       .eq('company_id', targetCompany.id);
                   }
                 } catch { /* non-fatal */ }

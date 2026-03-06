@@ -141,7 +141,8 @@ export async function checkAndAutoRespond(
   return { responded: false };
 }
 
-function matchesRule(rule: AutoRule, message: NewMessage, conversation: Conversation): boolean {
+/** @internal Exported for testing */
+export function matchesRule(rule: AutoRule, message: NewMessage, conversation: Conversation): boolean {
   // Check platform filter
   if (rule.trigger_platform && rule.trigger_platform !== conversation.platform) {
     return false;
@@ -328,15 +329,19 @@ async function notifyEditor(
 
   // Insert in-app notifications for each editor
   for (const userId of rule.notify_user_ids) {
-    await supabase.from('notifications').insert({
-      user_id: userId,
-      company_id: message.company_id,
-      type: 'inbox_rule_trigger',
-      title: notification.title,
-      body: notification.body,
-      action_url: notification.action_url,
-      read: false,
-    }).then(() => {});
+    try {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        company_id: message.company_id,
+        type: 'inbox_rule_trigger',
+        title: notification.title,
+        body: notification.body,
+        action_url: notification.action_url,
+        read: false,
+      });
+    } catch {
+      // Non-fatal — notification insert is best-effort
+    }
   }
 
   // Email notification via Resend (if configured and notify_via includes 'email')
@@ -351,16 +356,21 @@ async function notifyEditor(
 
       for (const user of users || []) {
         if (!user.email) continue;
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'Longtale Inbox <inbox@longtale.ai>',
-            to: user.email,
-            subject: notification.title,
-            text: `${notification.body}\n\nView: https://app.longtale.ai${notification.action_url}`,
-          }),
-        }).catch(() => {}); // Fire-and-forget
+        try {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(10_000),
+            body: JSON.stringify({
+              from: 'Longtale Inbox <inbox@longtale.ai>',
+              to: user.email,
+              subject: notification.title,
+              text: `${notification.body}\n\nView: https://app.longtale.ai${notification.action_url}`,
+            }),
+          });
+        } catch {
+          // Fire-and-forget — email notification is best-effort
+        }
       }
     }
   }

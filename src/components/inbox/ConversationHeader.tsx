@@ -117,9 +117,8 @@ export function ConversationHeader({
       <div className="flex items-center gap-1">
         {conversation.status === 'open' && (
           <Button
-            variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
             onClick={() => onStatusChange('resolved')}
           >
             <CheckCircle2 className="h-3.5 w-3.5" />

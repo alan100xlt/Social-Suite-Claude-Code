@@ -9,6 +9,7 @@ import { BulkActionBar } from '@/components/inbox/BulkActionBar';
 import { SearchResults } from '@/components/inbox/SearchResults';
 import { CannedReplyPicker } from '@/components/inbox/CannedReplyPicker';
 import { AISuggestionsPanel } from '@/components/inbox/AISuggestionsPanel';
+import { SocialPostTab } from '@/components/inbox/SocialPostTab';
 import { CrisisAlertBanner } from '@/components/inbox/CrisisAlertBanner';
 import {
   Search,
@@ -55,12 +56,14 @@ export default function InboxPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'contact' | 'post'>('contact');
   const [showCannedPicker, setShowCannedPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [composerContent, setComposerContent] = useState('');
   const [activeTypeTab, setActiveTypeTab] = useState<TypeTab>('all');
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<{
     status?: ConversationStatus;
     platform?: string;
@@ -180,6 +183,15 @@ export default function InboxPage() {
 
   const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleToggleFlag = useCallback((id: string) => {
+    setFlaggedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -410,12 +422,13 @@ export default function InboxPage() {
                 />
               ) : (
                 <ConversationList
-                  conversations={filteredConversations}
+                  conversations={filteredConversations.map(c => ({ ...c, flagged: flaggedIds.has(c.id) }))}
                   selectedId={selectedConversationId}
                   onSelect={handleSelectConversation}
                   isLoading={conversationsLoading}
                   selectedIds={selectedIds}
                   onToggleSelect={handleToggleSelect}
+                  onToggleFlag={handleToggleFlag}
                 />
               )}
 
@@ -445,11 +458,6 @@ export default function InboxPage() {
                   labels={labels}
                 />
 
-                <AISuggestionsPanel
-                  conversation={selectedConversation}
-                  onInsertReply={handleInsertReply}
-                />
-
                 <div className="flex-1 min-h-0">
                   <ConversationThread
                     messages={messages}
@@ -458,6 +466,11 @@ export default function InboxPage() {
                     conversation={selectedConversation}
                   />
                 </div>
+
+                <AISuggestionsPanel
+                  conversation={selectedConversation}
+                  onInsertReply={handleInsertReply}
+                />
 
                 <div className="relative">
                   <CannedReplyPicker
@@ -501,13 +514,45 @@ export default function InboxPage() {
           {/* === DRAWER PANEL (right, conditional) === */}
           {drawerOpen && selectedConversation && (
             <div className="bg-background rounded-xl border shadow-sm flex flex-col overflow-hidden min-h-0">
-              <ContactDetailPanel
-                conversation={selectedConversation}
-                labels={labels}
-                onAssign={handleAssign}
-                onAddLabel={handleAddLabel}
-                onRemoveLabel={handleRemoveLabel}
-              />
+              {/* Drawer tabs */}
+              <div className="flex border-b">
+                <button
+                  onClick={() => setDrawerTab('contact')}
+                  className={cn(
+                    'flex-1 py-3 text-center text-[12.5px] font-semibold border-b-[2.5px] transition-colors',
+                    drawerTab === 'contact'
+                      ? 'text-primary border-primary'
+                      : 'text-muted-foreground border-transparent hover:text-foreground/70'
+                  )}
+                >
+                  Contact
+                </button>
+                <button
+                  onClick={() => setDrawerTab('post')}
+                  className={cn(
+                    'flex-1 py-3 text-center text-[12.5px] font-semibold border-b-[2.5px] transition-colors',
+                    drawerTab === 'post'
+                      ? 'text-primary border-primary'
+                      : 'text-muted-foreground border-transparent hover:text-foreground/70'
+                  )}
+                >
+                  Social Post
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {drawerTab === 'contact' ? (
+                  <ContactDetailPanel
+                    conversation={selectedConversation}
+                    labels={labels}
+                    onAssign={handleAssign}
+                    onAddLabel={handleAddLabel}
+                    onRemoveLabel={handleRemoveLabel}
+                  />
+                ) : (
+                  <SocialPostTab conversation={selectedConversation} />
+                )}
+              </div>
             </div>
           )}
         </div>

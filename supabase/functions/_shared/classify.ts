@@ -53,7 +53,8 @@ const PRIORITY_MAP: Record<string, string> = {
 
 const PRIORITY_ORDER = ['low', 'normal', 'high', 'critical'];
 
-function derivePriority(subcategory: string, editorialValue: number): string {
+/** @internal Exported for testing */
+export function derivePriority(subcategory: string, editorialValue: number): string {
   const basePriority = PRIORITY_MAP[subcategory] || 'normal';
   if (editorialValue >= 4) {
     const idx = PRIORITY_ORDER.indexOf(basePriority);
@@ -118,7 +119,8 @@ const VALID_SUBCATEGORIES = new Set([
   'greeting_chat', 'unclassifiable',
 ]);
 
-function validateClassification(data: Record<string, unknown>): ClassificationResult | null {
+/** @internal Exported for testing */
+export function validateClassification(data: Record<string, unknown>): ClassificationResult | null {
   if (!data.category || !VALID_CATEGORIES.includes(data.category as string)) return null;
   if (!data.subcategory || !VALID_SUBCATEGORIES.has(data.subcategory as string)) return null;
 

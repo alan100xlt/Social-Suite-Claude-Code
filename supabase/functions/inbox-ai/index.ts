@@ -37,18 +37,19 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Increment AI call counter — direct fetch to avoid .rpc() builder issues
+    // Increment AI call counter — best-effort, non-atomic read-then-write
+    // Race condition under concurrency is acceptable for a monitoring counter
     const incrementAICalls = async () => {
       try {
-        const { data: settings } = await supabase
+        const { data: s } = await supabase
           .from('inbox_ai_settings')
           .select('ai_calls_count')
           .eq('company_id', companyId)
-          .single();
-        if (settings) {
+          .maybeSingle();
+        if (s) {
           await supabase
             .from('inbox_ai_settings')
-            .update({ ai_calls_count: (settings.ai_calls_count || 0) + 1 })
+            .update({ ai_calls_count: (s.ai_calls_count || 0) + 1 })
             .eq('company_id', companyId);
         }
       } catch {

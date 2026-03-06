@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   Select,
@@ -13,13 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Image, Type, Eye, EyeOff, Search } from 'lucide-react';
+import { Loader2, Image, Type, Eye, Search, LayoutGrid, List } from 'lucide-react';
 import {
   useOgCompanySettings,
   useUpdateOgCompanySettings,
   OG_TEMPLATES,
   type OgCompanySettings,
 } from '@/hooks/useOgImage';
+import { TemplatePreviewCard } from './TemplatePreviewCard';
 
 const CATEGORIES = ['photo', 'gradient', 'news', 'stats', 'editorial', 'brand'] as const;
 
@@ -53,6 +53,7 @@ export function OgSettingsTab() {
   const { data: settings, isLoading } = useOgCompanySettings();
   const updateSettings = useUpdateOgCompanySettings();
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const current = settings || DEFAULT_SETTINGS;
   const disabledIds = new Set(settings?.disabled_template_ids || []);
@@ -238,21 +239,39 @@ export function OgSettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Template Management */}
+      {/* Template Library — Visual Gallery */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Image className="h-5 w-5" />
-            Template Library
-          </CardTitle>
-          <CardDescription>
-            Enable or disable templates. Disabled templates won't be used by AI or shown in the template picker.
-            {disabledIds.size > 0 && (
-              <span className="ml-1 text-amber-500">
-                ({disabledIds.size} disabled)
-              </span>
-            )}
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Image className="h-5 w-5" />
+                Template Library
+              </CardTitle>
+              <CardDescription>
+                Click any template to enable or disable it. Disabled templates won't be used by AI or shown in the picker.
+                {disabledIds.size > 0 && (
+                  <span className="ml-1 text-amber-500">
+                    ({disabledIds.size} disabled)
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-1 border rounded-md p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -267,7 +286,7 @@ export function OgSettingsTab() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {CATEGORIES.map(category => {
               const categoryTemplates = filteredTemplates.filter(t => t.category === category);
               if (categoryTemplates.length === 0) return null;
@@ -275,42 +294,57 @@ export function OgSettingsTab() {
 
               return (
                 <div key={category}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold capitalize">{category}</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold capitalize">{category}</h4>
+                      <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                        {categoryTemplates.length}
+                      </span>
+                    </div>
                     <span className="text-xs text-muted-foreground">
-                      {enabledCount}/{categoryTemplates.length} enabled
+                      <Eye className="inline h-3 w-3 mr-1" />
+                      {enabledCount}/{categoryTemplates.length}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {categoryTemplates.map(t => {
-                      const isDisabled = disabledIds.has(t.id);
-                      return (
-                        <button
+
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {categoryTemplates.map(t => (
+                        <TemplatePreviewCard
                           key={t.id}
-                          onClick={() => handleToggleTemplate(t.id)}
-                          disabled={updateSettings.isPending}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-md border text-left text-xs transition-colors ${
-                            isDisabled
-                              ? 'border-dashed border-muted-foreground/30 text-muted-foreground/50 bg-muted/30'
-                              : 'border-border bg-card hover:bg-accent'
-                          }`}
-                        >
-                          {isDisabled ? (
-                            <EyeOff className="h-3 w-3 flex-shrink-0" />
-                          ) : (
-                            <Eye className="h-3 w-3 flex-shrink-0 text-green-500" />
-                          )}
-                          <span className="truncate">{t.name}</span>
-                          {t.requiresImage && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto flex-shrink-0">
-                              img
-                            </Badge>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <Separator className="mt-3" />
+                          id={t.id}
+                          name={t.name}
+                          category={t.category}
+                          requiresImage={t.requiresImage}
+                          disabled={disabledIds.has(t.id)}
+                          onToggle={() => handleToggleTemplate(t.id)}
+                          isPending={updateSettings.isPending}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {categoryTemplates.map(t => {
+                        const isDisabled = disabledIds.has(t.id);
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => handleToggleTemplate(t.id)}
+                            disabled={updateSettings.isPending}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md border text-left text-xs transition-colors ${
+                              isDisabled
+                                ? 'border-dashed border-muted-foreground/30 text-muted-foreground/50 bg-muted/30'
+                                : 'border-border bg-card hover:bg-accent'
+                            }`}
+                          >
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isDisabled ? 'bg-muted-foreground/30' : 'bg-green-500'}`} />
+                            <span className="truncate">{t.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Separator className="mt-4" />
                 </div>
               );
             })}

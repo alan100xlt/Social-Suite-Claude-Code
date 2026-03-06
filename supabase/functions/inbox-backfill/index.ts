@@ -5,6 +5,7 @@ import { callGemini } from '../_shared/inbox-ai-helpers.ts';
 
 const BATCH_SIZE = 10;
 const THROTTLE_MS = 500;
+const MAX_CURSOR = 5000; // Safety guard: stop after 5000 conversations to prevent infinite self-chaining
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -132,6 +133,17 @@ async function continueBackfill(
   jobId: string,
   cursor: number
 ) {
+  // Safety guard: stop if cursor exceeds max to prevent runaway self-chaining
+  if (cursor >= MAX_CURSOR) {
+    await supabase
+      .from('inbox_backfill_jobs')
+      .update({ status: 'completed', error: `Stopped at cursor ${cursor} (max ${MAX_CURSOR})`, completed_at: new Date().toISOString() })
+      .eq('id', jobId);
+    return new Response(JSON.stringify({ success: true, status: 'completed', reason: 'max_cursor_reached' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   if (!geminiApiKey) {
     await supabase
       .from('inbox_backfill_jobs')

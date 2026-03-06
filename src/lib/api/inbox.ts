@@ -65,6 +65,10 @@ export interface InboxConversation {
   correction_status: 'received' | 'reviewing' | 'fixed' | null;
   article_url: string | null;
   article_title: string | null;
+  // Client-side enrichments
+  message_count?: number;
+  flagged?: boolean;
+  ai_topics?: string[];
 }
 
 export interface InboxMessage {
