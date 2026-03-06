@@ -1,0 +1,65 @@
+{
+  "skill_name": "linear-sync",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Scan the codebase for TODOs and create Linear issues",
+      "expected_output": "Searches for TODO/FIXME/HACK comments in src/, creates Linear issues with correct team ID, project ID, priority, estimate, and labels",
+      "files": [],
+      "assertions": [
+        {
+          "name": "scans-codebase",
+          "description": "Searches for // TODO:, // FIXME:, // HACK: comments in src/"
+        },
+        {
+          "name": "correct-team-id",
+          "description": "Uses team ID 77c0f6ee-76ac-4864-9287-50ef360fc1eb"
+        },
+        {
+          "name": "correct-project-id",
+          "description": "Uses project ID 735d7b90-d394-4687-9dc3-6ec3e6e8e733"
+        },
+        {
+          "name": "priority-mapping",
+          "description": "Maps bug/security to Urgent(1), features to High(2), enhancements to Medium(3), polish to Low(4)"
+        },
+        {
+          "name": "summary-table",
+          "description": "Prints a summary table with Issue, Title, Priority, Estimate, Linear URL columns"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create Linear issues from this task list:\n1. Add user avatar upload to settings\n2. Fix broken pagination on posts page\n3. Refactor analytics hook to use date range parameter",
+      "expected_output": "Creates parent issue + 3 child issues with correct parentId linkage, priority mapping, and estimates",
+      "files": [],
+      "assertions": [
+        {
+          "name": "parent-issue-created",
+          "description": "Creates one parent issue for the overall feature set"
+        },
+        {
+          "name": "child-issues-linked",
+          "description": "Creates child issues with parentId pointing to the parent issue"
+        },
+        {
+          "name": "bug-priority-correct",
+          "description": "Fix broken pagination is mapped to priority 1 (Urgent) with Bug label"
+        },
+        {
+          "name": "feature-priority-correct",
+          "description": "Add user avatar upload is mapped to priority 2 (High) with Feature label"
+        },
+        {
+          "name": "refactor-priority-correct",
+          "description": "Refactor analytics hook is mapped to priority 4 (Low) with Improvement label"
+        },
+        {
+          "name": "description-format",
+          "description": "Child issue descriptions follow the What/Why/Files/Done When format"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "skill_name": "debug-build",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "The app shows a white screen after adding a new component that imports ioredis",
+      "expected_output": "Identifies ioredis as a server-only import that cannot be used in browser code, removes or guards the import",
+      "files": [],
+      "assertions": [
+        {
+          "name": "identifies-server-import",
+          "description": "Correctly identifies ioredis as the root cause (server-only module in browser code)"
+        },
+        {
+          "name": "runs-build",
+          "description": "Runs npm run build to capture the actual error output"
+        },
+        {
+          "name": "searches-for-pattern",
+          "description": "Searches src/ for ioredis imports to find all occurrences"
+        },
+        {
+          "name": "verifies-fix",
+          "description": "Runs build again after fix to confirm it passes"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Build is failing with CSS errors in index.css",
+      "expected_output": "Checks @import order in index.css — Google Fonts @import must come before @tailwind directives",
+      "files": [],
+      "assertions": [
+        {
+          "name": "checks-import-order",
+          "description": "Checks that @import statements come before @tailwind directives in index.css"
+        },
+        {
+          "name": "runs-tsc",
+          "description": "Runs npx tsc --noEmit for type errors as part of diagnosis"
+        },
+        {
+          "name": "targeted-fix",
+          "description": "Applies a targeted fix rather than rewriting the entire file"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Getting 'process is not defined' error in the browser console",
+      "expected_output": "Finds process.env usage in src/ and replaces with import.meta.env.VITE_*",
+      "files": [],
+      "assertions": [
+        {
+          "name": "searches-process-env",
+          "description": "Searches for process.env in src/ to find offending code"
+        },
+        {
+          "name": "replaces-with-vite",
+          "description": "Replaces process.env.* with import.meta.env.VITE_*"
+        },
+        {
+          "name": "checks-hmr-overlay",
+          "description": "Notes that HMR overlay is enabled so errors show as red overlay in browser"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "TypeScript errors after pulling latest changes, app won't compile",
+      "expected_output": "Runs npx tsc --noEmit, identifies specific type errors, fixes them without masking with 'any'",
+      "files": [],
+      "assertions": [
+        {
+          "name": "runs-tsc-first",
+          "description": "Runs npx tsc --noEmit as the first diagnostic step"
+        },
+        {
+          "name": "no-any-escape",
+          "description": "Does not resolve type errors by casting to 'any' or using @ts-ignore"
+        },
+        {
+          "name": "build-verified",
+          "description": "Runs npm run build after fix to confirm compilation succeeds"
+        }
+      ]
+    }
+  ]
+}

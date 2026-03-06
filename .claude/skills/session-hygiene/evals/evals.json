@@ -1,0 +1,65 @@
+{
+  "skill_name": "session-hygiene",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We just finished writing a design doc at docs/plans/2026-03-06-notifications.md. Now implement it.",
+      "expected_output": "Warns that implementation should happen in a fresh session since the design context consumed significant budget. Names the plan file as the handoff artifact.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "warns-after-design-doc",
+          "description": "Issues a session hygiene warning since a design doc was just completed"
+        },
+        {
+          "name": "names-artifact",
+          "description": "References the specific plan file path as the artifact that carries context forward"
+        },
+        {
+          "name": "recommends-fresh-session",
+          "description": "Recommends starting a fresh session for implementation"
+        },
+        {
+          "name": "offers-to-continue",
+          "description": "Offers to continue in the current session if user prefers"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Can you fix a typo in the component I just built?",
+      "expected_output": "Does NOT warn about session hygiene — this is a small follow-up on the same task",
+      "files": [],
+      "assertions": [
+        {
+          "name": "no-false-positive",
+          "description": "Does NOT issue a session hygiene warning for a small follow-up fix on the same task"
+        },
+        {
+          "name": "proceeds-directly",
+          "description": "Proceeds to help with the typo fix without unnecessary preamble"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "OK now let's switch gears completely — I need you to set up a new Supabase edge function for email sending. Also after that, can you refactor the analytics page?",
+      "expected_output": "Warns about topic switch and multiple unrelated tasks, recommends separate sessions",
+      "files": [],
+      "assertions": [
+        {
+          "name": "detects-topic-switch",
+          "description": "Identifies this as a topic switch with multiple unrelated tasks"
+        },
+        {
+          "name": "concise-warning",
+          "description": "Warning is one short paragraph, not a lecture"
+        },
+        {
+          "name": "specific-reason",
+          "description": "Warning names the specific reason (topic switch + multiple tasks) not generic advice"
+        }
+      ]
+    }
+  ]
+}

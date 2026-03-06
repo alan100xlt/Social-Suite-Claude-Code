@@ -1,0 +1,65 @@
+{
+  "skill_name": "supabase-migration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a migration for a new 'team_invitations' table with email, role, status, and expiry fields",
+      "expected_output": "Creates timestamped migration file with UUID primary key, company_id FK, RLS policy using profiles table join, indexes on company_id and foreign keys",
+      "files": [],
+      "assertions": [
+        {
+          "name": "timestamp-prefix",
+          "description": "Migration filename uses YYYYMMDDHHMMSS_ prefix"
+        },
+        {
+          "name": "uuid-primary-key",
+          "description": "Table has id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+        },
+        {
+          "name": "company-id-fk",
+          "description": "Table has company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "rls-enabled",
+          "description": "Includes ALTER TABLE team_invitations ENABLE ROW LEVEL SECURITY"
+        },
+        {
+          "name": "rls-policy-pattern",
+          "description": "RLS policy checks company_id via profiles table join (SELECT company_id FROM profiles WHERE id = auth.uid())"
+        },
+        {
+          "name": "if-not-exists",
+          "description": "Uses CREATE TABLE IF NOT EXISTS for idempotency"
+        },
+        {
+          "name": "indexes-added",
+          "description": "Adds index on company_id column"
+        },
+        {
+          "name": "reads-existing-migrations",
+          "description": "Reads latest migration in supabase/migrations/ to understand current schema"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add a 'last_synced_at' timestamp column to the social_accounts table",
+      "expected_output": "Creates ALTER TABLE migration with ADD COLUMN IF NOT EXISTS, no need for RLS changes since table already has it",
+      "files": [],
+      "assertions": [
+        {
+          "name": "alter-not-create",
+          "description": "Uses ALTER TABLE, not CREATE TABLE, since the table already exists"
+        },
+        {
+          "name": "if-not-exists-column",
+          "description": "Uses ADD COLUMN IF NOT EXISTS for idempotency"
+        },
+        {
+          "name": "verify-step",
+          "description": "Runs npx tsc --noEmit after applying migration to check types"
+        }
+      ]
+    }
+  ]
+}

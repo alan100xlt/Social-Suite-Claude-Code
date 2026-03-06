@@ -1,0 +1,69 @@
+{
+  "skill_name": "writing-plans",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write an implementation plan for adding a webhook management page where users can configure outbound webhooks for post events",
+      "expected_output": "Creates plan in docs/plans/ with header, bite-sized tasks, exact file paths, complete code, verification commands, TDD steps, and commits",
+      "files": [],
+      "assertions": [
+        {
+          "name": "plan-header",
+          "description": "Plan starts with Goal, Architecture, Tech Stack header and the executing-plans sub-skill reference"
+        },
+        {
+          "name": "saved-to-docs-plans",
+          "description": "Plan is saved to docs/plans/YYYY-MM-DD-<feature-name>.md"
+        },
+        {
+          "name": "bite-sized-tasks",
+          "description": "Each task is one action (2-5 minutes), not a large multi-step chunk"
+        },
+        {
+          "name": "exact-file-paths",
+          "description": "Every task specifies exact file paths with Create: or Modify: prefixes"
+        },
+        {
+          "name": "complete-code",
+          "description": "Tasks include actual code, not placeholders like 'add validation logic'"
+        },
+        {
+          "name": "verify-steps",
+          "description": "Each task has a verify step with exact command and expected output"
+        },
+        {
+          "name": "commit-steps",
+          "description": "Tasks include commit steps with descriptive commit messages"
+        },
+        {
+          "name": "linear-sync-triggered",
+          "description": "After saving the plan, invokes /linear-sync to create Linear issues"
+        },
+        {
+          "name": "execution-handoff",
+          "description": "Outputs the execution prompt block with parallel vs subagent recommendation"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Plan the implementation for a simple feature flag toggle in settings",
+      "expected_output": "Short plan proportional to task size — not over-engineered. 2-3 tasks max for a simple toggle.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "proportional-scope",
+          "description": "Plan size is proportional to feature complexity — simple toggle gets 2-3 tasks, not 10"
+        },
+        {
+          "name": "yagni-applied",
+          "description": "Does not add unnecessary infrastructure (feature flag service, A/B testing framework) for a simple toggle"
+        },
+        {
+          "name": "announces-skill",
+          "description": "Announces 'I'm using the writing-plans skill' at the start"
+        }
+      ]
+    }
+  ]
+}

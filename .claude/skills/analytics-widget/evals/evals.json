@@ -1,0 +1,81 @@
+{
+  "skill_name": "analytics-widget",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a new engagement rate line chart for the analytics page",
+      "expected_output": "Creates a Recharts widget in src/components/analytics/ with ResponsiveContainer, Card wrapper, Skeleton loading state, CSS var colors",
+      "files": [],
+      "assertions": [
+        {
+          "name": "recharts-decision",
+          "description": "Correctly identifies this as a Recharts widget (analytics page, not analytics-v2)"
+        },
+        {
+          "name": "responsive-container",
+          "description": "Uses ResponsiveContainer for chart sizing"
+        },
+        {
+          "name": "css-var-colors",
+          "description": "Uses CSS variables var(--chart-1) through var(--chart-5) for colors"
+        },
+        {
+          "name": "loading-skeleton",
+          "description": "Shows Skeleton component from @/components/ui/skeleton while loading"
+        },
+        {
+          "name": "card-wrapper",
+          "description": "Wraps in Card with CardHeader/CardContent from @/components/ui/card"
+        },
+        {
+          "name": "wired-into-page",
+          "description": "Adds the widget to src/pages/Analytics.tsx"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Build a content performance treemap widget for analytics-v2",
+      "expected_output": "Creates a Nivo widget in src/components/analytics-v2/widgets/ using nivo-theme.ts, consistent with sibling widget patterns",
+      "files": [],
+      "assertions": [
+        {
+          "name": "nivo-decision",
+          "description": "Correctly identifies this as a Nivo widget (analytics-v2 page)"
+        },
+        {
+          "name": "nivo-theme-import",
+          "description": "Imports theme from src/lib/nivo-theme.ts"
+        },
+        {
+          "name": "widget-directory",
+          "description": "File is placed in src/components/analytics-v2/widgets/ or widgets-v2/"
+        },
+        {
+          "name": "reads-sibling-widgets",
+          "description": "Reads existing widgets to match patterns before creating new one"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add a chart showing post frequency over time",
+      "expected_output": "Asks which page (analytics vs analytics-v2) when ambiguous, then scaffolds appropriately",
+      "files": [],
+      "assertions": [
+        {
+          "name": "disambiguates-page",
+          "description": "Asks user whether this belongs on analytics (Recharts) or analytics-v2 (Nivo) since prompt is ambiguous"
+        },
+        {
+          "name": "data-hook-created",
+          "description": "Creates or reuses a TanStack Query hook for post frequency data"
+        },
+        {
+          "name": "type-check",
+          "description": "Runs npx tsc --noEmit to verify no type errors"
+        }
+      ]
+    }
+  ]
+}

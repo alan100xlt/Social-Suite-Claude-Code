@@ -1,0 +1,61 @@
+{
+  "skill_name": "review-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the current branch's PR",
+      "expected_output": "Fetches PR via gh pr view, gets diff, summarizes changes by area, runs security-reviewer agent, checks project-specific issues, runs lint and tsc",
+      "files": [],
+      "assertions": [
+        {
+          "name": "fetches-pr-metadata",
+          "description": "Runs gh pr view with --json to get PR title, body, files, additions, deletions"
+        },
+        {
+          "name": "gets-diff",
+          "description": "Runs gh pr diff to get the full changeset"
+        },
+        {
+          "name": "groups-by-area",
+          "description": "Summarizes changes grouped by area: UI/components, data fetching, Supabase, config, other"
+        },
+        {
+          "name": "security-review",
+          "description": "Invokes the security-reviewer subagent on changed files"
+        },
+        {
+          "name": "checks-process-env",
+          "description": "Checks for process.env usage in changed files"
+        },
+        {
+          "name": "checks-company-id",
+          "description": "Checks that Supabase queries in changed files include company_id filter"
+        },
+        {
+          "name": "runs-lint-and-tsc",
+          "description": "Runs npm run lint and npx tsc --noEmit"
+        },
+        {
+          "name": "output-format",
+          "description": "Output follows the structured format: Summary, Changed Files table, Security Review, Project-Specific Checks, Code Quality, Recommendation"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review PR #42",
+      "expected_output": "Uses PR number 42 directly, follows full review pipeline",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses-pr-number",
+          "description": "Uses PR #42 directly in gh commands, doesn't try to resolve from branch"
+        },
+        {
+          "name": "recommendation-given",
+          "description": "Ends with APPROVE / REQUEST CHANGES / COMMENT recommendation with justification"
+        }
+      ]
+    }
+  ]
+}

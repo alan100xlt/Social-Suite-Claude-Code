@@ -1,0 +1,81 @@
+{
+  "skill_name": "new-feature",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a new notifications page at /app/notifications that shows a list of notifications for the current company",
+      "expected_output": "Creates page component in src/pages/, TanStack Query hook in src/hooks/, adds route to App.tsx with ProtectedRoute, uses Shadcn UI components, includes company_id filter",
+      "files": [],
+      "assertions": [
+        {
+          "name": "page-created",
+          "description": "A new page component is created in src/pages/"
+        },
+        {
+          "name": "hook-created",
+          "description": "A TanStack Query hook is created in src/hooks/ with useQuery pattern"
+        },
+        {
+          "name": "route-added",
+          "description": "Route is added to src/App.tsx under /app/* with ProtectedRoute wrapper"
+        },
+        {
+          "name": "company-id-filter",
+          "description": "Supabase query includes .eq('company_id', companyId) for RLS"
+        },
+        {
+          "name": "shadcn-components",
+          "description": "Uses Shadcn UI components (Card, Table, etc.) not custom primitives"
+        },
+        {
+          "name": "vite-env",
+          "description": "No process.env usage — only import.meta.env if env vars are needed"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a team members management feature where admins can view and invite users to their company",
+      "expected_output": "Creates components in src/components/team/, hook with company_id filter, proper multi-tenancy, uses existing auth patterns",
+      "files": [],
+      "assertions": [
+        {
+          "name": "component-directory",
+          "description": "Components are placed in src/components/<feature-name>/ following convention"
+        },
+        {
+          "name": "query-enabled-guard",
+          "description": "TanStack Query hook has enabled: !!companyId guard"
+        },
+        {
+          "name": "supabase-client-import",
+          "description": "Imports supabase from @/integrations/supabase/client, not directly"
+        },
+        {
+          "name": "no-server-imports",
+          "description": "No ioredis, child_process, fs, or path imports in src/ files"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Scaffold a simple settings toggle for enabling/disabling email digests",
+      "expected_output": "Small feature: adds to existing settings page or creates minimal new component, uses existing patterns",
+      "files": [],
+      "assertions": [
+        {
+          "name": "reads-existing-patterns",
+          "description": "Reads existing settings components before creating new ones"
+        },
+        {
+          "name": "type-check-passes",
+          "description": "Runs npx tsc --noEmit as final verification step"
+        },
+        {
+          "name": "minimal-scaffolding",
+          "description": "Does not over-scaffold — simple toggle doesn't need a full page + hook + route"
+        }
+      ]
+    }
+  ]
+}
