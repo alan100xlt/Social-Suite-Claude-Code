@@ -37,6 +37,25 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // Increment AI call counter — direct fetch to avoid .rpc() builder issues
+    const incrementAICalls = async () => {
+      try {
+        const { data: settings } = await supabase
+          .from('inbox_ai_settings')
+          .select('ai_calls_count')
+          .eq('company_id', companyId)
+          .single();
+        if (settings) {
+          await supabase
+            .from('inbox_ai_settings')
+            .update({ ai_calls_count: (settings.ai_calls_count || 0) + 1 })
+            .eq('company_id', companyId);
+        }
+      } catch {
+        // Non-fatal — counter increment is best-effort
+      }
+    };
+
     let result: unknown;
 
     switch (action) {
@@ -51,24 +70,22 @@ Deno.serve(async (req) => {
         break;
       case 'classify':
         result = await classifyConversation(supabase, geminiApiKey, companyId, params.conversationId);
-        // Increment AI call counter
-        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        await incrementAICalls();
         break;
       case 'suggest-reply-v2':
         result = await suggestReplyV2(supabase, geminiApiKey, companyId, params.conversationId);
-        // Increment AI call counter
-        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        await incrementAICalls();
         break;
       case 'translate':
         result = await translateMessage(supabase, geminiApiKey, companyId, params);
-        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        await incrementAICalls();
         break;
       case 'crisis-check':
         result = await crisisCheck(supabase, geminiApiKey, companyId);
         break;
       case 'content-recycle-check':
         result = await contentRecycleCheck(supabase, geminiApiKey, companyId, params.conversationId);
-        await supabase.rpc('increment_ai_calls', { _company_id: companyId }).catch(() => {});
+        await incrementAICalls();
         break;
       case 'save-feedback':
         result = await saveFeedback(supabase, companyId, userId, params);
@@ -177,8 +194,8 @@ Return ONLY the JSON object, no markdown or explanation.`;
     company_id: companyId,
     result_type: 'sentiment',
     result_data: analysis,
-    model_version: 'gemini-2.5-flash-preview-04-17',
-  }).catch(() => {});
+    model_version: 'gemini-2.5-flash',
+  });
 
   return { analysis };
 }
@@ -253,8 +270,8 @@ Return ONLY the JSON object, no markdown or explanation.`;
     company_id: companyId,
     result_type: 'summary',
     result_data: data,
-    model_version: 'gemini-2.5-flash-preview-04-17',
-  }).catch(() => {});
+    model_version: 'gemini-2.5-flash',
+  });
 
   return { summary: data.summary };
 }
@@ -393,8 +410,8 @@ Return ONLY the JSON object, no markdown or explanation.`;
     company_id: companyId,
     result_type: 'suggestions',
     result_data: data,
-    model_version: 'gemini-2.5-flash-preview-04-17',
-  }).catch(() => {});
+    model_version: 'gemini-2.5-flash',
+  });
 
   return data;
 }
@@ -447,8 +464,8 @@ Text: ${textToTranslate}`;
         targetLanguage: params.targetLanguage,
         messageId: params.messageId || null,
       },
-      model_version: 'gemini-2.5-flash-preview-04-17',
-    }).catch(() => {});
+      model_version: 'gemini-2.5-flash',
+    });
   }
 
   return { translated, targetLanguage: params.targetLanguage };

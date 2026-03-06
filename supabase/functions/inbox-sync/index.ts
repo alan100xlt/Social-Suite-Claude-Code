@@ -212,7 +212,19 @@ Deno.serve(async (req) => {
                 await classifyConversation(supabase, geminiApiKey, targetCompany.id, conv.id);
                 classificationsSucceeded++;
                 // Increment AI call counter (R3)
-                await supabase.rpc('increment_ai_calls', { _company_id: targetCompany.id }).catch(() => {});
+                try {
+                  const { data: aiSettings } = await supabase
+                    .from('inbox_ai_settings')
+                    .select('ai_calls_count')
+                    .eq('company_id', targetCompany.id)
+                    .single();
+                  if (aiSettings) {
+                    await supabase
+                      .from('inbox_ai_settings')
+                      .update({ ai_calls_count: (aiSettings.ai_calls_count || 0) + 1 })
+                      .eq('company_id', targetCompany.id);
+                  }
+                } catch { /* non-fatal */ }
               } catch (classifyErr) {
                 console.error(`Classification failed for ${conv.id}:`, classifyErr);
                 // Gemini-down fallback (R1)

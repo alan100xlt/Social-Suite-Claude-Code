@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const GETLATE_API_URL = 'https://getlate.dev/api/v1';
 
 interface AutoRule {
@@ -104,6 +104,7 @@ export async function checkAndAutoRespond(
           .from('inbox_canned_replies')
           .select('content')
           .eq('id', rule.canned_reply_id)
+          .eq('company_id', message.company_id)
           .single();
 
         if (reply) {
@@ -113,6 +114,7 @@ export async function checkAndAutoRespond(
               .from('inbox_contacts')
               .select('display_name')
               .eq('id', message.contact_id)
+              .eq('company_id', message.company_id)
               .single();
             if (contact?.display_name) {
               responseContent = responseContent.replace(/\{\{contact_name\}\}/g, contact.display_name);
@@ -163,9 +165,12 @@ function matchesRule(rule: AutoRule, message: NewMessage, conversation: Conversa
 
     case 'regex': {
       if (!rule.trigger_value) return false;
+      // Guard against catastrophic backtracking: limit pattern length
+      if (rule.trigger_value.length > 200) return false;
       try {
         const regex = new RegExp(rule.trigger_value, 'i');
-        return regex.test(message.content);
+        // Test on truncated content to limit execution time
+        return regex.test(message.content.slice(0, 2000));
       } catch {
         return false;
       }
@@ -244,6 +249,7 @@ Respond with ONLY the reply text, nothing else. Keep it concise and appropriate 
     const response = await fetch(`${GEMINI_API_URL}?key=${geminiApiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 256 },
@@ -272,12 +278,14 @@ async function sendAutoResponse(
     await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({ profileId, text: content, platform: conversation.platform }),
     });
   } else if (conversation.type === 'comment') {
     await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({ profileId, postId: conversation.post_id, text: content, platform: conversation.platform }),
     });
   }
@@ -299,7 +307,8 @@ async function sendAutoResponse(
       last_message_at: new Date().toISOString(),
       last_message_preview: content.slice(0, 200),
     })
-    .eq('id', message.conversation_id);
+    .eq('id', message.conversation_id)
+    .eq('company_id', message.company_id);
 }
 
 async function notifyEditor(
@@ -367,6 +376,7 @@ async function hideComment(
   await fetch(`${GETLATE_API_URL}/inbox/comments/hide`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       profileId,
       postId: conversation.post_id,
