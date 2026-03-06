@@ -471,6 +471,21 @@ async function pollSingleFeed(
     }
 
     insertedCount = inserted?.length || 0
+
+    // Fire-and-forget OG image generation for new items
+    if (inserted?.length) {
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      for (const item of inserted) {
+        fetch(`${supabaseUrl}/functions/v1/og-image-generator`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'generate', feedItemId: item.id }),
+        }).catch(err => console.error(`OG gen failed for ${item.id}:`, err))
+      }
+    }
   }
 
   // Backfill images

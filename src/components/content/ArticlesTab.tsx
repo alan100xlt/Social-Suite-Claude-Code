@@ -22,6 +22,7 @@ import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import FlyoutEditor from './FlyoutEditor';
+import { OgImagePreview } from './OgImagePreview';
 import ContextualCardActions from './ContextualCardActions';
 import type { PostState } from '@/hooks/usePostState';
 import StatusBadge, { getStatusFromItem } from '@/components/ui/StatusBadge';
@@ -615,6 +616,18 @@ export function ArticlesTab() {
                 alt=""
                 className="w-full max-h-56 object-cover rounded-xl"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          )}
+
+          {viewingArticle && (
+            <div className="px-8 pt-4">
+              <OgImagePreview
+                feedItemId={viewingArticle.id}
+                ogImageUrl={viewingArticle.og_image_url}
+                ogTemplateId={viewingArticle.og_template_id}
+                ogAiReasoning={viewingArticle.og_ai_reasoning}
+                hasArticleImage={!!viewingArticle.image_url}
               />
             </div>
           )}

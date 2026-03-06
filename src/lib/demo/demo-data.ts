@@ -275,6 +275,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: 'demo-post-pub-1',
     status: 'posted',
     created_at: daysAgo(3),
+    og_image_url: 'https://placehold.co/1200x630/1a1a2e/ffffff?text=AI+Content+Tools',
+    og_template_id: 'photo-hero',
+    og_ai_reasoning: 'Strong photo with tech-focused headline — photo-hero provides maximum visual impact.',
   },
   {
     id: 'demo-fi-2',
@@ -290,6 +293,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: null,
     status: 'pending',
     created_at: daysAgo(5),
+    og_image_url: 'https://placehold.co/1200x630/0d1117/58a6ff?text=200%25+Growth',
+    og_template_id: 'stats-card',
+    og_ai_reasoning: 'Data-heavy headline with specific growth percentage — stats-card highlights the metric.',
   },
   {
     id: 'demo-fi-3',
@@ -305,6 +311,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: null,
     status: 'failed',
     created_at: daysAgo(8),
+    og_image_url: 'https://placehold.co/1200x630/1e3a5f/e0e0e0?text=Multi-Platform+CDN',
+    og_template_id: 'gradient-modern',
+    og_ai_reasoning: 'No image available — gradient-modern adds visual interest with geometric accents.',
   },
   {
     id: 'demo-fi-4',
@@ -320,6 +329,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: null,
     status: 'skipped',
     created_at: daysAgo(10),
+    og_image_url: 'https://placehold.co/1200x630/ff0050/ffffff?text=TikTok+API',
+    og_template_id: 'photo-split',
+    og_ai_reasoning: 'Brand-focused article with strong image — photo-split balances image and title.',
   },
   {
     id: 'demo-fi-5',
@@ -335,6 +347,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: 'demo-post-pub-2',
     status: 'posted',
     created_at: daysAgo(2),
+    og_image_url: 'https://placehold.co/1200x630/2d1b69/f0e6ff?text=7+Strategies',
+    og_template_id: 'photo-caption',
+    og_ai_reasoning: 'Listicle with good imagery — photo-caption pairs image with clear headline.',
   },
   {
     id: 'demo-fi-6',
@@ -350,6 +365,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: null,
     status: 'pending',
     created_at: daysAgo(4),
+    og_image_url: 'https://placehold.co/1200x630/0f172a/94a3b8?text=AI+Calendar',
+    og_template_id: 'gradient-clean',
+    og_ai_reasoning: 'No image — clean gradient with AI/optimization theme.',
   },
   {
     id: 'demo-fi-7',
@@ -365,6 +383,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: null,
     status: 'posted',
     created_at: daysAgo(7),
+    og_image_url: 'https://placehold.co/1200x630/1a365d/bee3f8?text=Analytics+Guide',
+    og_template_id: 'photo-glass',
+    og_ai_reasoning: 'Comprehensive guide with strong imagery — photo-glass adds premium feel.',
   },
   {
     id: 'demo-fi-8',
@@ -380,6 +401,9 @@ const baseFeedItems: RssFeedItem[] = [
     post_id: null,
     status: 'skipped',
     created_at: daysAgo(12),
+    og_image_url: null,
+    og_template_id: null,
+    og_ai_reasoning: null,
   },
 ];
 

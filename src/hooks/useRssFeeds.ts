@@ -31,6 +31,9 @@ export interface RssFeedItem {
   post_id: string | null;
   status: 'pending' | 'posted' | 'failed' | 'skipped';
   created_at: string;
+  og_image_url: string | null;
+  og_template_id: string | null;
+  og_ai_reasoning: string | null;
 }
 
 export function useRssFeeds() {

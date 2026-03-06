@@ -46,6 +46,22 @@ export default function ApprovePost() {
     setStatus("pending");
   };
 
+  // Set og:image meta tag for social previews
+  useEffect(() => {
+    const imageUrl = approval?.image_url || approval?.article_image_url;
+    if (!imageUrl) return;
+
+    let meta = document.querySelector('meta[property="og:image"]') as HTMLMetaElement | null;
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('property', 'og:image');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', imageUrl);
+
+    return () => { meta?.remove(); };
+  }, [approval?.image_url, approval?.article_image_url]);
+
   const handleApprove = async () => {
     setStatus("approving");
     try {
