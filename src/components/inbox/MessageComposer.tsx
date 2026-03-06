@@ -20,6 +20,7 @@ interface MessageComposerProps {
   replyTo?: InboxMessage | null;
   onCancelReply?: () => void;
   onSlashTrigger?: () => void;
+  defaultContent?: string;
 }
 
 export function MessageComposer({
@@ -31,6 +32,7 @@ export function MessageComposer({
   replyTo,
   onCancelReply,
   onSlashTrigger,
+  defaultContent,
 }: MessageComposerProps) {
   const [content, setContent] = useState('');
   const [isNoteMode, setIsNoteMode] = useState(false);
@@ -41,6 +43,14 @@ export function MessageComposer({
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
+
+  // Pre-fill from AI suggestions or external source
+  useEffect(() => {
+    if (defaultContent) {
+      setContent(defaultContent);
+      textareaRef.current?.focus();
+    }
+  }, [defaultContent]);
 
   const handleSubmit = () => {
     const trimmed = content.trim();

@@ -61,3 +61,55 @@ export function useSummarizeThread() {
     },
   });
 }
+
+export function useClassifyConversation() {
+  const { selectedCompanyId } = useSelectedCompany();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      if (!selectedCompanyId) throw new Error('No company selected');
+      return invokeInboxAI<{
+        category: string;
+        subcategory: string;
+        editorial_value: number;
+        sentiment: string;
+        confidence: number;
+        language: string;
+        topics: string[];
+        priority: string;
+      }>({
+        action: 'classify',
+        companyId: selectedCompanyId,
+        conversationId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+    },
+  });
+}
+
+export function useSaveFeedback() {
+  const { selectedCompanyId } = useSelectedCompany();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId: string;
+      feedbackType: 'classification' | 'editorial_value' | 'sentiment';
+      originalValue: Record<string, unknown>;
+      correctedValue: Record<string, unknown>;
+    }) => {
+      if (!selectedCompanyId) throw new Error('No company selected');
+      return invokeInboxAI<{ feedback: unknown }>({
+        action: 'save-feedback',
+        companyId: selectedCompanyId,
+        ...params,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+    },
+  });
+}

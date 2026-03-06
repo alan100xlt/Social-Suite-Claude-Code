@@ -1018,6 +1018,9 @@ export const DEMO_INBOX_CONVERSATIONS: InboxConversation[] = [
     last_message_at: minsAgo(15), last_message_preview: 'This is exactly what we needed! How does the AI scheduling work?',
     unread_count: 2, metadata: {}, created_at: hoursAgo(3), updated_at: minsAgo(15),
     labels: [{ label: DEMO_INBOX_LABELS[0] }],
+    message_type: 'community', message_subtype: 'positive_engagement', editorial_value: 4,
+    detected_language: 'en', ai_classified_at: minsAgo(14), correction_status: null,
+    article_url: null, article_title: null,
   },
   {
     id: 'demo-conv-2', company_id: DEMO_COMPANY_ID, platform: 'instagram',
@@ -1028,6 +1031,9 @@ export const DEMO_INBOX_CONVERSATIONS: InboxConversation[] = [
     last_message_at: hoursAgo(1), last_message_preview: 'Hey! Love your platform. Quick question about pricing...',
     unread_count: 1, metadata: {}, created_at: hoursAgo(2), updated_at: hoursAgo(1),
     labels: [],
+    message_type: 'business', message_subtype: 'advertising_inquiry', editorial_value: 3,
+    detected_language: 'en', ai_classified_at: hoursAgo(1), correction_status: null,
+    article_url: null, article_title: null,
   },
   {
     id: 'demo-conv-3', company_id: DEMO_COMPANY_ID, platform: 'linkedin',
@@ -1039,6 +1045,9 @@ export const DEMO_INBOX_CONVERSATIONS: InboxConversation[] = [
     last_message_at: hoursAgo(4), last_message_preview: 'Great insights! We saw similar results with our B2B content.',
     unread_count: 0, metadata: {}, created_at: hoursAgo(6), updated_at: hoursAgo(4),
     labels: [{ label: DEMO_INBOX_LABELS[3] }],
+    message_type: 'community', message_subtype: 'discussion', editorial_value: 2,
+    detected_language: 'en', ai_classified_at: hoursAgo(4), correction_status: null,
+    article_url: 'https://longtale.ai/blog/content-repurposing', article_title: 'Content Repurposing Strategy for B2B',
   },
   {
     id: 'demo-conv-4', company_id: DEMO_COMPANY_ID, platform: 'facebook',
@@ -1049,6 +1058,9 @@ export const DEMO_INBOX_CONVERSATIONS: InboxConversation[] = [
     last_message_at: hoursAgo(8), last_message_preview: 'Can you help me set up the RSS automation? Having trouble with the feed URL.',
     unread_count: 3, metadata: {}, created_at: hoursAgo(12), updated_at: hoursAgo(8),
     labels: [{ label: DEMO_INBOX_LABELS[2] }],
+    message_type: 'support', message_subtype: 'technical_problem', editorial_value: 1,
+    detected_language: 'en', ai_classified_at: hoursAgo(8), correction_status: null,
+    article_url: null, article_title: null,
   },
   {
     id: 'demo-conv-5', company_id: DEMO_COMPANY_ID, platform: 'tiktok',
@@ -1059,6 +1071,9 @@ export const DEMO_INBOX_CONVERSATIONS: InboxConversation[] = [
     last_message_at: hoursAgo(2), last_message_preview: 'This is so cool! Can you do a full tutorial?',
     unread_count: 1, metadata: {}, created_at: hoursAgo(5), updated_at: hoursAgo(2),
     labels: [{ label: DEMO_INBOX_LABELS[1] }],
+    message_type: 'editorial', message_subtype: 'story_idea', editorial_value: 5,
+    detected_language: 'en', ai_classified_at: hoursAgo(2), correction_status: null,
+    article_url: null, article_title: null,
   },
   {
     id: 'demo-conv-6', company_id: DEMO_COMPANY_ID, platform: 'twitter',
@@ -1069,6 +1084,9 @@ export const DEMO_INBOX_CONVERSATIONS: InboxConversation[] = [
     last_message_at: daysAgo(1), last_message_preview: 'Thanks for the help! Everything is working now.',
     unread_count: 0, metadata: {}, created_at: daysAgo(3), updated_at: daysAgo(1),
     labels: [],
+    message_type: 'general', message_subtype: 'greeting_chat', editorial_value: 1,
+    detected_language: 'en', ai_classified_at: daysAgo(1), correction_status: null,
+    article_url: null, article_title: null,
   },
 ];
 

@@ -31,6 +31,8 @@ export interface InboxLabel {
   created_at: string;
 }
 
+export type MessageCategory = 'editorial' | 'business' | 'support' | 'community' | 'noise' | 'general';
+
 export interface InboxConversation {
   id: string;
   company_id: string;
@@ -54,6 +56,15 @@ export interface InboxConversation {
   created_at: string;
   updated_at: string;
   labels: Array<{ label: InboxLabel }>;
+  // AI classification columns (Phase 1)
+  message_type: MessageCategory | null;
+  message_subtype: string | null;
+  editorial_value: number | null;
+  detected_language: string | null;
+  ai_classified_at: string | null;
+  correction_status: 'received' | 'reviewing' | 'fixed' | null;
+  article_url: string | null;
+  article_title: string | null;
 }
 
 export interface InboxMessage {

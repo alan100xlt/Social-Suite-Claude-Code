@@ -19,9 +19,12 @@ import {
   Mail,
   Star,
   AtSign,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+import { ClassificationBadge } from './ClassificationBadge';
+import { SignalScoreBadge } from './SignalScoreBadge';
 import type { InboxConversation, InboxLabel } from '@/lib/api/inbox';
 
 interface ContactDetailPanelProps {
@@ -104,22 +107,6 @@ export function ContactDetailPanel({
             </Badge>
           </div>
 
-          {conversation.sentiment && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-xs">Sentiment</span>
-              <Badge
-                variant="outline"
-                className={
-                  conversation.sentiment === 'positive' ? 'text-green-500 border-green-500/30 text-xs' :
-                  conversation.sentiment === 'negative' ? 'text-red-500 border-red-500/30 text-xs' :
-                  'text-muted-foreground text-xs'
-                }
-              >
-                {conversation.sentiment}
-              </Badge>
-            </div>
-          )}
-
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground text-xs">Created</span>
             <span className="text-xs">{format(new Date(conversation.created_at), 'MMM d, yyyy')}</span>
@@ -138,6 +125,62 @@ export function ContactDetailPanel({
           )}
         </div>
       </div>
+
+      {/* AI Analysis section */}
+      {conversation.message_type && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-violet-500" /> AI Analysis
+            </h4>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">Category</span>
+                <ClassificationBadge category={conversation.message_type} subcategory={conversation.message_subtype} showSubcategory />
+              </div>
+
+              {conversation.editorial_value && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Signal Score</span>
+                  <SignalScoreBadge score={conversation.editorial_value} />
+                </div>
+              )}
+
+              {conversation.sentiment && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Sentiment</span>
+                  <Badge
+                    variant="outline"
+                    className={
+                      conversation.sentiment === 'positive' ? 'text-green-500 border-green-500/30 text-xs capitalize' :
+                      conversation.sentiment === 'negative' ? 'text-red-500 border-red-500/30 text-xs capitalize' :
+                      'text-muted-foreground text-xs capitalize'
+                    }
+                  >
+                    {conversation.sentiment}
+                  </Badge>
+                </div>
+              )}
+
+              {conversation.detected_language && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Language</span>
+                  <span className="text-xs font-medium uppercase">{conversation.detected_language}</span>
+                </div>
+              )}
+
+              {conversation.correction_status && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">Correction</span>
+                  <Badge variant="destructive" className="text-xs capitalize">{conversation.correction_status}</Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       <Separator />
 
