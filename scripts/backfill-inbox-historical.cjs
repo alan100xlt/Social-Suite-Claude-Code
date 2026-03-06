@@ -61,20 +61,35 @@ if (!showStatus && !backfillAll && !targetCompanyId) {
 // ─── Config ──────────────────────────────────────────────────
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'alan@100xlt.ai';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('ERROR: Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('ERROR: Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY in .env.local');
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Main ────────────────────────────────────────────────────
 
 async function main() {
+  // Authenticate
+  if (!ADMIN_PASSWORD) {
+    console.error('ERROR: Set ADMIN_PASSWORD in .env.local or as env var');
+    process.exit(1);
+  }
+  const { error: loginErr } = await supabase.auth.signInWithPassword({
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+  });
+  if (loginErr) {
+    console.error('Login failed:', loginErr.message);
+    process.exit(1);
+  }
+  console.log(`Authenticated as ${ADMIN_EMAIL}\n`);
+
   if (showStatus) {
     return await showJobStatus();
   }
@@ -117,18 +132,16 @@ async function main() {
     console.log(`── Triggering historical sync for ${company.name} ──`);
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/inbox-historical-sync`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ companyId: company.id }),
+      const { data, error: invokeErr } = await supabase.functions.invoke('inbox-historical-sync', {
+        body: { companyId: company.id },
       });
 
-      const data = await response.json();
+      if (invokeErr) {
+        console.error(`  Invoke error: ${invokeErr.message}`);
+        continue;
+      }
 
-      if (data.success) {
+      if (data && data.success) {
         console.log(`  Job started: ${data.jobId}`);
 
         // Poll for progress

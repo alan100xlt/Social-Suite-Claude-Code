@@ -77,3 +77,9 @@ verify_jwt = false
 
 [functions.getlate-webhook]
 verify_jwt = false
+
+[functions.inbox-historical-sync]
+verify_jwt = false
+
+[functions.inbox-backfill]
+verify_jwt = false
