@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.inbox-ai]
 verify_jwt = false
+
+[functions.getlate-webhook]
+verify_jwt = false
