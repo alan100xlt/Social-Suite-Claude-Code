@@ -47,6 +47,44 @@
     "symlinkDirectories": ["node_modules", "scripts/slack-agent/node_modules"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/session-health-check.cjs",
+            "timeout": 10000
+          },
+          {
+            "type": "command",
+            "command": "node scripts/hooks/check-edge-function-drift.cjs",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/stop-edge-function-guard.cjs",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/block-process-env.js"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
