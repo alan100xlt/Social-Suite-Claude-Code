@@ -412,7 +412,7 @@ async function syncComments(
               }
 
               if (convResult.isNew && post.postId) {
-                await linkArticleToConversation(supabase, post.postId, convResult.id);
+                await linkArticleToConversation(supabase, post.postId, convResult.id, targetCompany.id);
               }
 
               const platformMsgId = comment.id;

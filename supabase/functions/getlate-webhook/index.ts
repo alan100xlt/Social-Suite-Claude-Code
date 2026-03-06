@@ -373,7 +373,7 @@ async function handleCommentReceived(
 
   // Link article on new conversations
   if (convResult.isNew && postId) {
-    await linkArticleToConversation(supabase, postId, convResult.id);
+    await linkArticleToConversation(supabase, postId, convResult.id, companyId);
   }
 
   const commentId = (extractField(data, 'commentId', 'comment_id', 'id') as string) || '';

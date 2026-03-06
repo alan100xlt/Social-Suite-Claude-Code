@@ -348,11 +348,20 @@ async function notifyEditor(
   if (rule.notify_via?.includes('email')) {
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (resendApiKey) {
-      // Fetch user emails
+      // Fetch user emails — only for users who are members of this company
+      const { data: members } = await supabase
+        .from('company_memberships')
+        .select('user_id')
+        .eq('company_id', message.company_id)
+        .in('user_id', rule.notify_user_ids);
+
+      const memberIds = (members || []).map(m => m.user_id);
+      if (memberIds.length === 0) return;
+
       const { data: users } = await supabase
         .from('profiles')
         .select('email')
-        .in('id', rule.notify_user_ids);
+        .in('id', memberIds);
 
       for (const user of users || []) {
         if (!user.email) continue;

@@ -467,6 +467,16 @@ async function addLabel(
 
   if (!label) throw new Error('Label not found');
 
+  // Verify conversation belongs to company
+  const { data: conv } = await supabase
+    .from('inbox_conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (!conv) throw new Error('Conversation not found');
+
   const { error } = await supabase
     .from('inbox_conversation_labels')
     .insert({ conversation_id: conversationId, label_id: labelId });
@@ -508,6 +518,16 @@ async function addInternalNote(
   userId: string,
   content: string
 ) {
+  // Verify conversation belongs to company
+  const { data: conv } = await supabase
+    .from('inbox_conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (!conv) throw new Error('Conversation not found');
+
   const { data, error } = await supabase
     .from('inbox_messages')
     .insert({

@@ -161,6 +161,7 @@ export async function insertMessageIfNew(
     .select('id')
     .eq('platform_message_id', data.platformMessageId)
     .eq('conversation_id', conversationId)
+    .eq('company_id', companyId)
     .maybeSingle();
 
   if (existing) {
@@ -196,14 +197,21 @@ export async function insertMessageIfNew(
 export async function linkArticleToConversation(
   supabase: SupabaseClient,
   postId: string,
-  conversationId: string
+  conversationId: string,
+  companyId?: string
 ): Promise<void> {
   try {
-    const { data: feedItem } = await supabase
+    // Scope to company's feeds to prevent cross-tenant article data leak
+    let query = supabase
       .from('rss_feed_items')
-      .select('link, title')
-      .eq('post_id', postId)
-      .maybeSingle();
+      .select('link, title, rss_feeds!inner(company_id)')
+      .eq('post_id', postId);
+
+    if (companyId) {
+      query = query.eq('rss_feeds.company_id', companyId);
+    }
+
+    const { data: feedItem } = await query.maybeSingle();
 
     if (feedItem?.link) {
       await supabase.from('inbox_conversations').update({

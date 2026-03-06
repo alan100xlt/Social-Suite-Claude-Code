@@ -263,7 +263,9 @@ serve(async (req: Request) => {
   }
 
   const startTime = Date.now();
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   let userId: string | null = null;
   let companyId: string | null = null;
 
@@ -271,14 +273,23 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { action } = body;
 
-    // Auth: allow service_role or JWT
+    // Auth: require valid JWT or service_role for all actions except list-templates
     const authHeader = req.headers.get("Authorization");
-    if (authHeader?.startsWith("Bearer ")) {
+    if (action === "list-templates") {
+      // Public endpoint — no auth needed
+    } else if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Authorization required" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } else {
       try {
         const auth = await authorize(req, { allowServiceRole: true });
         userId = auth.userId;
-      } catch {
-        // Service role calls from rss-poll won't have a user
+      } catch (authErr) {
+        if (authErr instanceof Response) return authErr;
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
@@ -348,7 +359,8 @@ serve(async (req: Request) => {
           const png = resvg.render().asPng();
           return new Response(png, { headers: { ...corsHeaders, "Content-Type": "image/png" } });
         } catch (e) {
-          return new Response(JSON.stringify({ error: String(e), stack: (e as Error).stack }), {
+          console.error("Test-render error:", (e as Error).stack || e);
+          return new Response(JSON.stringify({ error: "Render failed" }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -404,9 +416,8 @@ serve(async (req: Request) => {
           fontOverride,
         });
       } catch (renderErr) {
-        const stack = renderErr instanceof Error ? renderErr.stack : String(renderErr);
-        console.error("Render error:", stack);
-        return new Response(JSON.stringify({ error: String(renderErr), stack }), {
+        console.error("Render error:", renderErr instanceof Error ? renderErr.stack : String(renderErr));
+        return new Response(JSON.stringify({ error: "Render failed" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
