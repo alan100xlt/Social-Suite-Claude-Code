@@ -10,6 +10,7 @@ import { RefreshCcw, Shield, Zap, Loader2 } from "lucide-react";
 import { useAccounts, useConnectPlatform, useDisconnectAccount } from "@/hooks/useGetLateAccounts";
 import { Platform } from "@/lib/api/getlate";
 import { useToast } from "@/hooks/use-toast";
+import { PlatformMetricsMatrix } from "@/components/shared/PlatformMetricsMatrix";
 
 interface PlatformConfig {
   id: Platform;
@@ -238,6 +239,17 @@ export default function ConnectionsPage() {
           </p>
         </div>
       )}
+
+      {/* Metrics by Platform */}
+      <div className="mt-8">
+        <h2 className="font-display font-semibold text-xl text-foreground mb-4">
+          Metrics by Platform
+        </h2>
+        <PlatformMetricsMatrix
+          mode="connections"
+          connectedPlatforms={(accounts ?? []).map((a) => a.platform)}
+        />
+      </div>
 
       {/* Page Selection Dialog */}
       <PageSelectionDialog

@@ -41,6 +41,8 @@ import {
   DEMO_ROUTING_RULES,
   DEMO_TEAM_WORKLOAD,
   DEMO_TEAM_METRICS,
+  DEMO_PLATFORM_METRICS_MATRIX,
+  DEMO_PLATFORM_SPARKLINES,
 } from './demo-data';
 
 interface DemoContextValue {
@@ -313,6 +315,14 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
 
     // Cross-outlet members (empty for demo — no media company hierarchy)
     queryClient.setQueryData(['cross-outlet-members', DEMO_COMPANY_ID], []);
+
+    // Platform metrics matrix
+    queryClient.setQueryData(['platform-metrics-matrix', DEMO_COMPANY_ID], DEMO_PLATFORM_METRICS_MATRIX);
+
+    // Platform sparklines (per platform)
+    for (const [platform, sparklineData] of Object.entries(DEMO_PLATFORM_SPARKLINES)) {
+      queryClient.setQueryData(['platform-sparklines', platform, DEMO_COMPANY_ID], sparklineData);
+    }
   }, [isDemo, queryClient]);
 
   const value = useMemo(() => ({ isDemo }), [isDemo]);

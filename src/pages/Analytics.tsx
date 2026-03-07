@@ -46,6 +46,8 @@ import {
 import { AnalyticsErrorBoundary } from "@/components/analytics/AnalyticsErrorBoundary";
 import { CrossOutletAnalytics } from "@/components/analytics/CrossOutletAnalytics";
 import { FeatureGate } from "@/components/auth/FeatureGate";
+import { PlatformMetricsMatrix } from "@/components/shared/PlatformMetricsMatrix";
+import { useAccounts } from "@/hooks/useGetLateAccounts";
 
 function WidgetSkeleton() {
   return (
@@ -82,6 +84,7 @@ export default function Analytics() {
   const { data: decayBuckets } = useContentDecay();
   const { data: topPosts, isLoading: topPostsLoading } = useTopPerformingPosts({ days: 30 });
   const { data: allPosts, isLoading: allPostsLoading } = useAllPostsWithAnalytics();
+  const { data: analyticsAccounts } = useAccounts();
 
   // Transforms
   const sparklines = useMemo(() => buildKpiSparklines(pdm || []), [pdm]);
@@ -257,6 +260,16 @@ export default function Analytics() {
                   />
                 </div>
               )}
+              {/* Platform Metrics Overview */}
+              <div className="mt-2">
+                <h3 className="font-display font-semibold text-lg text-foreground mb-3">
+                  Platform Metrics Overview
+                </h3>
+                <PlatformMetricsMatrix
+                  mode="analytics"
+                  connectedPlatforms={(analyticsAccounts ?? []).map((a) => a.platform)}
+                />
+              </div>
             </AnalyticsErrorBoundary>
           </TabsContent>
 
