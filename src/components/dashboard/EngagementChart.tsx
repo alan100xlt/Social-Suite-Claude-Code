@@ -77,7 +77,8 @@ export function EngagementChart({ startDate, endDate, timeframeLabel }: Engageme
     queryKey: ["dashboard-chart", companyId, fourteenDaysAgo, today],
     queryFn: async () => {
       if (!companyId) return [];
-      const { data, error } = await supabase.rpc("get_post_analytics_by_date", {
+      // Use publish_date grouping (same as Analytics page) for richer time-series data
+      const { data, error } = await supabase.rpc("get_post_analytics_by_publish_date", {
         _company_id: companyId,
         _start_date: fourteenDaysAgo,
         _end_date: today,
@@ -107,20 +108,20 @@ export function EngagementChart({ startDate, endDate, timeframeLabel }: Engageme
 
   // Transform → Nivo Line
   const lineData = (() => {
-    const rows = (dailyData || []) as Array<{ snapshot_date: string; views: number; likes: number }>;
+    const rows = (dailyData || []) as Array<{ publish_date: string; views: number; likes: number }>;
     if (rows.length === 0) return [];
     return [
       {
         id: "Views",
         data: rows.map((r) => ({
-          x: format(new Date(r.snapshot_date + "T00:00"), "MMM d"),
+          x: format(new Date(r.publish_date + "T00:00"), "MMM d"),
           y: Number(r.views) || 0,
         })),
       },
       {
         id: "Likes",
         data: rows.map((r) => ({
-          x: format(new Date(r.snapshot_date + "T00:00"), "MMM d"),
+          x: format(new Date(r.publish_date + "T00:00"), "MMM d"),
           y: Number(r.likes) || 0,
         })),
       },

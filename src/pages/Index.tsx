@@ -40,16 +40,18 @@ function useSparklineData(startDate: string, endDate: string) {
     queryKey: ["dashboard-sparkline", companyId, startDate, endDate],
     queryFn: async () => {
       if (!companyId) return null;
-      const { data, error } = await supabase.rpc("get_post_analytics_by_date", {
+      // Use publish_date grouping (same as Analytics page) — snapshot_date
+      // only has data from the day tracking was fixed forward.
+      const { data, error } = await supabase.rpc("get_post_analytics_by_publish_date", {
         _company_id: companyId,
         _start_date: startDate,
         _end_date: endDate,
       });
 
       if (error) throw error;
-      type Row = { snapshot_date: string; views: number; likes: number; reach: number; impressions: number; post_count: number; avg_engagement_rate: number };
+      type Row = { publish_date: string; views: number; likes: number; reach: number; impressions: number; post_count: number; avg_engagement_rate: number };
       const rows = (data || []) as Row[];
-      const pt = (r: Row, v: number): SparkPoint => ({ x: r.snapshot_date, y: v });
+      const pt = (r: Row, v: number): SparkPoint => ({ x: r.publish_date, y: v });
       return {
         reachSpark: rows.map((r) => pt(r, Number(r.reach) || Number(r.views) || Number(r.impressions) || 0)),
         engagementSpark: rows.map((r) => pt(r, Number(r.avg_engagement_rate) || 0)),
