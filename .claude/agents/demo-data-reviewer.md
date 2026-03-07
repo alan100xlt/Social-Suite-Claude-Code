@@ -37,7 +37,15 @@ For new hooks that call Supabase, verify one of:
 - Check for missing required fields or wrong types in mock data
 - New columns added via migrations should be reflected in demo data
 
-### 5. Schema Shape Verification
+### 5. Query Key String Matching
+
+Verify that query key strings are identical between hooks and DemoDataProvider:
+- Read the hook file to find the exact `queryKey: ['some-key', ...]` string
+- Read DemoDataProvider to find the matching `setQueryData(['some-key', ...])`
+- Flag any mismatches (e.g., hook uses `'post-timeline'` but provider uses `'postTimeline'`)
+- A single-character typo in a query key means demo data is never served — the hook falls through to Supabase and errors
+
+### 6. Schema Shape Verification
 
 Go beyond checking that a fixture exists — verify its **content** contains required fields and realistic values.
 

@@ -58,6 +58,14 @@ When reviewing test files, flag these issues as **blocking**:
 - **Hardcoded expected values** — test compares against magic strings/numbers instead of importing constants from source (e.g., testing `ALL_PERMISSIONS.length === 15` but hardcoding `15` instead of importing `ALL_PERMISSIONS`).
 - **Test would pass if production code deleted** — the test never imports or calls the production module. It tests a local copy, a mock, or a fixture in isolation. Delete the source file mentally — if the test still passes, it's broken.
 - **Missing layer coverage** — schema changes without integration tests, external API code without contract tests, new hooks without at least smoke-level imports test.
+- **Edge function without invocation test** — if a PR adds or modifies an edge function, it MUST have an integration test that calls the deployed function via HTTP (auth probe + health probe). Source-level string checks (`toContain`) are structural only and don't count.
+- **Silent test skips** — test catches an error and returns early with `console.warn` instead of failing. This creates false green results. Tests must either pass meaningfully or fail loudly.
+
+### 9. Edge Function Coverage
+When a PR adds a new hook that calls `supabase.functions.invoke`:
+- Check that `src/tests/integration/edge-function-health.test.ts` has a probe for the target edge function
+- Check that the hook's query key appears in `DemoDataProvider.tsx`
+- Check that `useSyncAnalytics.ts` invalidates the query key (if it's analytics-related)
 
 ## How to Review
 
