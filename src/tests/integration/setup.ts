@@ -25,6 +25,15 @@ if (!supabaseAnonKey) {
 
 export { supabaseUrl };
 
+// Expose keys as globals for integration tests that need raw HTTP access
+// (edge-function-health.test.ts uses fetch directly, not the Supabase client)
+declare global {
+  var __SERVICE_ROLE_KEY__: string;
+  var __ANON_KEY__: string;
+}
+globalThis.__SERVICE_ROLE_KEY__ = supabaseServiceKey;
+globalThis.__ANON_KEY__ = supabaseAnonKey;
+
 // Service role client — bypasses RLS, used for setup/cleanup
 export const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { persistSession: false, autoRefreshToken: false },

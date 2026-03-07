@@ -6,9 +6,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ActivityFeed } from '@/components/inbox/ActivityFeed';
+import { RoutingRulesPanel } from '@/components/inbox/RoutingRulesPanel';
 import { useTeamWorkload } from '@/hooks/useTeamWorkload';
 import { useTeamMetrics } from '@/hooks/useTeamMetrics';
-import { Loader2, Users, MessageSquare, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Users, MessageSquare, CheckCircle2, Clock, AlertCircle, Route } from 'lucide-react';
 
 const SENTIMENT_COLORS: Record<string, string> = {
   positive: '#22c55e',
@@ -295,6 +296,10 @@ export default function TeamWorkload() {
           <TabsList>
             <TabsTrigger value="workload">Workload</TabsTrigger>
             <TabsTrigger value="metrics">Metrics</TabsTrigger>
+            <TabsTrigger value="routing">
+              <Route className="h-4 w-4 mr-1" />
+              Routing
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="workload">
@@ -303,6 +308,10 @@ export default function TeamWorkload() {
 
           <TabsContent value="metrics">
             <MetricsTab />
+          </TabsContent>
+
+          <TabsContent value="routing">
+            <RoutingRulesPanel />
           </TabsContent>
         </Tabs>
       </div>
