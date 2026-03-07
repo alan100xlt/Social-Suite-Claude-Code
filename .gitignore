@@ -47,3 +47,11 @@ tmp_*.json
 tmp-figma-*.png
 deno.lock
 getlate-*.json
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Generated artifacts
+.firecrawl/
+context-window-optimization-report.md

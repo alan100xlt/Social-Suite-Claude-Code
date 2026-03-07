@@ -318,6 +318,10 @@ Do not lecture. Offer to continue. Use the `session-hygiene` skill for full guid
 - `/analytics-widget <description>` — scaffold a new chart widget (Recharts or Nivo)
 - `/review-pr [number|url]` — review a PR: summarize changes, run security checks, post findings to Slack
 - `/tdd` — project test strategy: test pyramid, what to test per component type, deployment gates
+- `/content-generation` — generate platform-optimized social media content (X, LinkedIn, Instagram, etc.)
+- `/edge-function-scaffold <name>` — scaffold a new Supabase edge function with standard boilerplate
+- `/inbox-debug` — diagnose inbox pipeline issues (stale syncs, webhook failures, message gaps)
+- `/tech-debt` — scan codebase for known debt patterns and output a prioritized report
 
 ## Linear Issue Generation (required before starting work)
 
@@ -343,4 +347,10 @@ Key files:
 - `performance-reviewer` — checks bundle size impact, unnecessary re-renders, missing lazy loading, and query efficiency
 - `analytics-reviewer` — reviews analytics code for the snapshot_date vs published_at bug, date filtering correctness, and data pipeline conventions
 - `supabase-reviewer` — reviews migrations, RLS policies, edge functions, and database queries for correctness and security
+- `getlate-api-reviewer` — catches GetLate API misuse (wrong paths, field names, profileId vs accountId)
+- `accessibility-reviewer` — WCAG 2.1 AA compliance: ARIA, keyboard nav, color contrast, form labels
+- `bi-engineer` — reviews data pipelines, ETL logic, analytics queries, and cron jobs for correctness
+- `dashboard-designer` — reviews analytics dashboards, chart widgets, and data visualizations
+- `business-analyst` — reviews features and metrics from business perspective (relevance, ROI, media company needs)
+- `documentation-writer` — generates feature docs, API/hook docs, component docs, and ADRs from source code
 

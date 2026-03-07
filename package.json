@@ -31,8 +31,9 @@
     "deploy:production": "vercel --env production",
     "docker:build": "docker build -t social-suite-enterprise .",
     "docker:run": "docker run -p 3000:3000 social-suite-enterprise",
-    "docs:generate": "typedoc --out docs src",
-    "docs:serve": "http-server docs -p 8080",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "analyze:bundle": "ANALYZE=true vite build",
     "clean": "rimraf dist .next out",
     "postinstall": "husky install || true",
@@ -155,6 +156,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19",
+    "vitepress": "^1.6.4",
     "vitest": "^3.2.4",
     "windsurf-task-manager": "^1.1.3"
   }
