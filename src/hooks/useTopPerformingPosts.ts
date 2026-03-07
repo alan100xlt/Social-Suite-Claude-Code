@@ -61,8 +61,9 @@ export function useTopPerformingPosts(params: TopPostsParams = {}) {
         .from('post_analytics_snapshots')
         .select('*')
         .eq('company_id', companyId)
-        .gte('snapshot_date', startDate.toISOString().split('T')[0])
-        .order('snapshot_date', { ascending: false });
+        .not('published_at', 'is', null)
+        .gte('published_at', startDate.toISOString())
+        .order('published_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching top posts:', error);

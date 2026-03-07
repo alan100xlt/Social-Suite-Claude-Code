@@ -63,8 +63,9 @@ export function useAllPostsWithAnalytics(params: { days?: number } = {}) {
           .from('post_analytics_snapshots')
           .select('*')
           .eq('company_id', companyId)
-          .gte('snapshot_date', startDateStr)
-          .order('snapshot_date', { ascending: false }),
+          .not('published_at', 'is', null)
+          .gte('published_at', startDate.toISOString())
+          .order('published_at', { ascending: false }),
         inactiveQuery,
       ]);
 

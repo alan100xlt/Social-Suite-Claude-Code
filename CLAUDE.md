@@ -162,6 +162,12 @@ Use `import.meta.env.*` not `process.env.*` — this is Vite, not CRA.
 
 When fixing a bug, always ask **"why does this failure mode exist?"** before writing a fix. If the answer is "because we designed it with unnecessary complexity," simplify the design rather than patching the symptom. Treat the root cause, not the surface error. A band-aid that makes tests pass is not a fix — it's tech debt with a green checkmark.
 
+## Analytics Date Filtering (CRITICAL)
+
+**NEVER filter `post_analytics_snapshots` by `snapshot_date`** — use `published_at` instead. `snapshot_date` is when the sync ran (all data on same day), `published_at` is when the post was published (spread across real dates). See the `analytics-data` skill for full rules.
+
+Exception: `account_analytics_snapshots` correctly uses `snapshot_date` (tracks growth over time).
+
 ## Known Issues / Watch Out For
 
 - **No lazy loading** — all pages bundled eagerly. Large bundle (~4MB after Nivo additions). Add `React.lazy()` for admin/analytics routes.
@@ -308,6 +314,7 @@ Do not lecture. Offer to continue. Use the `session-hygiene` skill for full guid
 - `/debug-build` — diagnose white screens, build errors, runtime crashes
 - `/session-hygiene` — review session hygiene signals and advise on context management
 - `/supabase-migration <description>` — scaffold and apply a new DB migration with RLS
+- `/analytics-data` — enforce date column rules, data pipeline conventions, and RPC patterns for analytics code
 - `/analytics-widget <description>` — scaffold a new chart widget (Recharts or Nivo)
 - `/review-pr [number|url]` — review a PR: summarize changes, run security checks, post findings to Slack
 - `/tdd` — project test strategy: test pyramid, what to test per component type, deployment gates
@@ -334,5 +341,6 @@ Key files:
 - `security-reviewer` — reviews auth/RLS/XSS issues; invoked automatically on security-adjacent changes
 - `code-reviewer` — reviews code for Social Suite conventions, TanStack Query patterns, multi-tenancy, and TypeScript quality
 - `performance-reviewer` — checks bundle size impact, unnecessary re-renders, missing lazy loading, and query efficiency
+- `analytics-reviewer` — reviews analytics code for the snapshot_date vs published_at bug, date filtering correctness, and data pipeline conventions
 - `supabase-reviewer` — reviews migrations, RLS policies, edge functions, and database queries for correctness and security
 

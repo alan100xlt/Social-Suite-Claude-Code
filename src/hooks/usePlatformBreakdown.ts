@@ -62,8 +62,9 @@ export function usePlatformBreakdown(params: PlatformBreakdownParams) {
         .from('post_analytics_snapshots')
         .select('platform, impressions, reach, views, likes, comments, shares, clicks, engagement_rate, account_id')
         .eq('company_id', companyId)
-        .gte('snapshot_date', params.startDate)
-        .lte('snapshot_date', params.endDate);
+        .not('published_at', 'is', null)
+        .gte('published_at', params.startDate)
+        .lte('published_at', params.endDate);
 
       if (postError) {
         console.error('Error fetching post analytics:', postError);

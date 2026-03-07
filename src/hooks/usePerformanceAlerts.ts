@@ -28,8 +28,9 @@ export function usePerformanceAlerts() {
         .from('post_analytics_snapshots')
         .select('*')
         .eq('company_id', selectedCompanyId)
-        .gte('snapshot_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('snapshot_date', { ascending: false })
+        .not('published_at', 'is', null)
+        .gte('published_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('published_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
