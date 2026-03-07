@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
 import { useToast } from '@/hooks/use-toast';
+import { useHasPermission } from '@/hooks/usePermissions';
+import { canTransition, type ContentStatus } from '@/lib/content-workflow';
 
 export interface PostDraft {
   id: string;
@@ -18,9 +21,15 @@ export interface PostDraft {
   image_url: string | null;
   current_step: number;
   compose_phase: string | null;
-  status: string;
+  status: ContentStatus;
   created_at: string;
   updated_at: string;
+  assigned_to: string | null;
+  reviewer_id: string | null;
+  due_at: string | null;
+  rejection_reason: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
 }
 
 export function usePostDrafts() {
@@ -169,6 +178,255 @@ export function useDeleteDraft() {
         description: error instanceof Error ? error.message : 'Failed to delete draft',
         variant: 'destructive',
       });
+    },
+  });
+}
+
+// --- Content Workflow Mutations ---
+
+async function logContentActivity(
+  companyId: string,
+  userId: string,
+  action: string,
+  draftId: string,
+  metadata: Record<string, any> = {}
+) {
+  await supabase.from('inbox_activity_log').insert({
+    company_id: companyId,
+    user_id: userId,
+    action,
+    entity_type: 'content',
+    entity_id: draftId,
+    metadata,
+  });
+}
+
+async function notifyWorkflowEvent(
+  userId: string,
+  title: string,
+  body: string,
+  draftId: string
+) {
+  try {
+    await supabase.functions.invoke('send-in-app-notification', {
+      body: { userId, title, body, actionUrl: `/app/content?draft=${draftId}` },
+    });
+  } catch (e) {
+    console.error('Workflow notification error:', e);
+  }
+}
+
+export function useSubmitForApproval() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useMutation({
+    mutationFn: async ({ draftId, currentStatus, reviewerId }: {
+      draftId: string;
+      currentStatus: ContentStatus;
+      reviewerId?: string;
+    }) => {
+      if (!canTransition(currentStatus, 'awaiting_approval')) {
+        throw new Error(`Cannot submit for approval from status "${currentStatus}"`);
+      }
+      if (!selectedCompanyId) throw new Error('No company');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('post_drafts' as any)
+        .update({
+          status: 'awaiting_approval',
+          reviewer_id: reviewerId || null,
+          updated_by: user.id,
+        } as any)
+        .eq('id', draftId);
+      if (error) throw error;
+
+      await logContentActivity(selectedCompanyId, user.id, 'content_submitted', draftId, {
+        user_name: user.email,
+      });
+
+      if (reviewerId) {
+        await notifyWorkflowEvent(reviewerId, '📋 Review Requested', 'A draft has been submitted for your review.', draftId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-drafts'] });
+      toast({ title: 'Submitted for approval' });
+    },
+    onError: (error) => {
+      toast({ title: 'Submit Failed', description: error instanceof Error ? error.message : 'Failed to submit', variant: 'destructive' });
+    },
+  });
+}
+
+export function useApproveContent() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useSelectedCompany();
+  const hasPublish = useHasPermission('publish');
+
+  return useMutation({
+    mutationFn: async ({ draftId, currentStatus, authorId }: {
+      draftId: string;
+      currentStatus: ContentStatus;
+      authorId: string;
+    }) => {
+      if (!hasPublish) throw new Error('You do not have permission to approve content');
+      if (!canTransition(currentStatus, 'approved')) {
+        throw new Error(`Cannot approve from status "${currentStatus}"`);
+      }
+      if (!selectedCompanyId) throw new Error('No company');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('post_drafts' as any)
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: user.id,
+          updated_by: user.id,
+        } as any)
+        .eq('id', draftId);
+      if (error) throw error;
+
+      await logContentActivity(selectedCompanyId, user.id, 'content_approved', draftId, {
+        user_name: user.email,
+      });
+
+      await notifyWorkflowEvent(authorId, '✅ Content Approved', 'Your draft has been approved.', draftId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-drafts'] });
+      toast({ title: 'Content approved' });
+    },
+    onError: (error) => {
+      toast({ title: 'Approve Failed', description: error instanceof Error ? error.message : 'Failed to approve', variant: 'destructive' });
+    },
+  });
+}
+
+export function useRejectContent() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useSelectedCompany();
+  const hasPublish = useHasPermission('publish');
+
+  return useMutation({
+    mutationFn: async ({ draftId, currentStatus, authorId, reason }: {
+      draftId: string;
+      currentStatus: ContentStatus;
+      authorId: string;
+      reason?: string;
+    }) => {
+      if (!hasPublish) throw new Error('You do not have permission to reject content');
+      if (!canTransition(currentStatus, 'rejected')) {
+        throw new Error(`Cannot reject from status "${currentStatus}"`);
+      }
+      if (!selectedCompanyId) throw new Error('No company');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('post_drafts' as any)
+        .update({
+          status: 'rejected',
+          rejection_reason: reason || null,
+          updated_by: user.id,
+        } as any)
+        .eq('id', draftId);
+      if (error) throw error;
+
+      await logContentActivity(selectedCompanyId, user.id, 'content_rejected', draftId, {
+        user_name: user.email,
+        reason,
+      });
+
+      await notifyWorkflowEvent(authorId, '❌ Content Rejected', reason || 'Your draft was not approved.', draftId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-drafts'] });
+      toast({ title: 'Content rejected' });
+    },
+    onError: (error) => {
+      toast({ title: 'Reject Failed', description: error instanceof Error ? error.message : 'Failed to reject', variant: 'destructive' });
+    },
+  });
+}
+
+export function usePullContent() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useMutation({
+    mutationFn: async ({ draftId, currentStatus }: {
+      draftId: string;
+      currentStatus: ContentStatus;
+    }) => {
+      if (!canTransition(currentStatus, 'pulled')) {
+        throw new Error(`Cannot pull from status "${currentStatus}"`);
+      }
+      if (!selectedCompanyId) throw new Error('No company');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('post_drafts' as any)
+        .update({ status: 'pulled', updated_by: user.id } as any)
+        .eq('id', draftId);
+      if (error) throw error;
+
+      await logContentActivity(selectedCompanyId, user.id, 'content_pulled', draftId, {
+        user_name: user.email,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-drafts'] });
+      toast({ title: 'Content pulled' });
+    },
+    onError: (error) => {
+      toast({ title: 'Pull Failed', description: error instanceof Error ? error.message : 'Failed to pull', variant: 'destructive' });
+    },
+  });
+}
+
+export function useAssignDraft() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useMutation({
+    mutationFn: async ({ draftId, assigneeId }: {
+      draftId: string;
+      assigneeId: string;
+    }) => {
+      if (!selectedCompanyId) throw new Error('No company');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('post_drafts' as any)
+        .update({ assigned_to: assigneeId, updated_by: user.id } as any)
+        .eq('id', draftId);
+      if (error) throw error;
+
+      await logContentActivity(selectedCompanyId, user.id, 'content_assigned', draftId, {
+        user_name: user.email,
+        assignee_id: assigneeId,
+      });
+
+      await notifyWorkflowEvent(assigneeId, '📝 Draft Assigned', 'A draft has been assigned to you.', draftId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post-drafts'] });
+      toast({ title: 'Draft assigned' });
+    },
+    onError: (error) => {
+      toast({ title: 'Assign Failed', description: error instanceof Error ? error.message : 'Failed to assign', variant: 'destructive' });
     },
   });
 }

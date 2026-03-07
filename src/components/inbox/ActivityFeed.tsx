@@ -13,6 +13,11 @@ const ACTION_CONFIG: Record<ActivityAction, { label: string; color: string }> = 
   escalated: { label: 'Escalated', color: 'bg-red-100 text-red-800' },
   correction_created: { label: 'Correction Created', color: 'bg-orange-100 text-orange-800' },
   correction_resolved: { label: 'Correction Resolved', color: 'bg-emerald-100 text-emerald-800' },
+  content_submitted: { label: 'Submitted', color: 'bg-indigo-100 text-indigo-800' },
+  content_approved: { label: 'Approved', color: 'bg-green-100 text-green-800' },
+  content_rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
+  content_pulled: { label: 'Pulled', color: 'bg-amber-100 text-amber-800' },
+  content_assigned: { label: 'Draft Assigned', color: 'bg-sky-100 text-sky-800' },
 };
 
 function getInitials(metadata: Record<string, any>): string {
@@ -42,6 +47,16 @@ function getDescription(action: ActivityAction, metadata: Record<string, any>): 
       return `${userName} created a correction`;
     case 'correction_resolved':
       return `${userName} resolved a correction`;
+    case 'content_submitted':
+      return `${userName} submitted a draft for approval`;
+    case 'content_approved':
+      return `${userName} approved a draft`;
+    case 'content_rejected':
+      return `${userName} rejected a draft${metadata?.reason ? `: ${metadata.reason}` : ''}`;
+    case 'content_pulled':
+      return `${userName} pulled published content`;
+    case 'content_assigned':
+      return `${userName} assigned a draft`;
     default:
       return `${userName} performed an action`;
   }

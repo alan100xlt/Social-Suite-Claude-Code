@@ -11,7 +11,14 @@ export type ActivityAction =
   | 'labeled'
   | 'escalated'
   | 'correction_created'
-  | 'correction_resolved';
+  | 'correction_resolved'
+  | 'content_submitted'
+  | 'content_approved'
+  | 'content_rejected'
+  | 'content_pulled'
+  | 'content_assigned';
+
+export type ActivityEntityType = 'conversation' | 'content';
 
 export interface ActivityEntry {
   id: string;
@@ -19,24 +26,30 @@ export interface ActivityEntry {
   user_id: string;
   action: ActivityAction;
   conversation_id: string | null;
+  entity_type: ActivityEntityType;
+  entity_id: string | null;
   metadata: Record<string, any>;
   created_at: string;
 }
 
-export function useActivityFeed(limit = 50) {
+export function useActivityFeed(limit = 50, entityType?: ActivityEntityType) {
   const { selectedCompanyId } = useSelectedCompany();
   const isDemo = isDemoCompany(selectedCompanyId);
 
   return useQuery({
-    queryKey: ['activity-feed', selectedCompanyId, limit],
+    queryKey: ['activity-feed', selectedCompanyId, limit, entityType],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('inbox_activity_log')
         .select('*')
         .eq('company_id', selectedCompanyId)
         .order('created_at', { ascending: false })
         .limit(limit);
+      if (entityType) {
+        query = query.eq('entity_type', entityType);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as ActivityEntry[];
     },
@@ -53,10 +66,14 @@ export function useLogActivity() {
     mutationFn: async ({
       action,
       conversationId,
+      entityType,
+      entityId,
       metadata,
     }: {
       action: ActivityAction;
       conversationId?: string;
+      entityType?: ActivityEntityType;
+      entityId?: string;
       metadata?: Record<string, any>;
     }) => {
       if (!selectedCompanyId) throw new Error('No company');
@@ -69,6 +86,8 @@ export function useLogActivity() {
         user_id: user.id,
         action,
         conversation_id: conversationId || null,
+        entity_type: entityType || 'conversation',
+        entity_id: entityId || conversationId || null,
         metadata: metadata || {},
       });
       if (error) throw error;

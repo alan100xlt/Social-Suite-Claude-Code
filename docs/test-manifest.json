@@ -134,6 +134,34 @@
       "L5_e2e": [
         "src/tests/end-to-end/core-pages.test.ts"
       ]
+    },
+    "platform-metrics-matrix": {
+      "description": "Platform Metrics Matrix widget showing metric availability and live values per platform",
+      "L1_contract": [],
+      "L2_integration": [],
+      "L3_smoke": [
+        "src/tests/smoke/platform-metrics-matrix.test.ts"
+      ],
+      "L4_unit": [
+        "src/test/platform-metrics.test.ts",
+        "src/test/usePlatformMetricsMatrix.test.ts",
+        "src/test/usePlatformSparklines.test.ts"
+      ],
+      "L5_e2e": [
+        "src/tests/end-to-end/platform-metrics.test.ts"
+      ]
+    },
+    "content-workflow": {
+      "description": "Content workflow state machine, kanban statuses, approval/rejection, assignment, audit trail",
+      "L1_contract": [],
+      "L2_integration": [
+        "src/tests/integration/content-workflow-rls.test.ts"
+      ],
+      "L3_smoke": [],
+      "L4_unit": [
+        "src/test/content-workflow.test.ts"
+      ],
+      "L5_e2e": []
     }
   }
 }
