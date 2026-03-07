@@ -35,6 +35,10 @@ import {
   DEMO_EVERGREEN_QUEUE,
   DEMO_FEATURE_CONFIG,
   DEMO_PERMISSIONS,
+  DEMO_GA_CONNECTIONS,
+  DEMO_GA_PAGE_SNAPSHOTS,
+  DEMO_GA_REFERRAL_SNAPSHOTS,
+  DEMO_GA_CONTENT_JOURNEY,
 } from './demo-data';
 
 interface DemoContextValue {
@@ -46,6 +50,14 @@ const DemoContext = createContext<DemoContextValue>({ isDemo: false });
 export function useDemo() {
   return useContext(DemoContext);
 }
+
+const GA_ARTICLES_PATHS = [
+  '/blog/ai-content-strategy',
+  '/blog/social-media-2026',
+  '/blog/content-calendar-tips',
+  '/blog/analytics-guide',
+  '/blog/brand-voice-ai',
+];
 
 export function DemoDataProvider({ children }: { children: React.ReactNode }) {
   const { selectedCompanyId } = useSelectedCompany();
@@ -282,6 +294,70 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
 
     // Cross-outlet analytics (Phase 11 — empty for demo, no media company)
     queryClient.setQueryData(['cross-outlet-analytics', undefined], []);
+
+    // ─── Google Analytics ───
+    queryClient.setQueryData(['ga-connections', DEMO_COMPANY_ID], DEMO_GA_CONNECTIONS);
+
+    // GA page metrics — aggregate from snapshots for common date ranges
+    const gaPageMetrics = GA_ARTICLES_PATHS.map(path => {
+      const snapshots = DEMO_GA_PAGE_SNAPSHOTS.filter(s => s.page_path === path);
+      return {
+        metricDate: today,
+        pagePath: path,
+        totalPageviews: snapshots.reduce((sum, s) => sum + s.pageviews, 0),
+        totalUniquePageviews: snapshots.reduce((sum, s) => sum + s.unique_pageviews, 0),
+        totalSessions: snapshots.reduce((sum, s) => sum + s.sessions, 0),
+        totalUsers: snapshots.reduce((sum, s) => sum + s.users, 0),
+        avgBounceRate: snapshots.length > 0 ? Math.round(snapshots.reduce((sum, s) => sum + s.bounce_rate, 0) / snapshots.length * 100) / 100 : 0,
+        avgTimeOnPage: snapshots.length > 0 ? Math.round(snapshots.reduce((sum, s) => sum + s.avg_time_on_page, 0) / snapshots.length * 100) / 100 : 0,
+      };
+    });
+    queryClient.setQueryData(['ga-page-metrics', DEMO_COMPANY_ID, { startDate: thirtyAgo, endDate: today }], gaPageMetrics);
+    queryClient.setQueryData(['ga-page-metrics', DEMO_COMPANY_ID, { startDate: sevenAgo, endDate: today }], gaPageMetrics);
+    queryClient.setQueryData(['ga-page-metrics', DEMO_COMPANY_ID, { startDate: ninetyAgo, endDate: today }], gaPageMetrics);
+
+    // GA traffic sources — aggregate from referral snapshots
+    const sourceMap = new Map<string, { source: string; medium: string; sessions: number; users: number; pageviews: number; bounceRateSum: number; durationSum: number; count: number }>();
+    for (const snap of DEMO_GA_REFERRAL_SNAPSHOTS) {
+      const key = `${snap.source}|${snap.medium}`;
+      const existing = sourceMap.get(key);
+      if (existing) {
+        existing.sessions += snap.sessions;
+        existing.users += snap.users;
+        existing.pageviews += snap.pageviews;
+        existing.bounceRateSum += snap.bounce_rate;
+        existing.durationSum += snap.avg_session_duration;
+        existing.count++;
+      } else {
+        sourceMap.set(key, {
+          source: snap.source,
+          medium: snap.medium,
+          sessions: snap.sessions,
+          users: snap.users,
+          pageviews: snap.pageviews,
+          bounceRateSum: snap.bounce_rate,
+          durationSum: snap.avg_session_duration,
+          count: 1,
+        });
+      }
+    }
+    const gaTrafficSources = Array.from(sourceMap.values()).map(s => ({
+      source: s.source,
+      medium: s.medium,
+      totalSessions: s.sessions,
+      totalUsers: s.users,
+      totalPageviews: s.pageviews,
+      avgBounceRate: Math.round(s.bounceRateSum / s.count * 100) / 100,
+      avgSessionDuration: Math.round(s.durationSum / s.count * 100) / 100,
+    })).sort((a, b) => b.totalSessions - a.totalSessions);
+    queryClient.setQueryData(['ga-traffic-sources', DEMO_COMPANY_ID, { startDate: thirtyAgo, endDate: today }], gaTrafficSources);
+    queryClient.setQueryData(['ga-traffic-sources', DEMO_COMPANY_ID, { startDate: sevenAgo, endDate: today }], gaTrafficSources);
+    queryClient.setQueryData(['ga-traffic-sources', DEMO_COMPANY_ID, { startDate: ninetyAgo, endDate: today }], gaTrafficSources);
+
+    // Content journey
+    queryClient.setQueryData(['content-journey', DEMO_COMPANY_ID, { startDate: thirtyAgo, endDate: today }], DEMO_GA_CONTENT_JOURNEY);
+    queryClient.setQueryData(['content-journey', DEMO_COMPANY_ID, { startDate: sevenAgo, endDate: today }], DEMO_GA_CONTENT_JOURNEY);
+    queryClient.setQueryData(['content-journey', DEMO_COMPANY_ID, { startDate: ninetyAgo, endDate: today }], DEMO_GA_CONTENT_JOURNEY);
   }, [isDemo, queryClient]);
 
   const value = useMemo(() => ({ isDemo }), [isDemo]);

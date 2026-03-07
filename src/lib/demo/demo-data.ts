@@ -1580,3 +1580,153 @@ export const DEMO_PERMISSIONS = {
     respond_inbox: true,
   },
 };
+
+// ─── Google Analytics ─────────────────────────────────────────
+
+export const DEMO_GA_CONNECTIONS = [
+  {
+    id: 'demo-ga-conn-1',
+    company_id: DEMO_COMPANY_ID,
+    google_email: 'analytics@longtale.ai',
+    property_id: 'properties/demo-123456',
+    property_name: 'Longtale Blog',
+    is_active: true,
+    connected_at: '2026-01-15T10:00:00Z',
+    last_sync_at: daysAgo(0),
+    sync_error: null,
+    created_at: '2026-01-15T10:00:00Z',
+    updated_at: daysAgo(0),
+  },
+];
+
+const GA_ARTICLES = [
+  { path: '/blog/ai-content-strategy', title: 'AI Content Strategy for Media Companies' },
+  { path: '/blog/social-media-2026', title: 'Social Media Trends in 2026' },
+  { path: '/blog/content-calendar-tips', title: '10 Content Calendar Tips That Actually Work' },
+  { path: '/blog/analytics-guide', title: 'The Complete Analytics Guide for Publishers' },
+  { path: '/blog/brand-voice-ai', title: 'How AI Can Maintain Your Brand Voice' },
+];
+
+const GA_SOURCES = [
+  { source: 'twitter.com', medium: 'social' },
+  { source: 'linkedin.com', medium: 'social' },
+  { source: 'facebook.com', medium: 'social' },
+  { source: 'google', medium: 'organic' },
+  { source: '(direct)', medium: '(none)' },
+];
+
+export const DEMO_GA_PAGE_SNAPSHOTS = GA_ARTICLES.flatMap((article, aIdx) =>
+  Array.from({ length: 14 }, (_, dayIdx) => ({
+    id: `demo-ga-page-${aIdx}-${dayIdx}`,
+    company_id: DEMO_COMPANY_ID,
+    connection_id: 'demo-ga-conn-1',
+    page_path: article.path,
+    page_title: article.title,
+    pageviews: Math.round(200 + Math.sin(aIdx + dayIdx) * 100 + aIdx * 50),
+    unique_pageviews: Math.round(150 + Math.sin(aIdx + dayIdx) * 80 + aIdx * 30),
+    sessions: Math.round(120 + Math.cos(aIdx + dayIdx) * 60 + aIdx * 20),
+    users: Math.round(100 + Math.cos(aIdx + dayIdx) * 50 + aIdx * 15),
+    avg_time_on_page: Math.round((90 + aIdx * 20 + dayIdx * 3) * 100) / 100,
+    bounce_rate: Math.round((35 + Math.sin(aIdx * 2) * 15) * 100) / 100,
+    snapshot_hour: subDays(NOW, dayIdx).toISOString(),
+  }))
+);
+
+export const DEMO_GA_REFERRAL_SNAPSHOTS = GA_ARTICLES.flatMap((article, aIdx) =>
+  GA_SOURCES.flatMap((src, sIdx) =>
+    Array.from({ length: 7 }, (_, dayIdx) => ({
+      id: `demo-ga-ref-${aIdx}-${sIdx}-${dayIdx}`,
+      company_id: DEMO_COMPANY_ID,
+      connection_id: 'demo-ga-conn-1',
+      page_path: article.path,
+      source: src.source,
+      medium: src.medium,
+      campaign: src.medium === 'social' ? 'longtale-auto' : null,
+      sessions: Math.round(20 + Math.sin(aIdx + sIdx + dayIdx) * 15),
+      users: Math.round(15 + Math.sin(aIdx + sIdx + dayIdx) * 10),
+      pageviews: Math.round(25 + Math.cos(aIdx + sIdx + dayIdx) * 12),
+      bounce_rate: Math.round((40 + sIdx * 5) * 100) / 100,
+      avg_session_duration: Math.round((60 + aIdx * 15 + sIdx * 10) * 100) / 100,
+      snapshot_hour: subDays(NOW, dayIdx).toISOString(),
+    }))
+  )
+);
+
+export const DEMO_GA_CONTENT_JOURNEY = [
+  {
+    postId: 'demo-post-twitter-1',
+    platform: 'twitter',
+    postContent: 'Our latest deep dive into AI content strategy is live! 🧵 Read the full analysis...',
+    postUrl: 'https://longtale.ai/blog/ai-content-strategy',
+    publishedAt: daysAgo(3),
+    impressions: 12400,
+    socialClicks: 890,
+    likes: 156,
+    shares: 43,
+    engagementRate: 4.2,
+    pagePath: '/blog/ai-content-strategy',
+    pageviews: 2340,
+    sessionsFromSocial: 645,
+    bounceRate: 32.5,
+    avgTimeOnPage: 185.3,
+    matchType: 'url',
+    matchConfidence: 1.0,
+  },
+  {
+    postId: 'demo-post-linkedin-1',
+    platform: 'linkedin',
+    postContent: 'Social media is evolving fast. Here are the trends shaping 2026...',
+    postUrl: 'https://longtale.ai/blog/social-media-2026',
+    publishedAt: daysAgo(5),
+    impressions: 8600,
+    socialClicks: 520,
+    likes: 210,
+    shares: 67,
+    engagementRate: 5.8,
+    pagePath: '/blog/social-media-2026',
+    pageviews: 1890,
+    sessionsFromSocial: 412,
+    bounceRate: 28.1,
+    avgTimeOnPage: 210.7,
+    matchType: 'url',
+    matchConfidence: 1.0,
+  },
+  {
+    postId: 'demo-post-facebook-1',
+    platform: 'facebook',
+    postContent: 'Struggling with content planning? These 10 calendar tips will change how you work.',
+    postUrl: 'https://longtale.ai/blog/content-calendar-tips',
+    publishedAt: daysAgo(7),
+    impressions: 6200,
+    socialClicks: 340,
+    likes: 89,
+    shares: 28,
+    engagementRate: 3.1,
+    pagePath: '/blog/content-calendar-tips',
+    pageviews: 1450,
+    sessionsFromSocial: 285,
+    bounceRate: 38.4,
+    avgTimeOnPage: 145.2,
+    matchType: 'url',
+    matchConfidence: 1.0,
+  },
+  {
+    postId: 'demo-post-twitter-2',
+    platform: 'twitter',
+    postContent: 'We built a comprehensive analytics guide for publishers. Here\'s what we learned...',
+    postUrl: 'https://longtale.ai/blog/analytics-guide',
+    publishedAt: daysAgo(10),
+    impressions: 9800,
+    socialClicks: 680,
+    likes: 134,
+    shares: 51,
+    engagementRate: 4.8,
+    pagePath: '/blog/analytics-guide',
+    pageviews: 2100,
+    sessionsFromSocial: 520,
+    bounceRate: 30.2,
+    avgTimeOnPage: 195.8,
+    matchType: 'url',
+    matchConfidence: 1.0,
+  },
+];
