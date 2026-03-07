@@ -271,20 +271,30 @@ export function WebhookHealthTab() {
           <CardTitle className="text-base">Pipeline Overview</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center gap-4 py-6">
-            <div className="text-center p-4 border rounded-lg bg-muted/50">
-              <p className="text-sm font-medium">GetLate API</p>
-              <p className="text-xs text-muted-foreground mt-1">External source</p>
-            </div>
-            <ArrowRight className="h-5 w-5 text-muted-foreground" />
-            <div className="text-center p-4 border rounded-lg bg-muted/50">
-              <p className="text-sm font-medium">inbox-sync</p>
+          <div className="flex items-center justify-center gap-3 py-6 flex-wrap">
+            <div className="text-center p-3 border rounded-lg bg-muted/50 min-w-[90px]">
+              <p className="text-sm font-medium">pg_cron</p>
               <p className="text-xs text-muted-foreground mt-1">Every 5 min</p>
             </div>
-            <ArrowRight className="h-5 w-5 text-muted-foreground" />
-            <div className="text-center p-4 border rounded-lg bg-muted/50">
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="text-center p-3 border rounded-lg bg-primary/5 border-primary/20 min-w-[110px]">
+              <p className="text-sm font-medium">cron-dispatcher</p>
+              <p className="text-xs text-muted-foreground mt-1">Fan-out</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="text-center p-3 border rounded-lg bg-muted/50 min-w-[90px]">
+              <p className="text-sm font-medium">inbox-sync</p>
+              <p className="text-xs text-muted-foreground mt-1">Per company</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="text-center p-3 border rounded-lg bg-muted/50 min-w-[90px]">
+              <p className="text-sm font-medium">GetLate API</p>
+              <p className="text-xs text-muted-foreground mt-1">External</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="text-center p-3 border rounded-lg bg-muted/50 min-w-[90px]">
               <p className="text-sm font-medium">Supabase</p>
-              <p className="text-xs text-muted-foreground mt-1">{messageCount24h} msgs (24h)</p>
+              <p className="text-xs text-muted-foreground mt-1">{messageCount24h} msgs/24h</p>
             </div>
           </div>
           <div className="flex justify-center gap-6 text-sm">
