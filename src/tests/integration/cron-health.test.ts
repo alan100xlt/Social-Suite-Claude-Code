@@ -2,27 +2,44 @@ import { describe, test, expect } from "vitest";
 import { adminClient } from "./setup";
 
 describe("Cron job health", () => {
-  test("all expected cron jobs are registered", async () => {
+  test("get_cron_jobs RPC returns data", async () => {
     const result = await adminClient.rpc("get_cron_jobs");
-    const data = result.data;
-    const error = result.error;
+    expect(
+      result.error,
+      `get_cron_jobs RPC failed: ${result.error?.message}. Fix the RPC or remove this test.`
+    ).toBeNull();
+    expect(Array.isArray(result.data)).toBe(true);
+    expect((result.data as any[]).length).toBeGreaterThan(0);
+  });
 
-    // If RPC doesn't work, use raw SQL via admin client
-    // Note: cron.job may not be directly queryable via PostgREST.
-    // This test verifies the jobs exist using the admin SQL endpoint.
-    if (error) {
-      // Skip gracefully — cron verification done via SQL in smoke tests
-      console.warn(
-        "Cannot verify cron jobs via PostgREST — use smoke test instead"
-      );
-      return;
-    }
+  test("core cron jobs are registered", async () => {
+    const result = await adminClient.rpc("get_cron_jobs");
+    const jobNames = (result.data as any[]).map((j: any) => j.jobname);
 
-    const jobNames = (data as any[]).map((j: any) => j.jobname);
+    // These 3 are critical — data pipeline breaks without them
     expect(jobNames).toContain("analytics-sync-hourly");
-    expect(jobNames).toContain("rss-poll-every-5-min");
-    expect(jobNames).toContain("getlate-changelog-monitor");
     expect(jobNames).toContain("inbox-sync-every-15-min");
-    expect(jobNames).toContain("cron-escalation-every-30-min");
+    expect(jobNames).toContain("rss-poll-every-5-min");
+  });
+
+  test("all enabled cron_job_settings have a matching pg_cron entry", async () => {
+    const { data: settings } = await adminClient
+      .from("cron_job_settings")
+      .select("job_name")
+      .eq("enabled", true);
+
+    if (!settings || settings.length === 0) return; // no settings table = skip
+
+    const result = await adminClient.rpc("get_cron_jobs");
+    const registeredNames = new Set((result.data as any[]).map((j: any) => j.jobname));
+
+    const missing = settings
+      .map((s: any) => s.job_name)
+      .filter((name: string) => !registeredNames.has(name));
+
+    expect(
+      missing,
+      `These jobs are enabled in cron_job_settings but NOT registered in pg_cron: ${missing.join(", ")}`
+    ).toHaveLength(0);
   });
 });

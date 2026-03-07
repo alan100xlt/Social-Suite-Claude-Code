@@ -27,7 +27,17 @@ UPDATE public.inbox_activity_log SET entity_id = conversation_id WHERE entity_id
 
 CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON public.inbox_activity_log(entity_type, entity_id);
 
--- ===== STEP 3: Seed notification preferences for content workflow events =====
+-- ===== STEP 3: Expand event_type check constraint and seed content workflow events =====
+ALTER TABLE public.notification_preferences
+  DROP CONSTRAINT IF EXISTS notification_preferences_event_type_check;
+
+ALTER TABLE public.notification_preferences
+  ADD CONSTRAINT notification_preferences_event_type_check
+  CHECK (event_type IN (
+    'assignment','mention','reply','status_change','correction','escalation','sla_breach',
+    'content_submitted','content_approved','content_rejected','content_published'
+  ));
+
 INSERT INTO public.notification_preferences (user_id, company_id, event_type, in_app, email)
 SELECT cm.user_id, cm.company_id, evt.type, true, false
 FROM public.company_memberships cm
