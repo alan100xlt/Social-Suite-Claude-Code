@@ -11,7 +11,7 @@ import { OnboardingProgressWidget } from "@/components/dashboard/OnboardingProgr
 import { DateRangeFilter } from "@/components/analytics/DateRangeFilter";
 import { getPremiumSeries } from "@/components/analytics-v2/widgets-v2/premium-theme";
 import { Button } from "@/components/ui/button";
-import { Plus, Users, Eye, BarChart3, FileText, Sparkles } from "lucide-react";
+import { Plus, Users, Eye, BarChart3, FileText, Sparkles, Database } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,26 @@ const fadeUp = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0, 0, 0.2, 1] as const } },
 };
+
+/** Debug tooltip showing data source — only visible on hover */
+function DataSourceTag({ sources }: { sources: string[] }) {
+  return (
+    <div className="group/ds absolute top-1.5 right-1.5 z-10">
+      <div className="opacity-0 group-hover/ds:opacity-100 transition-opacity duration-150 absolute right-0 top-6 bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-[11px] whitespace-nowrap pointer-events-none">
+        <div className="flex items-center gap-1.5 text-muted-foreground font-medium mb-1">
+          <Database className="w-3 h-3" />
+          Data source
+        </div>
+        {sources.map((s, i) => (
+          <div key={i} className="text-foreground font-mono">{s}</div>
+        ))}
+      </div>
+      <div className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/ds:opacity-60 transition-opacity cursor-help">
+        <Database className="w-3 h-3 text-muted-foreground" />
+      </div>
+    </div>
+  );
+}
 
 interface SparkPoint { x: string; y: number }
 
@@ -148,59 +168,97 @@ const Index = () => {
 
         {/* Hero KPI Row — 4x StatSparklineWidget from widgets-v2 */}
         <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatSparklineWidget
-            title="Followers"
-            value={stats.isLoading ? "—" : stats.totalFollowers}
-            change={trends.isLoading ? undefined : trends.followers.changePercent}
-            sparklineData={followersSpark}
-            color={series[0]}
-            icon={<Users className="w-4 h-4" />}
-            timeframeLabel={timeframeLabel}
-            secondaryValue={followerChange !== 0 ? followerChangeLabel : undefined}
-            secondaryLabel={followerChange !== 0 ? "net change" : undefined}
-          />
-          <StatSparklineWidget
-            title="Reach"
-            value={stats.isLoading ? "—" : stats.totalReach}
-            change={trends.isLoading ? undefined : trends.reach.changePercent}
-            sparklineData={sparkLoading ? [] : reachSpark}
-            color={series[1]}
-            icon={<Eye className="w-4 h-4" />}
-            timeframeLabel={timeframeLabel}
-          />
-          <StatSparklineWidget
-            title="Engagement"
-            value={stats.isLoading ? "—" : `${stats.avgEngagementRate.toFixed(2)}%`}
-            change={trends.isLoading ? undefined : trends.engagementRate.changePercent}
-            sparklineData={sparkLoading ? [] : engagementSpark}
-            color={series[2]}
-            icon={<BarChart3 className="w-4 h-4" />}
-            timeframeLabel={timeframeLabel}
-          />
-          <StatSparklineWidget
-            title="Posts"
-            value={stats.isLoading ? "—" : stats.totalPosts}
-            change={trends.isLoading ? undefined : trends.posts.changePercent}
-            sparklineData={sparkLoading ? [] : postsSpark}
-            chartType="bar"
-            color={series[3]}
-            icon={<FileText className="w-4 h-4" />}
-            timeframeLabel={timeframeLabel}
-          />
+          <div className="relative">
+            <DataSourceTag sources={[
+              "value: account_analytics_snapshots",
+              "spark: account_analytics_snapshots (daily)",
+              "trend: rpc get_post_analytics_totals",
+            ]} />
+            <StatSparklineWidget
+              title="Followers"
+              value={stats.isLoading ? "—" : stats.totalFollowers}
+              change={trends.isLoading ? undefined : trends.followers.changePercent}
+              sparklineData={followersSpark}
+              color={series[0]}
+              icon={<Users className="w-4 h-4" />}
+              timeframeLabel={timeframeLabel}
+              secondaryValue={followerChange !== 0 ? followerChangeLabel : undefined}
+              secondaryLabel={followerChange !== 0 ? "net change" : undefined}
+            />
+          </div>
+          <div className="relative">
+            <DataSourceTag sources={[
+              "value: rpc get_post_analytics_totals",
+              "spark: rpc get_post_analytics_by_publish_date",
+            ]} />
+            <StatSparklineWidget
+              title="Reach"
+              value={stats.isLoading ? "—" : stats.totalReach}
+              change={trends.isLoading ? undefined : trends.reach.changePercent}
+              sparklineData={sparkLoading ? [] : reachSpark}
+              color={series[1]}
+              icon={<Eye className="w-4 h-4" />}
+              timeframeLabel={timeframeLabel}
+            />
+          </div>
+          <div className="relative">
+            <DataSourceTag sources={[
+              "value: rpc get_post_analytics_totals",
+              "spark: rpc get_post_analytics_by_publish_date",
+            ]} />
+            <StatSparklineWidget
+              title="Engagement"
+              value={stats.isLoading ? "—" : `${stats.avgEngagementRate.toFixed(2)}%`}
+              change={trends.isLoading ? undefined : trends.engagementRate.changePercent}
+              sparklineData={sparkLoading ? [] : engagementSpark}
+              color={series[2]}
+              icon={<BarChart3 className="w-4 h-4" />}
+              timeframeLabel={timeframeLabel}
+            />
+          </div>
+          <div className="relative">
+            <DataSourceTag sources={[
+              "value: rpc get_post_analytics_totals",
+              "spark: rpc get_post_analytics_by_publish_date",
+            ]} />
+            <StatSparklineWidget
+              title="Posts"
+              value={stats.isLoading ? "—" : stats.totalPosts}
+              change={trends.isLoading ? undefined : trends.posts.changePercent}
+              sparklineData={sparkLoading ? [] : postsSpark}
+              chartType="bar"
+              color={series[3]}
+              icon={<FileText className="w-4 h-4" />}
+              timeframeLabel={timeframeLabel}
+            />
+          </div>
         </motion.div>
 
         {/* Top Posts + Activity Timeline — same row */}
         <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5">
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 relative">
+            <DataSourceTag sources={[
+              "post_analytics_snapshots (latest per post)",
+              "account_analytics_snapshots (avg benchmark)",
+            ]} />
             <TopPostsSpotlight days={days} timeframeLabel={timeframeLabel} />
           </div>
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 relative">
+            <DataSourceTag sources={[
+              "GetLate API /posts (scheduled)",
+              "post_approvals table (pending)",
+              "post_drafts table",
+            ]} />
             <ActivityTimeline />
           </div>
         </motion.div>
 
         {/* Engagement Chart — full width */}
-        <motion.div variants={fadeUp}>
+        <motion.div variants={fadeUp} className="relative">
+          <DataSourceTag sources={[
+            "line: rpc get_post_analytics_by_publish_date",
+            "bars: rpc get_post_analytics_by_platform",
+          ]} />
           <EngagementChart startDate={startDate} endDate={endDate} timeframeLabel={timeframeLabel} />
         </motion.div>
       </motion.div>
