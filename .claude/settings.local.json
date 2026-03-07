@@ -64,7 +64,21 @@
       "WebFetch(domain:ogimage.io)",
       "WebFetch(domain:og-image.org)",
       "mcp__figma__get_metadata",
-      "mcp__figma__whoami"
+      "mcp__figma__whoami",
+      "mcp__claude_ai_Linear__save_comment",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_evaluate",
+      "WebFetch(domain:www.framer.com)",
+      "WebFetch(domain:getlate.dev)",
+      "WebFetch(domain:www.courier.com)",
+      "WebFetch(domain:novu.co)",
+      "WebFetch(domain:www.suprsend.com)",
+      "WebFetch(domain:knock.app)",
+      "WebFetch(domain:engagespot.co)",
+      "WebFetch(domain:www.magicbell.com)",
+      "WebFetch(domain:www.g2.com)",
+      "WebFetch(domain:www.capterra.com)",
+      "WebFetch(domain:bundlephobia.com)"
     ]
   }
 }

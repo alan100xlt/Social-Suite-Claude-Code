@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.inbox-backfill]
 verify_jwt = false
+
+[functions.webhook-admin]
+verify_jwt = false

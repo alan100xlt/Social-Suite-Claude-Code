@@ -1,22 +1,25 @@
 ---
 name: analytics-widget
-description: Scaffold a new analytics chart widget following Social Suite conventions (Recharts or Nivo)
+description: Scaffold a new analytics chart widget following Social Suite conventions (Nivo premium widgets)
 tools: Read, Edit, Write, Bash, Glob, Grep
 user-invocable: true
 ---
 
 Create a new analytics widget: $ARGUMENTS
 
-## Decide: Recharts or Nivo?
-- **Recharts** → use for `/app/analytics` (primary analytics page) — files in `src/components/analytics/`
-- **Nivo** → use for `/app/analytics-v2` (widget system) — files in `src/components/analytics-v2/`
-- If unclear, ask the user which page it belongs to
+## Widget System
+
+All analytics widgets use the **premium widgets-v2** system (Nivo-based, glassmorphism cards).
+- Widget files: `src/components/analytics-v2/widgets-v2/`
+- Design foundation: `premium-theme.ts` (colors, gradients, typography)
+- Card wrapper: `ChartCard.tsx` (glassmorphism wrapper)
+- Analytics page: `src/pages/Analytics.tsx` (consolidated, single route)
 
 ## Steps
 
 ### 1. Read existing patterns
-- For Recharts: read `src/components/analytics/MetricWidget.tsx` and a chart in `src/components/analytics/charts/`
-- For Nivo: read a widget in `src/components/analytics-v2/widgets/`
+- Read a widget in `src/components/analytics-v2/widgets-v2/` (e.g. `StatSparklineWidget.tsx`)
+- Read `src/components/analytics-v2/widgets-v2/premium-theme.ts` for theme utilities
 - Read the relevant hook (e.g. `src/hooks/useAnalyticsStats.ts`) to understand data shape
 
 ### 2. Create the data hook (if new data needed)
@@ -48,21 +51,15 @@ export function use<WidgetName>(params?: { /* options */ }) {
 ```
 
 ### 3. Create the widget component
-
-**Recharts pattern** — `src/components/analytics/<WidgetName>.tsx`:
-- Use `<ResponsiveContainer>` for all charts
-- Import colors from the theme: use CSS vars `var(--chart-1)` through `var(--chart-5)`
-- Show `<Skeleton>` while loading (import from `@/components/ui/skeleton`)
-- Wrap in a `<Card>` with `<CardHeader>` / `<CardContent>` from `@/components/ui/card`
-
-**Nivo pattern** — `src/components/analytics-v2/widgets/<WidgetName>.tsx`:
-- Import theme from `src/lib/nivo-theme.ts`
+File: `src/components/analytics-v2/widgets-v2/<WidgetName>.tsx`
+- Import `ChartCard` from `./ChartCard`
+- Import theme utilities from `./premium-theme`
 - Use the existing widget wrapper pattern from sibling widgets
 - Keep consistent padding and height with other widgets
+- Export from `src/components/analytics-v2/widgets-v2/index.ts`
 
-### 4. Wire into the page
-- For Recharts: add to the relevant section in `src/pages/Analytics.tsx`
-- For Nivo: register in `src/components/analytics-v2/` widget registry if one exists
+### 4. Wire into the analytics page
+- Add to the relevant tab in `src/pages/Analytics.tsx`
 
 ### 5. Verify
 - Run `npx tsc --noEmit` — fix any type errors

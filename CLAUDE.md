@@ -22,6 +22,28 @@ VITE_SUPABASE_PUBLISHABLE_KEY
 VITE_SUPABASE_PROJECT_ID
 ```
 
+## Secret Management
+
+Secrets live in **one canonical place**. Never duplicate across stores.
+
+| Secret | Location | Used By |
+|--------|----------|---------|
+| `VITE_SUPABASE_*` | `.env.local` | Vite frontend |
+| `SUPABASE_SERVICE_ROLE_KEY` | `.env.local` + Supabase Secrets | Integration tests (local) + edge functions (prod) |
+| `GETLATE_API_KEY` | `.env.local` + Supabase Secrets | Contract tests (local) + edge functions (prod) |
+| `GEMINI_API_KEY` | Supabase Secrets only | Edge functions (prod only) |
+| `RESEND_API_KEY` | Supabase Secrets only | Edge functions (prod only) |
+| `FIRECRAWL_API_KEY` | Supabase Secrets only | Edge functions (prod only) |
+| `COURIER_AUTH_TOKEN` | Supabase Secrets only | Edge functions (prod only) |
+| `SLACK_BOT_TOKEN` etc. | `.env.local` | Slack agent (deactivated) |
+
+**Rules:**
+- Do NOT add production-only secrets (Gemini, Resend, Firecrawl, Courier) to `.env.local`
+- Edge function secrets are managed via `supabase secrets set` — not via `.env.local`
+- `setup-env.sh` distributes local secrets only; use `--push` to sync the few shared secrets
+- For local edge function dev (`supabase functions serve`), manually add needed secrets to `supabase/functions/.env`
+- Admin operations (webhook registration, cron cleanup) run as edge functions, not local scripts
+
 ## Project Structure
 
 ```

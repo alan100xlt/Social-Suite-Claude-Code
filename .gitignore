@@ -28,6 +28,7 @@ coverage
 scripts/slack-agent/.env
 scripts/slack-agent/.listener.pid
 .claude/approval-state*.json
+.claude/*.local.md
 supabase/functions/.env
 
 # E2E test auth state (contains session tokens)
@@ -35,3 +36,14 @@ src/tests/end-to-end/.auth/
 
 # Worktrees
 .worktrees
+.vercel
+
+# Temp artifacts (screenshots, playgrounds, debug reports)
+*.png
+*.html
+!index.html
+!src/**/*.html
+tmp_*.json
+tmp-figma-*.png
+deno.lock
+getlate-*.json

@@ -155,22 +155,13 @@ cat > "$EDGE_ENV" << EOF
 # Edit .env.local and re-run: bash scripts/setup-env.sh
 EOF
 
-# Edge Function secrets (only write non-empty values)
+# Edge Function secrets for LOCAL dev only.
+# Production secrets live in Supabase Secrets (set via `supabase secrets set`).
+# Only GETLATE_API_KEY and SITE_URL are kept here for local edge function testing.
+# Other secrets (GEMINI_API_KEY, RESEND_API_KEY, etc.) are production-only.
 EDGE_VARS=(
-  ANTHROPIC_API_KEY
   GETLATE_API_KEY
-  RESEND_API_KEY
-  FIRECRAWL_API_KEY
-  GEMINI_API_KEY
-  COURIER_AUTH_TOKEN
-  LINEAR_API_KEY
-  LINEAR_TEAM_ID
   SITE_URL
-  BOOTSTRAP_SECRET
-  SEND_EMAIL_HOOK_SECRET
-  SLACK_WEBHOOK_URL
-  SLACK_SIGNING_SECRET
-  SLACK_BOT_TOKEN
 )
 
 EDGE_COUNT=0

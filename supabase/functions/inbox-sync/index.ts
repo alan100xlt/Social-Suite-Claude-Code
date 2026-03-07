@@ -483,9 +483,10 @@ async function syncDMs(
         try {
           const contactId = await upsertContact(supabase, company.id, {
             platform: conv.platform || 'unknown',
-            platformUserId: conv.id || 'unknown',
+            platformUserId: conv.participantId || conv.id || 'unknown',
             username: conv.participantName,
             displayName: conv.participantName,
+            avatarUrl: conv.participantPicture || undefined,
           });
 
           const convKey = `dm-${conv.platform}-${conv.id}`;
@@ -497,7 +498,7 @@ async function syncDMs(
               type: 'dm',
               subject: conv.participantName || 'DM',
               contactId,
-              lastMessageAt: conv.lastMessageTime || new Date().toISOString(),
+              lastMessageAt: conv.updatedTime || conv.lastMessageTime || new Date().toISOString(),
               lastMessagePreview: (conv.lastMessage || '').slice(0, 200),
               unreadCount: conv.unreadCount || 0,
             });
@@ -532,13 +533,16 @@ async function syncDMs(
             const platformMsgId = msg.id || msg._id || `${conv.id}-${msg.createdAt}`;
             const isFromUs = msg.isFromBrand || msg.direction === 'outbound' || msg.isOwn === true;
 
+            // Extract attachment URL: API returns attachments: [{ id, url, type }]
+            const attachmentUrl = msg.attachments?.[0]?.url || msg.mediaUrl || null;
+
             const msgResult = await insertMessageIfNew(supabase, company.id, convResult.id, {
               platformMessageId: platformMsgId,
               contactId: isFromUs ? null : contactId,
               senderType: isFromUs ? 'agent' : 'contact',
               content: msg.text || msg.content || msg.message || '',
-              contentType: msg.mediaUrl || msg.attachments?.length ? 'image' : 'text',
-              mediaUrl: msg.mediaUrl,
+              contentType: attachmentUrl ? 'image' : 'text',
+              mediaUrl: attachmentUrl,
               metadata: { raw: msg },
               createdAt: msg.createdAt || msg.timestamp || new Date().toISOString(),
             });
