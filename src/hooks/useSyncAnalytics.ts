@@ -25,11 +25,18 @@ export function useSyncAnalytics() {
     },
     onSuccess: (data) => {
       // Invalidate all analytics queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['historical-analytics'] });
       queryClient.invalidateQueries({ queryKey: ['account-growth'] });
       queryClient.invalidateQueries({ queryKey: ['aggregated-followers'] });
       queryClient.invalidateQueries({ queryKey: ['top-posts'] });
-      queryClient.invalidateQueries({ queryKey: ['analytics-by-platform'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-by-publish-date'] });
+      queryClient.invalidateQueries({ queryKey: ['platform-breakdown'] });
+      queryClient.invalidateQueries({ queryKey: ['content-decay'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['last-sync-time'] });
+      queryClient.invalidateQueries({ queryKey: ['all-posts-with-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['best-time-to-post'] });
+      queryClient.invalidateQueries({ queryKey: ['inactive-account-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-trends'] });
 
       toast.success('Analytics synced', {
         description: `Synced ${data.postSnapshots || 0} posts and ${data.accountSnapshots || 0} accounts`,

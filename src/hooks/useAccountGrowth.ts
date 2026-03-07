@@ -144,6 +144,7 @@ export function useAggregatedFollowers(days: number = 30) {
         .from('account_analytics_snapshots')
         .select('snapshot_date, followers')
         .eq('company_id', companyId)
+        .eq('is_active', true)
         .gte('snapshot_date', startDate.toISOString().split('T')[0])
         .order('snapshot_date', { ascending: true });
 

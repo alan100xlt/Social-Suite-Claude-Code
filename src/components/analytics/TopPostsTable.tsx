@@ -629,6 +629,7 @@ export function TopPostsTable({ posts, isLoading, onDeleted, highlightPostId }: 
           columnDefs={colDefs}
           defaultColDef={defaultColDef}
           quickFilterText={quickFilter}
+          domLayout="autoHeight"
           pagination
           paginationPageSize={20}
           paginationPageSizeSelector={[10, 20, 50]}

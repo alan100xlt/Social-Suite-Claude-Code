@@ -1,205 +1,178 @@
-import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { ChartWidget } from '@/components/charts/ChartWidget';
-import type { ChartPresetId } from '@/lib/charts/types';
-import { MoreHorizontal } from 'lucide-react';
 import {
-  sampleBarData,
-  sampleLineData,
-  samplePieData,
-  sampleHeatmapData,
-  sampleRadarData,
-  sampleTreemapData,
-  sampleSunburstData,
-  sampleBumpData,
-  sampleFunnelData,
-  sampleScatterData,
-  sampleSparklineData,
-  sampleHorizontalBarData,
-} from '@/lib/charts/sample-data';
+  StatSparklineWidget,
+  AreaTrendWidget,
+  BarComparisonWidget,
+  DonutKpiWidget,
+  HeatmapWidget,
+  RadarStrengthWidget,
+  TreemapWidget,
+  FunnelWidget,
+  GaugeWidget,
+  BulletWidget,
+  SankeyWidget,
+} from '@/components/analytics-v2/widgets-v2';
 
-// Side-effect import to populate the registry
-import '@/lib/charts/registry';
+const sparkData = [30, 45, 28, 60, 55, 72, 65, 80, 70, 85];
 
-const PRESETS: { id: ChartPresetId; label: string }[] = [
-  { id: 'brand', label: 'Brand' },
-  { id: 'figma-kit', label: 'Figma Kit' },
+const areaData = [
+  { date: 'Jan', views: 400, engagement: 240 },
+  { date: 'Feb', views: 300, engagement: 180 },
+  { date: 'Mar', views: 600, engagement: 350 },
+  { date: 'Apr', views: 800, engagement: 450 },
+  { date: 'May', views: 500, engagement: 300 },
+  { date: 'Jun', views: 900, engagement: 520 },
 ];
 
-export default function NivoShowcase() {
-  const [preset, setPreset] = useState<ChartPresetId>('brand');
+const barData = [
+  { bucket: '0-1h', count: 45 },
+  { bucket: '1-6h', count: 32 },
+  { bucket: '6-24h', count: 18 },
+  { bucket: '1-3d', count: 12 },
+  { bucket: '3-7d', count: 8 },
+  { bucket: '7d+', count: 4 },
+];
 
+const donutData = [
+  { id: 'Facebook', label: 'Facebook', value: 3200, color: '#4267B2' },
+  { id: 'Instagram', label: 'Instagram', value: 2800, color: '#E1306C' },
+  { id: 'Twitter', label: 'Twitter', value: 1500, color: '#1DA1F2' },
+  { id: 'LinkedIn', label: 'LinkedIn', value: 900, color: '#0077B5' },
+];
+
+const heatmapData = Array.from({ length: 7 }, (_, day) => ({
+  id: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day],
+  data: Array.from({ length: 24 }, (_, hour) => ({
+    x: `${hour}:00`,
+    y: Math.floor(Math.random() * 100),
+  })),
+}));
+
+const radarData = [
+  { metric: 'Reach', LinkedIn: 80, Twitter: 60, Instagram: 90 },
+  { metric: 'Engagement', LinkedIn: 65, Twitter: 75, Instagram: 85 },
+  { metric: 'Growth', LinkedIn: 70, Twitter: 55, Instagram: 60 },
+  { metric: 'Clicks', LinkedIn: 90, Twitter: 45, Instagram: 50 },
+  { metric: 'Shares', LinkedIn: 50, Twitter: 80, Instagram: 70 },
+];
+
+const treemapData = [
+  { id: 'Photos', value: 450, color: '#6366f1' },
+  { id: 'Videos', value: 320, color: '#8b5cf6' },
+  { id: 'Articles', value: 180, color: '#a78bfa' },
+  { id: 'Stories', value: 120, color: '#c4b5fd' },
+];
+
+const funnelData = [
+  { id: 'Impressions', label: 'Impressions', value: 10000 },
+  { id: 'Clicks', label: 'Clicks', value: 4500 },
+  { id: 'Engagement', label: 'Engagement', value: 2200 },
+  { id: 'Conversions', label: 'Conversions', value: 800 },
+];
+
+const gaugeData = [
+  { id: 'Facebook', value: 72, color: '#4267B2' },
+  { id: 'Instagram', value: 85, color: '#E1306C' },
+  { id: 'Twitter', value: 45, color: '#1DA1F2' },
+];
+
+const bulletData = [
+  { id: 'Views', ranges: [0, 5000, 10000], measures: [7200], markers: [8000], title: 'Views' },
+  { id: 'Clicks', ranges: [0, 1000, 3000], measures: [1800], markers: [2500], title: 'Clicks' },
+];
+
+const sankeyData = {
+  nodes: [
+    { id: 'Facebook' }, { id: 'Instagram' }, { id: 'Twitter' },
+    { id: 'Clicks' }, { id: 'Shares' }, { id: 'Comments' },
+  ],
+  links: [
+    { source: 'Facebook', target: 'Clicks', value: 40 },
+    { source: 'Facebook', target: 'Shares', value: 25 },
+    { source: 'Instagram', target: 'Clicks', value: 30 },
+    { source: 'Instagram', target: 'Comments', value: 20 },
+    { source: 'Twitter', target: 'Shares', value: 15 },
+    { source: 'Twitter', target: 'Comments', value: 10 },
+  ],
+};
+
+export default function NivoShowcase() {
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
-              Chart System Showcase
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">All 14 chart types via ChartWidget + registry</p>
-          </div>
-
-          {/* Preset toggle */}
-          <div className="flex gap-2 bg-muted rounded-lg p-1">
-            {PRESETS.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setPreset(p.id)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  preset === p.id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+            Premium Widget Showcase
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">All 11 premium widgets (widgets-v2)</p>
         </div>
 
-        {/* Chart grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-
-          <ChartWidget
-            type="bar"
-            title="Bar Chart"
-            subtitle="Grouped vertical bars"
-            preset={preset}
-            data={sampleBarData}
-            keys={['2010', '2020']}
-            indexBy="country"
-            height={260}
-            action={<button className="text-muted-foreground hover:text-foreground"><MoreHorizontal className="w-4 h-4" /></button>}
+          <StatSparklineWidget
+            title="Views"
+            value={12450}
+            change={12.5}
+            sparkData={sparkData}
+            format="number"
           />
 
-          <ChartWidget
-            type="line"
-            title="Line Chart"
-            subtitle="Multi-series line"
-            preset={preset}
-            data={sampleLineData}
-            height={260}
+          <AreaTrendWidget
+            title="Engagement Trend"
+            data={areaData}
+            keys={['views', 'engagement']}
+            xKey="date"
           />
 
-          <ChartWidget
-            type="area"
-            title="Area Chart"
-            subtitle="Stacked area fill"
-            preset={preset}
-            data={sampleLineData}
-            height={260}
+          <BarComparisonWidget
+            title="Content Decay"
+            data={barData}
+            xKey="bucket"
+            yKey="count"
           />
 
-          <ChartWidget
-            type="pie"
-            title="Pie Chart"
-            subtitle="Platform breakdown"
-            preset={preset}
-            data={samplePieData}
-            height={260}
-            legendItems={samplePieData.map((d, i) => ({
-              id: d.id,
-              label: d.label,
-              color: ['hsl(224 71% 25%)', 'hsl(12 95% 62%)', 'hsl(142 71% 45%)', 'hsl(38 92% 50%)'][i],
-            }))}
+          <DonutKpiWidget
+            title="Follower Distribution"
+            data={donutData}
+            centerLabel="8.4K"
           />
 
-          <ChartWidget
-            type="donut"
-            title="Donut Chart"
-            subtitle="With inner radius"
-            preset={preset}
-            data={samplePieData}
-            height={260}
+          <HeatmapWidget
+            title="Best Times to Post"
+            data={heatmapData}
           />
 
-          <ChartWidget
-            type="heatmap"
-            title="Heatmap"
-            subtitle="Engagement by day & hour"
-            preset={preset}
-            data={sampleHeatmapData}
-            height={260}
-          />
-
-          <ChartWidget
-            type="radar"
-            title="Radar Chart"
-            subtitle="Platform performance metrics"
-            preset={preset}
-            data={sampleRadarData}
+          <RadarStrengthWidget
+            title="Platform Performance"
+            data={radarData}
             keys={['LinkedIn', 'Twitter', 'Instagram']}
             indexBy="metric"
-            height={260}
           />
 
-          <ChartWidget
-            type="treemap"
-            title="Treemap"
-            subtitle="Content type distribution"
-            preset={preset}
-            data={sampleTreemapData}
-            height={260}
+          <TreemapWidget
+            title="Content Mix"
+            data={treemapData}
           />
 
-          <ChartWidget
-            type="sunburst"
-            title="Sunburst"
-            subtitle="Hierarchical breakdown"
-            preset={preset}
-            data={sampleSunburstData}
-            height={260}
+          <FunnelWidget
+            title="Conversion Funnel"
+            data={funnelData}
           />
 
-          <ChartWidget
-            type="bump"
-            title="Bump Chart"
-            subtitle="Platform ranking over time"
-            preset={preset}
-            data={sampleBumpData}
-            height={260}
+          <GaugeWidget
+            title="Engagement Rate"
+            data={gaugeData}
+            maxValue={100}
           />
 
-          <ChartWidget
-            type="funnel"
-            title="Funnel"
-            subtitle="Conversion pipeline"
-            preset={preset}
-            data={sampleFunnelData}
-            height={260}
+          <BulletWidget
+            title="KPI Targets"
+            data={bulletData}
           />
 
-          <ChartWidget
-            type="scatter"
-            title="Scatter Plot"
-            subtitle="Reach vs engagement rate"
-            preset={preset}
-            data={sampleScatterData}
-            height={260}
+          <SankeyWidget
+            title="Traffic Flow"
+            data={sankeyData}
           />
-
-          <ChartWidget
-            type="sparkline"
-            title="Sparkline"
-            subtitle="Pure trend, no axes"
-            preset={preset}
-            data={sampleSparklineData}
-            height={64}
-          />
-
-          <ChartWidget
-            type="bar-horizontal"
-            title="Horizontal Bar"
-            subtitle="Platform reach"
-            preset={preset}
-            data={sampleHorizontalBarData}
-            keys={['Views']}
-            indexBy="platform"
-            height={260}
-          />
-
         </div>
       </div>
     </DashboardLayout>

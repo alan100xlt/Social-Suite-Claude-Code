@@ -2,14 +2,12 @@ import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
-// Unit test: verify the rewritten hooks no longer call getlate-analytics edge function,
-// and that dead analytics hooks have been removed from useGetLateAnalytics.ts.
+// Unit test: verify the rewritten hooks no longer call getlate-analytics edge function.
 
 const hooksDir = path.resolve(__dirname, "../hooks");
 
 const REWRITTEN_HOOKS = [
   "useBestTimeToPost.ts",
-  "usePostingFrequency.ts",
   "useContentDecay.ts",
 ];
 
@@ -41,17 +39,6 @@ describe("Analytics hooks — no live GetLate API calls", () => {
 
     it("does not accept profileId parameter", () => {
       expect(source).not.toContain("profileId");
-    });
-  });
-
-  describe("usePostingFrequency.ts", () => {
-    const source = fs.readFileSync(
-      path.join(hooksDir, "usePostingFrequency.ts"),
-      "utf-8"
-    );
-
-    it("calls get_posting_frequency_analysis RPC", () => {
-      expect(source).toContain("get_posting_frequency_analysis");
     });
   });
 
@@ -94,4 +81,21 @@ describe("Dead GetLate analytics hooks removed", () => {
   it("still exports useDailyMetrics", () => {
     expect(source).toContain("function useDailyMetrics");
   });
+});
+
+describe("Deleted analytics hooks no longer exist", () => {
+  const deletedHooks = [
+    "usePostingFrequency.ts",
+    "useViewsByPublishDate.ts",
+    "useHistoricalAnalytics.ts",
+    "useDailyPlatformMetrics.ts",
+    "useFollowersByPlatform.ts",
+    "useMetric.ts",
+  ];
+
+  for (const hookFile of deletedHooks) {
+    it(`${hookFile} does not exist`, () => {
+      expect(fs.existsSync(path.join(hooksDir, hookFile))).toBe(false);
+    });
+  }
 });
