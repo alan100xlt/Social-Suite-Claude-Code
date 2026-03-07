@@ -52,6 +52,7 @@ const mainNavigation: NavItem[] = [
   { name: "Content", href: "/app/content", icon: Newspaper },
   { name: "Content Sources", href: "/app/content/sources", icon: Rss },
   { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
+  { name: "Content Journey", href: "/app/analytics/content-journey", icon: ExternalLink },
   { name: "Connections", href: "/app/connections", icon: Link2 },
   { name: "Settings", href: "/app/settings", icon: Settings },
 ];

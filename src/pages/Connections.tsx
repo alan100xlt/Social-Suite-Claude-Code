@@ -2,12 +2,17 @@ import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PlatformCard } from "@/components/dashboard/PlatformCard";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageSelectionDialog } from "@/components/connections/PageSelectionDialog";
-import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube, FaPinterest, FaReddit } from "react-icons/fa";
+import { GAPropertySelectionDialog } from "@/components/connections/GAPropertySelectionDialog";
+import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube, FaPinterest, FaReddit, FaGoogle } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
-import { RefreshCcw, Shield, Zap, Loader2 } from "lucide-react";
+import { RefreshCcw, Shield, Zap, Loader2, BarChart3, ExternalLink } from "lucide-react";
 import { useAccounts, useConnectPlatform, useDisconnectAccount } from "@/hooks/useGetLateAccounts";
+import { useGAConnections, useDisconnectGA, useSyncGA } from "@/hooks/useGoogleAnalytics";
+import { googleAnalyticsApi, GAProperty } from "@/lib/api/google-analytics";
+import { useSelectedCompany } from "@/contexts/SelectedCompanyContext";
 import { Platform } from "@/lib/api/getlate";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,11 +51,58 @@ export default function ConnectionsPage() {
   const [pendingDataToken, setPendingDataToken] = useState<string | null>(null);
   const [pendingUserProfile, setPendingUserProfile] = useState<{ id?: string; name?: string; profilePicture?: string } | null>(null);
 
+  // GA state
+  const { selectedCompanyId } = useSelectedCompany();
+  const { data: gaConnections, isLoading: gaLoading } = useGAConnections();
+  const disconnectGAMutation = useDisconnectGA();
+  const syncGAMutation = useSyncGA();
+  const [gaPropertyDialogOpen, setGaPropertyDialogOpen] = useState(false);
+  const [gaProperties, setGaProperties] = useState<GAProperty[]>([]);
+  const [gaCallbackData, setGaCallbackData] = useState<{ refreshToken: string; accessToken: string; expiresIn: number; googleEmail: string } | null>(null);
+  const [gaConnecting, setGaConnecting] = useState(false);
+
+  const handleConnectGA = async () => {
+    if (!selectedCompanyId) return;
+    setGaConnecting(true);
+    try {
+      const redirectUrl = `${window.location.origin}/oauth-callback?platform=google-analytics`;
+      const result = await googleAnalyticsApi.startAuth(selectedCompanyId, redirectUrl);
+      if (result.success && result.data?.authUrl) {
+        window.open(result.data.authUrl, 'ga-oauth', 'width=600,height=700');
+      } else {
+        toast({ title: 'Error', description: result.error || 'Failed to start GA authentication', variant: 'destructive' });
+        setGaConnecting(false);
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to start GA authentication', variant: 'destructive' });
+      setGaConnecting(false);
+    }
+  };
+
+  const handleSelectGAProperty = async (property: GAProperty) => {
+    if (!selectedCompanyId || !gaCallbackData) return;
+    const result = await googleAnalyticsApi.selectProperty({
+      companyId: selectedCompanyId,
+      propertyId: property.propertyId,
+      propertyName: property.displayName,
+      refreshToken: gaCallbackData.refreshToken,
+      accessToken: gaCallbackData.accessToken,
+      expiresIn: gaCallbackData.expiresIn,
+      googleEmail: gaCallbackData.googleEmail,
+    });
+    if (!result.success) {
+      toast({ title: 'Error', description: result.error || 'Failed to connect property', variant: 'destructive' });
+      throw new Error(result.error);
+    }
+    toast({ title: 'Connected', description: `${property.displayName} connected successfully!` });
+    setGaCallbackData(null);
+  };
+
   // Listen for OAuth callback messages
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'oauth-callback') {
-        const { tempToken, pendingDataToken: pdt, error, platform, userProfile } = event.data;
+        const { tempToken, pendingDataToken: pdt, error, platform, userProfile, code, state } = event.data;
 
         if (error) {
           toast({
@@ -58,6 +110,32 @@ export default function ConnectionsPage() {
             description: error,
             variant: 'destructive',
           });
+          setGaConnecting(false);
+          return;
+        }
+
+        // Handle Google Analytics OAuth callback
+        if (platform === 'google-analytics' && code) {
+          try {
+            const redirectUrl = `${window.location.origin}/oauth-callback?platform=google-analytics`;
+            const result = await googleAnalyticsApi.handleCallback(code, redirectUrl, state);
+            if (result.success && result.data) {
+              setGaProperties(result.data.properties);
+              setGaCallbackData({
+                refreshToken: result.data.refreshToken,
+                accessToken: result.data.accessToken,
+                expiresIn: result.data.expiresIn,
+                googleEmail: result.data.googleEmail,
+              });
+              setGaPropertyDialogOpen(true);
+            } else {
+              toast({ title: 'Error', description: result.error || 'Failed to process GA callback', variant: 'destructive' });
+            }
+          } catch {
+            toast({ title: 'Error', description: 'Failed to process GA callback', variant: 'destructive' });
+          } finally {
+            setGaConnecting(false);
+          }
           return;
         }
 
@@ -238,6 +316,124 @@ export default function ConnectionsPage() {
           </p>
         </div>
       )}
+
+      {/* Google Analytics Section */}
+      <div className="mt-10 mb-6">
+        <h2 className="font-display font-semibold text-xl text-foreground mb-1">
+          Data Sources
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Connect analytics platforms to track the full content journey from social to web.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <Card className="border-border">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Google Analytics</CardTitle>
+                  <CardDescription className="text-xs">GA4 property</CardDescription>
+                </div>
+              </div>
+              {gaConnections && gaConnections.length > 0 ? (
+                <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-200">
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Not connected</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {gaConnections && gaConnections.length > 0 ? (
+              <>
+                {gaConnections.map((conn) => (
+                  <div key={conn.id} className="space-y-2">
+                    <div className="text-sm">
+                      <span className="font-medium">{conn.property_name || conn.property_id}</span>
+                      <span className="text-muted-foreground ml-2">({conn.google_email})</span>
+                    </div>
+                    {conn.last_sync_at && (
+                      <div className="text-xs text-muted-foreground">
+                        Last synced: {new Date(conn.last_sync_at).toLocaleString()}
+                      </div>
+                    )}
+                    {conn.sync_error && (
+                      <div className="text-xs text-destructive">
+                        Error: {conn.sync_error}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => selectedCompanyId && syncGAMutation.mutate(selectedCompanyId)}
+                        disabled={syncGAMutation.isPending}
+                      >
+                        {syncGAMutation.isPending ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCcw className="mr-1 h-3 w-3" />
+                        )}
+                        Sync Now
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          disconnectGAMutation.mutate({
+                            connectionId: conn.id,
+                            companyId: selectedCompanyId || undefined,
+                          })
+                        }
+                        disabled={disconnectGAMutation.isPending}
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Connect GA4 to see page metrics, traffic sources, and correlate social posts with web traffic.
+                </p>
+                <Button
+                  onClick={handleConnectGA}
+                  disabled={gaConnecting}
+                  size="sm"
+                >
+                  {gaConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <FaGoogle className="mr-2 h-4 w-4" />
+                      Connect Google Analytics
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* GA Property Selection Dialog */}
+      <GAPropertySelectionDialog
+        open={gaPropertyDialogOpen}
+        onOpenChange={setGaPropertyDialogOpen}
+        properties={gaProperties}
+        onSelect={handleSelectGAProperty}
+      />
 
       {/* Page Selection Dialog */}
       <PageSelectionDialog
