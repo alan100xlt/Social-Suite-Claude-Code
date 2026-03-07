@@ -29,6 +29,7 @@ import {
   AlarmClock,
   X,
 } from 'lucide-react';
+import { Tip } from '@/components/ui/tooltip';
 import type { InboxConversation, InboxLabel, ConversationStatus } from '@/lib/api/inbox';
 
 interface ConversationHeaderProps {
@@ -80,15 +81,15 @@ export function ConversationHeader({
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b bg-background">
-      <Avatar className="h-9 w-9">
+    <div className="flex items-center gap-3.5 px-[18px] py-[18px] border-b border-border-light bg-card">
+      <Avatar className="h-[42px] w-[42px]">
         <AvatarImage src={conversation.contact?.avatar_url || undefined} />
-        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        <AvatarFallback className="text-sm font-bold">{initials}</AvatarFallback>
       </Avatar>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold truncate">{contactName}</h3>
+          <h3 className="text-base font-bold tracking-tight truncate">{contactName}</h3>
           <Badge variant="outline" className="text-[10px] px-1.5 capitalize">
             {conversation.type}
           </Badge>
@@ -116,40 +117,48 @@ export function ConversationHeader({
       {/* Status actions */}
       <div className="flex items-center gap-1">
         {conversation.status === 'open' && (
-          <Button
-            size="sm"
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => onStatusChange('resolved')}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Resolve
-          </Button>
+          <Tip label="Mark this conversation as resolved">
+            <Button
+              size="sm"
+              className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => onStatusChange('resolved')}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Resolve
+            </Button>
+          </Tip>
         )}
         {conversation.status === 'resolved' && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => onStatusChange('open')}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Reopen
-          </Button>
+          <Tip label="Reopen this conversation">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => onStatusChange('open')}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Reopen
+            </Button>
+          </Tip>
         )}
 
         {conversation.post_url && (
-          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <a href={conversation.post_url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </Button>
+          <Tip label="View on platform">
+            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+              <a href={conversation.post_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </Tip>
         )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+            <Tip label="More actions">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </Tip>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {statusActions

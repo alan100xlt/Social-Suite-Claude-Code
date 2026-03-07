@@ -24,6 +24,7 @@ import {
 import { FaFacebook, FaInstagram, FaTwitter, FaLinkedin, FaTiktok, FaYoutube } from 'react-icons/fa';
 import { SiBluesky, SiThreads } from 'react-icons/si';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 import {
   useInboxConversations,
   useUpdateConversationStatus,
@@ -37,7 +38,7 @@ import { useInboxSearch } from '@/hooks/useInboxSearch';
 import { useInboxRealtime } from '@/hooks/useInboxRealtime';
 import { useDemo } from '@/lib/demo/DemoDataProvider';
 import { useTranslateMessage } from '@/hooks/useInboxAI';
-import type { ConversationStatus, ConversationType, InboxConversation, InboxMessage } from '@/lib/api/inbox';
+import type { ConversationStatus, ConversationType, ConversationPriority, Sentiment, MessageCategory, InboxConversation, InboxMessage } from '@/lib/api/inbox';
 
 const platformTabIcons: { key: string; icon: React.ElementType; color: string }[] = [
   { key: 'facebook', icon: FaFacebook, color: 'text-blue-600' },
@@ -69,6 +70,10 @@ export default function InboxPage() {
     status?: ConversationStatus;
     platform?: string;
     type?: ConversationType;
+    sentiment?: Sentiment;
+    priority?: ConversationPriority;
+    category?: MessageCategory;
+    dateRange?: 'today' | '7d' | '30d' | '90d';
   }>({});
 
   // FTS search mode
@@ -110,7 +115,7 @@ export default function InboxPage() {
     if (replyComment.error) toast.error(`Failed to send reply: ${replyComment.error.message}`);
   }, [replyComment.error]);
 
-  // Filter by search locally
+  // Filter by search + client-side filters
   const filteredConversations = useMemo(() => {
     let result = conversations;
     if (searchQuery) {
@@ -122,8 +127,23 @@ export default function InboxPage() {
         c.subject?.toLowerCase().includes(q)
       );
     }
+    if (filters.sentiment) {
+      result = result.filter((c: InboxConversation) => c.sentiment === filters.sentiment);
+    }
+    if (filters.priority) {
+      result = result.filter((c: InboxConversation) => c.priority === filters.priority);
+    }
+    if (filters.category) {
+      result = result.filter((c: InboxConversation) => c.message_type === filters.category);
+    }
+    if (filters.dateRange) {
+      const now = Date.now();
+      const msMap = { today: 86400000, '7d': 604800000, '30d': 2592000000, '90d': 7776000000 };
+      const cutoff = now - msMap[filters.dateRange];
+      result = result.filter((c: InboxConversation) => new Date(c.last_message_at).getTime() >= cutoff);
+    }
     return result;
-  }, [conversations, searchQuery]);
+  }, [conversations, searchQuery, filters.sentiment, filters.priority, filters.category, filters.dateRange]);
 
   const selectedConversation = filteredConversations.find((c: InboxConversation) => c.id === selectedConversationId) || null;
 
@@ -256,23 +276,25 @@ export default function InboxPage() {
   }, [selectedIds, addLabel]);
 
   return (
-    <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-64px)]">
+    <DashboardLayout noPadding>
+      <div className="flex flex-col flex-1 min-h-0">
         {/* === TOPBAR === */}
-        <div className="bg-background border-b flex-shrink-0 px-6">
+        <div className="bg-card border-b border-border-light flex-shrink-0 px-6">
           {/* Row 1: Title + count + sync indicator */}
           <div className="flex items-center gap-4 h-[54px]">
-            <h1 className="text-lg font-extrabold tracking-tight">Inbox</h1>
+            <h1 className="text-lg font-extrabold tracking-[-0.03em]">Inbox</h1>
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">
               {totalCount} conversations
             </span>
-            <div className="flex items-center gap-1.5 ml-auto text-xs font-semibold text-emerald-600">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              Syncing
-            </div>
+            <Tip label="Real-time sync with connected platforms">
+              <div className="flex items-center gap-1.5 ml-auto text-xs font-semibold text-emerald-600 cursor-help">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                Syncing
+              </div>
+            </Tip>
           </div>
 
           {/* Row 2: Filters + drawer toggle */}
@@ -310,10 +332,58 @@ export default function InboxPage() {
               onChange={(v) => setFilters(f => ({ ...f, type: v as ConversationType | undefined }))}
             />
 
+            <FilterDropdown
+              label="Sentiment"
+              value={filters.sentiment}
+              options={[
+                { value: 'positive', label: 'Positive' },
+                { value: 'neutral', label: 'Neutral' },
+                { value: 'negative', label: 'Negative' },
+              ]}
+              onChange={(v) => setFilters(f => ({ ...f, sentiment: v as Sentiment | undefined }))}
+            />
+
+            <FilterDropdown
+              label="Priority"
+              value={filters.priority}
+              options={[
+                { value: 'urgent', label: 'Urgent' },
+                { value: 'high', label: 'High' },
+                { value: 'normal', label: 'Normal' },
+                { value: 'low', label: 'Low' },
+              ]}
+              onChange={(v) => setFilters(f => ({ ...f, priority: v as ConversationPriority | undefined }))}
+            />
+
+            <FilterDropdown
+              label="Category"
+              value={filters.category}
+              options={[
+                { value: 'editorial', label: 'Editorial' },
+                { value: 'business', label: 'Business' },
+                { value: 'support', label: 'Support' },
+                { value: 'community', label: 'Community' },
+                { value: 'noise', label: 'Noise' },
+              ]}
+              onChange={(v) => setFilters(f => ({ ...f, category: v as MessageCategory | undefined }))}
+            />
+
+            <FilterDropdown
+              label="Date"
+              value={filters.dateRange}
+              options={[
+                { value: 'today', label: 'Today' },
+                { value: '7d', label: 'Last 7 days' },
+                { value: '30d', label: 'Last 30 days' },
+                { value: '90d', label: 'Last 90 days' },
+              ]}
+              onChange={(v) => setFilters(f => ({ ...f, dateRange: v as 'today' | '7d' | '30d' | '90d' | undefined }))}
+            />
+
             <button
               onClick={() => setDrawerOpen(!drawerOpen)}
               className={cn(
-                'ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors',
+                'ml-auto flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] border-[1.5px] text-xs font-semibold transition-all',
                 drawerOpen
                   ? 'border-primary bg-primary/5 text-primary'
                   : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
@@ -338,9 +408,9 @@ export default function InboxPage() {
           )}
         >
           {/* === CONVERSATION PANEL (left) === */}
-          <div className="bg-background rounded-xl border shadow-sm flex flex-col overflow-hidden min-h-0">
+          <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0">
             {/* Platform icon bar */}
-            <div className="flex items-center gap-1.5 px-4 py-3 border-b">
+            <div className="flex items-center gap-1.5 px-[18px] py-3.5 border-b">
               <button
                 onClick={() => setActivePlatform(null)}
                 className={cn(
@@ -355,19 +425,20 @@ export default function InboxPage() {
               {platformTabIcons
                 .filter(p => platformCounts[p.key])
                 .map(p => (
-                  <button
-                    key={p.key}
-                    onClick={() => setActivePlatform(activePlatform === p.key ? null : p.key)}
-                    className={cn(
-                      'h-9 w-9 rounded-full flex items-center justify-center transition-colors border-2',
-                      activePlatform === p.key
-                        ? 'border-primary bg-primary/5'
-                        : 'border-transparent bg-muted hover:border-border',
-                      p.color
-                    )}
-                  >
-                    <p.icon className="h-4 w-4" />
-                  </button>
+                  <Tip key={p.key} label={`${p.key.charAt(0).toUpperCase() + p.key.slice(1)} (${platformCounts[p.key]})`}>
+                    <button
+                      onClick={() => setActivePlatform(activePlatform === p.key ? null : p.key)}
+                      className={cn(
+                        'h-9 w-9 rounded-full flex items-center justify-center transition-colors border-2',
+                        activePlatform === p.key
+                          ? 'border-primary bg-primary/5'
+                          : 'border-transparent bg-muted hover:border-border',
+                        p.color
+                      )}
+                    >
+                      <p.icon className="h-4 w-4" />
+                    </button>
+                  </Tip>
                 ))
               }
               <span className="ml-auto text-xs font-semibold text-muted-foreground">
@@ -376,7 +447,7 @@ export default function InboxPage() {
             </div>
 
             {/* Search */}
-            <div className="px-4 py-2.5">
+            <div className="px-[18px] py-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <input
@@ -384,13 +455,13 @@ export default function InboxPage() {
                   placeholder="Search conversations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border bg-muted/50 text-sm outline-none focus:border-primary focus:bg-background transition-colors"
+                  className="w-full pl-[38px] pr-3.5 py-2.5 rounded-[10px] border-[1.5px] bg-muted/50 text-[13px] outline-none focus:border-primary focus:bg-background transition-all"
                 />
               </div>
             </div>
 
             {/* Type tabs: All / DMs / Comments / Reviews */}
-            <div className="flex border-b px-4">
+            <div className="flex border-b px-[18px]">
               {([
                 { key: 'all', label: 'All', count: totalCount },
                 { key: 'dm', label: 'DMs', count: dmCount },
@@ -454,7 +525,7 @@ export default function InboxPage() {
           </div>
 
           {/* === THREAD PANEL (center) === */}
-          <div className="bg-background rounded-xl border shadow-sm flex flex-col overflow-hidden min-h-0">
+          <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0">
             {selectedConversation ? (
               <>
                 <ConversationHeader
@@ -522,7 +593,7 @@ export default function InboxPage() {
 
           {/* === DRAWER PANEL (right, conditional) === */}
           {drawerOpen && selectedConversation && (
-            <div className="bg-background rounded-xl border shadow-sm flex flex-col overflow-hidden min-h-0">
+            <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0">
               {/* Drawer tabs */}
               <div className="flex border-b">
                 <button
@@ -590,7 +661,7 @@ function FilterDropdown({
       <button
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap transition-colors',
+          'flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] border-[1.5px] text-[12.5px] font-semibold whitespace-nowrap transition-all',
           value
             ? 'border-primary bg-primary/5 text-primary'
             : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'

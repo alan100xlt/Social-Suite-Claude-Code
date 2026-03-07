@@ -25,4 +25,22 @@ const TooltipContent = React.forwardRef<
 ));
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+/** Convenience wrapper: wraps any element with a styled tooltip */
+function Tip({ children, label, side }: { children: React.ReactNode; label: string; side?: "top" | "bottom" | "left" | "right" }) {
+  return (
+    <TooltipPrimitive.Provider delayDuration={300}>
+      <TooltipPrimitive.Root>
+        <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Content
+          side={side}
+          sideOffset={4}
+          className="z-50 overflow-hidden rounded-md border bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+        >
+          {label}
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
+  );
+}
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, Tip };

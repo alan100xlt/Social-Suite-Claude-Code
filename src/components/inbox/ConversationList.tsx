@@ -7,6 +7,7 @@ import { MessageSquare, Flag } from 'lucide-react';
 import { FaInstagram, FaTwitter, FaFacebook, FaLinkedin, FaTiktok, FaYoutube } from 'react-icons/fa';
 import { SiBluesky, SiThreads } from 'react-icons/si';
 import { format, isToday, isYesterday } from 'date-fns';
+import { Tip } from '@/components/ui/tooltip';
 import type { InboxConversation, ConversationType, Sentiment } from '@/lib/api/inbox';
 
 const platformIcons: Record<string, React.ElementType> = {
@@ -164,7 +165,7 @@ export function ConversationList({
     <ScrollArea className="h-full">
       <div
         ref={listRef}
-        className="flex flex-col gap-4 p-3.5"
+        className="flex flex-col gap-4 px-3.5 pt-3 pb-3.5"
         tabIndex={0}
         role="listbox"
       >
@@ -191,14 +192,14 @@ export function ConversationList({
               aria-selected={isSelected}
               onClick={() => onSelect(conv.id)}
               className={cn(
-                'flex flex-col cursor-pointer rounded-xl transition-all border overflow-hidden flex-shrink-0',
-                'shadow-sm hover:shadow-md',
+                'flex flex-col cursor-pointer rounded-[14px] transition-all border-[1.5px] overflow-hidden flex-shrink-0',
+                'shadow-sm hover:shadow-[0_4px_16px_rgba(0,0,0,.09)]',
                 isSelected
-                  ? 'border-primary ring-2 ring-primary/20 shadow-md'
-                  : 'border-border/60 hover:border-border',
+                  ? 'border-primary shadow-[0_0_0_2px_hsl(224_71%_25%),0_3px_16px_rgba(30,58,138,.1)]'
+                  : 'border-border-light hover:border-border',
               )}
             >
-              <div className="p-4 pb-3">
+              <div className="px-[18px] pt-[18px] pb-3.5">
                 {/* Row 1: Avatar + name + timestamp */}
                 <div className="flex items-center gap-3 mb-2.5">
                   {onToggleSelect && (
@@ -253,44 +254,52 @@ export function ConversationList({
                 {/* Chips row */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {categoryLabel && conv.message_type && (
-                    <span className={cn(
-                      'text-[11px] font-semibold px-2.5 py-0.5 rounded-full',
-                      categoryChipStyles[conv.message_type] || categoryChipStyles.general
-                    )}>
-                      {categoryLabel}
-                    </span>
+                    <Tip label={`AI-classified category: ${categoryLabel}`}>
+                      <span className={cn(
+                        'text-[11px] font-semibold px-2.5 py-0.5 rounded-full cursor-help',
+                        categoryChipStyles[conv.message_type] || categoryChipStyles.general
+                      )}>
+                        {categoryLabel}
+                      </span>
+                    </Tip>
                   )}
 
                   {sentimentLabel && conv.sentiment && (
-                    <span className={cn(
-                      'text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1',
-                      sentimentChipStyles[conv.sentiment] || sentimentChipStyles.neutral
-                    )}>
-                      <span className={cn('w-[7px] h-[7px] rounded-full', sentimentDotColors[conv.sentiment] || sentimentDotColors.neutral)} />
-                      {sentimentLabel}
-                    </span>
+                    <Tip label={`AI-detected sentiment: ${sentimentLabel}`}>
+                      <span className={cn(
+                        'text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 cursor-help',
+                        sentimentChipStyles[conv.sentiment] || sentimentChipStyles.neutral
+                      )}>
+                        <span className={cn('w-[7px] h-[7px] rounded-full', sentimentDotColors[conv.sentiment] || sentimentDotColors.neutral)} />
+                        {sentimentLabel}
+                      </span>
+                    </Tip>
                   )}
 
                   {/* Signal score star */}
                   {conv.editorial_value && conv.editorial_value >= 3 && (
-                    <span className={cn(
-                      'text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-0.5',
-                      conv.editorial_value >= 4
-                        ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
-                        : 'bg-slate-100 text-slate-500 dark:bg-slate-500/10 dark:text-slate-400'
-                    )}>
-                      {'★'} {conv.editorial_value}
-                    </span>
+                    <Tip label={`Editorial value: ${conv.editorial_value}/5 — AI-scored relevance for your brand`}>
+                      <span className={cn(
+                        'text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 cursor-help',
+                        conv.editorial_value >= 4
+                          ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-500/10 dark:text-slate-400'
+                      )}>
+                        {'★'} {conv.editorial_value}
+                      </span>
+                    </Tip>
                   )}
 
                   <span className="flex-1" />
 
                   {/* Message count */}
                   {(conv.message_count || 0) > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <MessageSquare className="h-3.5 w-3.5 opacity-50" />
-                      {conv.message_count}
-                    </span>
+                    <Tip label={`${conv.message_count} message${conv.message_count !== 1 ? 's' : ''} in thread`}>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground cursor-help">
+                        <MessageSquare className="h-3.5 w-3.5 opacity-50" />
+                        {conv.message_count}
+                      </span>
+                    </Tip>
                   )}
 
                   {/* Flag for reply */}

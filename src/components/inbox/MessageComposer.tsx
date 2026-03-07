@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/popover';
 import { Send, StickyNote, Loader2, Paperclip, Image, X, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 import type { InboxMessage } from '@/lib/api/inbox';
 
 interface MessageComposerProps {
@@ -95,7 +96,7 @@ export function MessageComposer({
     : 'Type a reply...';
 
   return (
-    <div className="border-t bg-background p-3 space-y-2">
+    <div className="border-t border-border-light bg-card px-6 py-3.5 space-y-2.5">
       {/* Public reply warning for comments */}
       {conversationType === 'comment' && !isNoteMode && (
         <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg text-[12px] font-medium text-amber-800 dark:text-amber-300">
@@ -145,7 +146,50 @@ export function MessageComposer({
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-3">
+        {/* Tool buttons — left of input */}
+        <div className="flex gap-1 flex-shrink-0">
+          {!isNoteMode && conversationType === 'dm' && (
+            <Tip label="Attach media URL">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setShowAttachment(!showAttachment)}
+              >
+                <Paperclip className={cn('h-4 w-4', showAttachment && 'text-primary')} />
+              </Button>
+            </Tip>
+          )}
+
+          {onAddNote && (
+            <Tip label="Internal note (not visible to contact)">
+              <Button
+                variant={isNoteMode ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setIsNoteMode(!isNoteMode)}
+              >
+                <StickyNote className={cn('h-4 w-4', isNoteMode && 'text-yellow-600')} />
+              </Button>
+            </Tip>
+          )}
+
+          {onTranslate && content.trim() && (
+            <Tip label={`Translate to ${detectedLanguage || 'detected language'}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => onTranslate(content.trim())}
+              >
+                <Languages className="h-4 w-4" />
+              </Button>
+            </Tip>
+          )}
+        </div>
+
+        {/* Input */}
         <Textarea
           ref={textareaRef}
           value={content}
@@ -153,50 +197,14 @@ export function MessageComposer({
           onKeyDown={handleKeyDown}
           placeholder={isNoteMode ? 'Add internal note...' : placeholder || defaultPlaceholder}
           className={cn(
-            'min-h-[40px] max-h-[120px] resize-none text-sm',
-            isNoteMode && 'border-yellow-500/30 bg-yellow-500/5'
+            'min-h-[44px] max-h-[120px] resize-none text-[13.5px] rounded-[20px] px-[18px] py-3 border-[1.5px]',
+            isNoteMode ? 'border-yellow-500/30 bg-yellow-500/5' : 'bg-muted/50 focus:bg-background'
           )}
           rows={1}
         />
 
-        <div className="flex gap-1 flex-shrink-0">
-          {/* Attachment button */}
-          {!isNoteMode && conversationType === 'dm' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setShowAttachment(!showAttachment)}
-              title="Add media URL"
-            >
-              <Paperclip className={cn('h-4 w-4', showAttachment && 'text-primary')} />
-            </Button>
-          )}
-
-          {onTranslate && content.trim() && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => onTranslate(content.trim())}
-              title={`Translate to ${detectedLanguage || 'detected language'}`}
-            >
-              <Languages className="h-4 w-4" />
-            </Button>
-          )}
-
-          {onAddNote && (
-            <Button
-              variant={isNoteMode ? 'secondary' : 'ghost'}
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setIsNoteMode(!isNoteMode)}
-              title="Internal note"
-            >
-              <StickyNote className={cn('h-4 w-4', isNoteMode && 'text-yellow-600')} />
-            </Button>
-          )}
-
+        {/* Send button — right of input */}
+        <Tip label={isNoteMode ? "Save note" : "Send reply (Enter)"}>
           <Button
             size="icon"
             className="h-11 w-11 rounded-full flex-shrink-0"
@@ -209,7 +217,7 @@ export function MessageComposer({
               <Send className="h-4 w-4" />
             )}
           </Button>
-        </div>
+        </Tip>
       </div>
     </div>
   );
