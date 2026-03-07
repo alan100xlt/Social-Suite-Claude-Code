@@ -7,6 +7,7 @@ import { FaInstagram, FaTwitter, FaFacebook, FaLinkedin, FaTiktok, FaYoutube } f
 import { SiBluesky, SiThreads } from "react-icons/si";
 
 type PostStatus = "all" | "draft" | "scheduled" | "published" | "failed";
+type ContentView = "all" | "articles" | "posts";
 
 const platforms = [
   { key: "twitter", icon: FaTwitter, label: "Twitter", activeColor: "bg-sky-500 text-white border-sky-500" },
@@ -33,6 +34,7 @@ export interface CalendarFilterState {
   search: string;
   focusMode: boolean;
   showBestTimes: boolean;
+  contentView: ContentView;
 }
 
 interface CalendarFiltersProps {
@@ -121,6 +123,25 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
         Best times
       </Button>
 
+      {/* Content view toggle */}
+      <div className="h-5 w-px bg-border" />
+      <div className="flex items-center gap-1">
+        {(["all", "articles", "posts"] as ContentView[]).map((view) => (
+          <button
+            key={view}
+            onClick={() => onChange({ ...filters, contentView: view })}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs font-medium transition-all capitalize",
+              filters.contentView === view
+                ? "bg-indigo-500 text-white"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            )}
+          >
+            {view}
+          </button>
+        ))}
+      </div>
+
       {/* Search */}
       {searchOpen ? (
         <div className="relative">
@@ -150,5 +171,5 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
 }
 
 export function createDefaultFilters(): CalendarFilterState {
-  return { platforms: new Set(), status: "all", search: "", focusMode: false, showBestTimes: true };
+  return { platforms: new Set(), status: "all", search: "", focusMode: false, showBestTimes: true, contentView: "all" as ContentView };
 }

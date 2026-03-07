@@ -275,7 +275,15 @@ async function syncComments(
   };
 
   try {
-    let cursor: string | null = null;
+    // Read persisted cursor from inbox_sync_state (resume from where we left off)
+    const { data: syncState } = await supabase
+      .from('inbox_sync_state')
+      .select('cursor')
+      .eq('company_id', company.id)
+      .eq('sync_type', 'comments')
+      .maybeSingle();
+
+    let cursor: string | null = syncState?.cursor || null;
     let hasMore = true;
     const postsWithComments: Array<{ postId: string; accountId: string; platform: string; platformPostUrl?: string; content?: string }> = [];
 
@@ -309,7 +317,7 @@ async function syncComments(
         }
       }
 
-      cursor = data.pagination?.cursor || null;
+      cursor = data.pagination?.nextCursor || null;
       hasMore = data.pagination?.hasMore === true && !!cursor;
     }
 
@@ -432,6 +440,7 @@ async function syncComments(
       platform: 'all',
       sync_type: 'comments',
       last_synced_at: new Date().toISOString(),
+      cursor: cursor,
     });
   } catch (err) {
     result.errors.push(String(err));
@@ -457,7 +466,15 @@ async function syncDMs(
   };
 
   try {
-    let cursor: string | null = null;
+    // Read persisted cursor from inbox_sync_state (resume from where we left off)
+    const { data: dmSyncState } = await supabase
+      .from('inbox_sync_state')
+      .select('cursor')
+      .eq('company_id', company.id)
+      .eq('sync_type', 'dms')
+      .maybeSingle();
+
+    let cursor: string | null = dmSyncState?.cursor || null;
     let hasMore = true;
 
     while (hasMore && !pastDeadline()) {
@@ -571,7 +588,7 @@ async function syncDMs(
         }
       }
 
-      cursor = data.pagination?.cursor || null;
+      cursor = data.pagination?.nextCursor || null;
       hasMore = data.pagination?.hasMore === true && !!cursor;
     }
 
@@ -580,6 +597,7 @@ async function syncDMs(
       platform: 'all',
       sync_type: 'dms',
       last_synced_at: new Date().toISOString(),
+      cursor: cursor,
     });
   } catch (err) {
     result.errors.push(String(err));

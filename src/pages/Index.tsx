@@ -8,6 +8,9 @@ import { TopPostsSpotlight } from "@/components/dashboard/TopPostsSpotlight";
 import { ActivityTimeline } from "@/components/dashboard/ActivityTimeline";
 import { EngagementChart } from "@/components/dashboard/EngagementChart";
 import { OnboardingProgressWidget } from "@/components/dashboard/OnboardingProgressWidget";
+import { InboxSummaryWidget } from "@/components/dashboard/InboxSummaryWidget";
+import { UpcomingPostsWidget } from "@/components/dashboard/UpcomingPostsWidget";
+import { PlatformHealthWidget } from "@/components/dashboard/PlatformHealthWidget";
 import { DateRangeFilter } from "@/components/analytics/DateRangeFilter";
 import { getPremiumSeries } from "@/components/analytics-v2/widgets-v2/premium-theme";
 import { Button } from "@/components/ui/button";
@@ -231,6 +234,22 @@ const Index = () => {
               icon={<FileText className="w-4 h-4" />}
               timeframeLabel={timeframeLabel}
             />
+          </div>
+        </motion.div>
+
+        {/* Inbox + Upcoming Posts + Platform Health — new insights row */}
+        <motion.div variants={fadeUp} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <DataSourceTag sources={["inbox_conversations (unread, type)"]} />
+            <InboxSummaryWidget />
+          </div>
+          <div className="relative">
+            <DataSourceTag sources={["GetLate API /posts (scheduled)"]} />
+            <UpcomingPostsWidget />
+          </div>
+          <div className="relative">
+            <DataSourceTag sources={["GetLate API /accounts"]} />
+            <PlatformHealthWidget />
           </div>
         </motion.div>
 

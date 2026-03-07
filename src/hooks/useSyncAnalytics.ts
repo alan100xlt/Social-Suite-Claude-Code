@@ -37,6 +37,10 @@ export function useSyncAnalytics() {
       queryClient.invalidateQueries({ queryKey: ['best-time-to-post'] });
       queryClient.invalidateQueries({ queryKey: ['inactive-account-ids'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-trends'] });
+      queryClient.invalidateQueries({ queryKey: ['post-timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['youtube-daily-views'] });
+      queryClient.invalidateQueries({ queryKey: ['follower-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['account-health'] });
 
       toast.success('Analytics synced', {
         description: `Synced ${data.postSnapshots || 0} posts and ${data.accountSnapshots || 0} accounts`,

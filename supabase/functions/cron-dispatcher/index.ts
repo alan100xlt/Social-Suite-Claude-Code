@@ -25,6 +25,8 @@ const ALLOWED_FUNCTIONS = [
   'rss-poll',
   'getlate-changelog-monitor',
   'cron-escalation',
+  'evergreen-recycler',
+  'performance-alerts',
 ];
 
 Deno.serve(async (req) => {

@@ -25,6 +25,7 @@ interface RssItem {
   guid: string
   pubDate: string
   imageUrl: string | null
+  author: string | null
 }
 
 function extractImageUrl(itemXml: string): string | null {
@@ -150,6 +151,30 @@ function needsCrawl(item: RssItem): boolean {
   return desc.length < 100
 }
 
+function extractAuthor(itemXml: string): string | null {
+  // 1. <dc:creator> (Dublin Core — most common in WordPress, media sites)
+  const dcMatch = /<dc:creator[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/dc:creator>/i.exec(itemXml)
+  if (dcMatch) return dcMatch[1].trim() || null
+
+  // 2. <author> (standard RSS)
+  const authorMatch = /<author[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/author>/i.exec(itemXml)
+  if (authorMatch) {
+    const raw = authorMatch[1].trim()
+    // RSS author often formatted as "email (Name)" — extract the name
+    const parenMatch = /\(([^)]+)\)/.exec(raw)
+    if (parenMatch) return parenMatch[1].trim()
+    // If it looks like an email, skip it
+    if (raw.includes('@')) return null
+    return raw || null
+  }
+
+  // 3. <itunes:author> (podcast feeds)
+  const itunesMatch = /<itunes:author[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/itunes:author>/i.exec(itemXml)
+  if (itunesMatch) return itunesMatch[1].trim() || null
+
+  return null
+}
+
 function parseRssXml(xml: string): RssItem[] {
   const items: RssItem[] = []
   const itemRegex = /<item>([\s\S]*?)<\/item>/g
@@ -178,6 +203,7 @@ function parseRssXml(xml: string): RssItem[] {
       guid,
       pubDate: getTag('pubDate'),
       imageUrl: extractImageUrl(itemXml),
+      author: extractAuthor(itemXml),
     })
   }
 
@@ -422,6 +448,7 @@ async function pollSingleFeed(
     feed_id: string; guid: string; title: string | null; link: string | null;
     description: string | null; full_content: string | null;
     image_url: string | null; published_at: string | null; status: 'pending';
+    byline: string | null; journalist_id: string | null;
   }> = []
 
   if (newItems.length > 0) {
@@ -448,6 +475,24 @@ async function pollSingleFeed(
         }
       }
 
+      // Upsert journalist if byline found
+      let journalistId: string | null = null
+      if (item.author) {
+        try {
+          const { data: journalist } = await supabase
+            .from('journalists')
+            .upsert(
+              { company_id: feed.company_id, name: item.author },
+              { onConflict: 'company_id,name' }
+            )
+            .select('id')
+            .single()
+          journalistId = journalist?.id || null
+        } catch (e) {
+          console.error(`Failed to upsert journalist "${item.author}":`, e)
+        }
+      }
+
       rows.push({
         feed_id: feedId,
         guid: item.guid,
@@ -458,6 +503,8 @@ async function pollSingleFeed(
         image_url: storedImageUrl || item.imageUrl || null,
         published_at: item.pubDate ? new Date(item.pubDate).toISOString() : null,
         status: 'pending' as const,
+        byline: item.author || null,
+        journalist_id: journalistId,
       })
     }
 
@@ -665,6 +712,7 @@ async function processAutomationRules(
     feed_id: string; guid: string; title: string | null; link: string | null;
     description: string | null; full_content: string | null;
     image_url: string | null; published_at: string | null; status: string;
+    byline: string | null; journalist_id: string | null;
   }>,
 ) {
   // Query active rules for this company that match this feed (or all feeds)

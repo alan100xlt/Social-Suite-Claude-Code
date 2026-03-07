@@ -1,22 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
+export type AppRole = "owner" | "admin" | "manager" | "collaborator" | "community_manager" | "member";
+
 export interface AuthResult {
   userId: string;
   email: string;
   isSuperAdmin: boolean;
   companyId?: string;
-  role?: "owner" | "admin" | "member";
+  role?: AppRole;
 }
 
 export interface AuthorizeOptions {
   /** Roles required in the target company. If empty/undefined, any membership suffices. */
-  requiredRoles?: ("owner" | "admin" | "member")[];
+  requiredRoles?: AppRole[];
   /** The company ID to check membership against. */
   companyId?: string;
   /** If true, only superadmins may proceed. */
   superadminOnly?: boolean;
   /** If true, skip all auth checks (for service-role / cron endpoints). */
   allowServiceRole?: boolean;
+  /** Permission name to check (uses user_has_permission DB function). */
+  requiredPermission?: string;
 }
 
 const corsHeaders = {
@@ -127,7 +131,7 @@ export async function authorize(
       );
     }
 
-    const role = membership.role as "owner" | "admin" | "member";
+    const role = membership.role as AppRole;
 
     if (
       options.requiredRoles &&
@@ -140,6 +144,23 @@ export async function authorize(
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Permission-level check (uses DB function for per-user overrides)
+    if (options.requiredPermission) {
+      const { data: hasPermission } = await adminClient.rpc("user_has_permission", {
+        _user_id: userId,
+        _company_id: options.companyId,
+        _permission: options.requiredPermission,
+      });
+      if (!hasPermission) {
+        throw new Response(
+          JSON.stringify({
+            error: `Forbidden: missing permission [${options.requiredPermission}]`,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     return { userId, email, isSuperAdmin: false, companyId: options.companyId, role };

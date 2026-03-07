@@ -1,0 +1,94 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
+import { isDemoCompany } from '@/lib/demo/demo-constants';
+
+export type AppRole = 'owner' | 'admin' | 'manager' | 'collaborator' | 'community_manager' | 'member';
+
+export type PermissionName =
+  | 'view_content' | 'create_content' | 'edit_content' | 'delete_content'
+  | 'publish' | 'schedule'
+  | 'manage_feeds' | 'manage_campaigns' | 'manage_team' | 'manage_settings'
+  | 'view_analytics' | 'manage_breaking_news' | 'manage_automations'
+  | 'manage_inbox' | 'respond_inbox';
+
+interface EffectivePermissions {
+  role: AppRole;
+  permissions: Record<string, boolean>;
+}
+
+export function usePermissions() {
+  const { user, isSuperAdmin } = useAuth();
+  const { selectedCompanyId } = useSelectedCompany();
+
+  return useQuery({
+    queryKey: ['user-permissions', user?.id, selectedCompanyId],
+    queryFn: async (): Promise<EffectivePermissions> => {
+      // Demo company: all permissions
+      if (isDemoCompany(selectedCompanyId)) {
+        return { role: 'owner', permissions: allGranted() };
+      }
+
+      // Superadmin: all permissions
+      if (isSuperAdmin) {
+        return { role: 'owner', permissions: allGranted() };
+      }
+
+      if (!user?.id || !selectedCompanyId) {
+        return { role: 'collaborator', permissions: {} };
+      }
+
+      // Get role
+      const { data: membership } = await supabase
+        .from('company_memberships')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('company_id', selectedCompanyId)
+        .maybeSingle();
+
+      const role = (membership?.role as AppRole) || 'collaborator';
+
+      // Get role defaults
+      const { data: defaults } = await supabase
+        .from('role_default_permissions')
+        .select('permission_name, granted')
+        .eq('role', role);
+
+      // Get per-user overrides
+      const { data: overrides } = await supabase
+        .from('user_permissions')
+        .select('permission_name, granted')
+        .eq('user_id', user.id)
+        .eq('company_id', selectedCompanyId);
+
+      // Merge: defaults first, overrides take precedence
+      const permissions: Record<string, boolean> = {};
+      for (const d of defaults || []) {
+        permissions[d.permission_name] = d.granted;
+      }
+      for (const o of overrides || []) {
+        permissions[o.permission_name] = o.granted;
+      }
+
+      return { role, permissions };
+    },
+    enabled: !!user?.id || isSuperAdmin,
+    staleTime: 5 * 60 * 1000, // 5 min — permissions rarely change
+  });
+}
+
+export function useHasPermission(permission: PermissionName): boolean {
+  const { data } = usePermissions();
+  return data?.permissions[permission] ?? false;
+}
+
+function allGranted(): Record<string, boolean> {
+  const perms: PermissionName[] = [
+    'view_content', 'create_content', 'edit_content', 'delete_content',
+    'publish', 'schedule', 'manage_feeds', 'manage_campaigns',
+    'manage_team', 'manage_settings', 'view_analytics',
+    'manage_breaking_news', 'manage_automations', 'manage_inbox', 'respond_inbox',
+  ];
+  return Object.fromEntries(perms.map(p => [p, true]));
+}

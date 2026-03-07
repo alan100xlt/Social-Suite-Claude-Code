@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { GetLatePost } from "@/lib/api/getlate";
 import { useUpdatePost } from "@/hooks/useGetLatePosts";
 import { CalendarCard, isTimeSensitive } from "./CalendarCard";
+import { CalendarArticleCard, type ArticleItem } from "./CalendarArticleCard";
 import { getBestTimeTint, isBestTimeSlot } from "./BestTimeOverlay";
 import { CalendarFilters, createDefaultFilters, type CalendarFilterState } from "./CalendarFilters";
 import { CalendarSidebar } from "./CalendarSidebar";
@@ -65,12 +66,15 @@ function DroppableCell({ id, className, children }: DroppableCellProps) {
 
 interface ContentCalendarProps {
   posts: GetLatePost[];
+  articles?: ArticleItem[];
   bestTimeSlots: BestTimeSlot[];
   onPostClick: (post: GetLatePost) => void;
+  onArticleClick?: (article: ArticleItem) => void;
+  onPostAction?: (postId: string, action: 'edit' | 'approve' | 'publish') => void;
   onNewPost?: () => void;
 }
 
-export function ContentCalendar({ posts, bestTimeSlots, onPostClick, onNewPost }: ContentCalendarProps) {
+export function ContentCalendar({ posts, articles = [], bestTimeSlots, onPostClick, onArticleClick, onPostAction, onNewPost }: ContentCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filters, setFilters] = useState<CalendarFilterState>(createDefaultFilters);
   const [weekMode, setWeekMode] = useState<WeekMode>("sun-sat");
@@ -156,6 +160,43 @@ export function ContentCalendar({ posts, bestTimeSlots, onPostClick, onNewPost }
     });
     return map;
   }, [filteredPosts, days]);
+
+  // Articles by slot (grid view) and by day (stacking view)
+  const articlesBySlot = useMemo(() => {
+    if (filters.contentView === "posts") return new Map<string, ArticleItem[]>();
+    const map = new Map<string, ArticleItem[]>();
+    articles.forEach((article) => {
+      if (!article.published_at) return;
+      const date = parseISO(article.published_at);
+      const day = days.findIndex((d) => isSameDay(d, date));
+      if (day === -1) return;
+      const hour = getHours(date);
+      if (hour < 6 || hour > 22) return;
+      const key = `${day}-${hour}`;
+      const existing = map.get(key) || [];
+      existing.push(article);
+      map.set(key, existing);
+    });
+    return map;
+  }, [articles, days, filters.contentView]);
+
+  const articlesByDay = useMemo(() => {
+    if (filters.contentView === "posts") return new Map<number, ArticleItem[]>();
+    const map = new Map<number, ArticleItem[]>();
+    articles.forEach((article) => {
+      if (!article.published_at) return;
+      const date = parseISO(article.published_at);
+      const dayIdx = days.findIndex((d) => isSameDay(d, date));
+      if (dayIdx === -1) return;
+      const existing = map.get(dayIdx) || [];
+      existing.push(article);
+      map.set(dayIdx, existing);
+    });
+    return map;
+  }, [articles, days, filters.contentView]);
+
+  // Whether to show posts in the calendar
+  const showPosts = filters.contentView !== "articles";
 
   // Sidebar awareness counts
   const failedCount = useMemo(
@@ -445,7 +486,15 @@ export function ContentCalendar({ posts, bestTimeSlots, onPostClick, onNewPost }
                               Best time
                             </span>
                           )}
-                          {cellPosts.map((post) => (
+                          {(articlesBySlot.get(cellId) || []).map((article) => (
+                            <CalendarArticleCard
+                              key={`article-${article.id}`}
+                              article={article}
+                              onArticleClick={onArticleClick}
+                              onPostAction={onPostAction}
+                            />
+                          ))}
+                          {showPosts && cellPosts.map((post) => (
                             <CalendarCard
                               key={post.id}
                               post={post}
@@ -498,9 +547,17 @@ export function ContentCalendar({ posts, bestTimeSlots, onPostClick, onNewPost }
                           </div>
                         )}
                       </div>
-                      {/* Posts */}
+                      {/* Articles + Posts */}
                       <div className="flex-1 space-y-0.5 p-1">
-                        {dayPosts.map((post) => (
+                        {(articlesByDay.get(dayIdx) || []).map((article) => (
+                          <CalendarArticleCard
+                            key={`article-${article.id}`}
+                            article={article}
+                            onArticleClick={onArticleClick}
+                            onPostAction={onPostAction}
+                          />
+                        ))}
+                        {showPosts && dayPosts.map((post) => (
                           <CalendarCard
                             key={post.id}
                             post={post}

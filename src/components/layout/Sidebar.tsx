@@ -30,6 +30,7 @@ import { SiBluesky, SiThreads } from "react-icons/si";
 import { useAccounts } from "@/hooks/useGetLateAccounts";
 import { useUserRole } from "@/hooks/useCompany";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useUserMediaCompanies } from "@/hooks/useMediaCompanyManagement";
 import { usePlatform } from "@/contexts/PlatformContext";
 import { Platform } from "@/lib/api/getlate";
@@ -285,6 +286,17 @@ export function Sidebar() {
   const platform = usePlatform();
 
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
+  const { data: permData } = usePermissions();
+  const perms = permData?.permissions;
+
+  // Filter nav items based on permissions
+  const filteredNav = mainNavigation.filter((item) => {
+    if (!perms) return true; // Show all while loading
+    if (item.href === '/app/analytics' && !perms.view_analytics) return false;
+    if (item.href === '/app/settings' && !perms.manage_settings) return false;
+    if (item.href === '/app/inbox' && !perms.manage_inbox && !perms.respond_inbox) return false;
+    return true;
+  });
 
   return (
     <aside
@@ -320,7 +332,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {/* Main */}
-        <NavSection label="Main" items={mainNavigation} collapsed={collapsed} location={location} />
+        <NavSection label="Main" items={filteredNav} collapsed={collapsed} location={location} />
 
         {/* My Channels Flyout */}
         <DropdownMenu open={channelsOpen} onOpenChange={setChannelsOpen}>

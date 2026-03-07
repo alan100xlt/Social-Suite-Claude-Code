@@ -14,6 +14,7 @@ import { ArticlePipeline } from "@/components/content/pipeline/ArticlePipeline";
 import { PipelineStats } from "@/components/content/pipeline/PipelineStats";
 import { QueueGrid } from "@/components/content/queue/QueueGrid";
 import type { ArticleRowData } from "@/components/content/pipeline/ArticleRow";
+import type { ArticleItem } from "@/components/content/calendar/CalendarArticleCard";
 import { isToday, parseISO } from "date-fns";
 
 type ViewType = "calendar" | "pipeline" | "queue";
@@ -84,6 +85,7 @@ export default function ContentV2() {
         title: fi.title,
         link: fi.link,
         feedName: fi.feed_name,
+        byline: (fi as any).byline || null,
         publishedAt: fi.published_at,
         status,
         imageUrl: fi.image_url,
@@ -91,6 +93,33 @@ export default function ContentV2() {
         ogTemplateId: fi.og_template_id,
         ogAiReasoning: fi.og_ai_reasoning,
         platformStatuses,
+      };
+    });
+  }, [feedItems, posts]);
+
+  // Map feed items to ArticleItem for calendar article layer
+  const calendarArticles: ArticleItem[] = useMemo(() => {
+    return feedItems.map((fi) => {
+      const linkedPosts = posts.filter((p) =>
+        p.text?.includes(fi.title || "__never_match__")
+      );
+      return {
+        id: fi.id,
+        title: fi.title,
+        link: fi.link,
+        image_url: fi.image_url,
+        byline: (fi as any).byline || null,
+        published_at: fi.published_at,
+        feed_name: fi.feed_name,
+        post_id: fi.post_id,
+        status: fi.status || 'pending',
+        content_classification: (fi as any).content_classification || null,
+        posts: linkedPosts.map((p) => ({
+          id: p.id,
+          text: p.text || '',
+          status: p.status || 'draft',
+          platform: p.platformResults?.[0]?.platform || 'unknown',
+        })),
       };
     });
   }, [feedItems, posts]);
@@ -146,6 +175,7 @@ export default function ContentV2() {
           {currentView === "calendar" && (
             <ContentCalendar
               posts={posts}
+              articles={calendarArticles}
               bestTimeSlots={bestTimeSlots}
               onPostClick={handlePostClick}
             />

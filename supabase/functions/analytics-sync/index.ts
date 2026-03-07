@@ -73,6 +73,7 @@ interface AnalyticsPostMetrics {
   comments?: number;
   shares?: number;
   clicks?: number;
+  saves?: number;
   views?: number;
   engagementRate?: number;
 }
@@ -475,6 +476,7 @@ Deno.serve(async (req) => {
             comments: post.analytics?.comments || 0,
             shares: post.analytics?.shares || 0,
             clicks: post.analytics?.clicks || 0,
+            saves: post.analytics?.saves || 0,
             engagement_rate: post.platforms?.[0]?.analytics?.engagementRate || post.analytics?.engagementRate || 0,
             snapshot_date: today,
             content: post.content || null,
@@ -513,7 +515,7 @@ Deno.serve(async (req) => {
 
             let totalImpressions = 0, totalReach = 0, totalViews = 0;
             let totalLikes = 0, totalComments = 0, totalShares = 0;
-            let totalClicks = 0, totalEngagementRate = 0;
+            let totalClicks = 0, totalSaves = 0, totalEngagementRate = 0;
 
             for (const post of platformPosts) {
               totalImpressions += post.analytics?.impressions || 0;
@@ -523,6 +525,7 @@ Deno.serve(async (req) => {
               totalComments += post.analytics?.comments || 0;
               totalShares += post.analytics?.shares || 0;
               totalClicks += post.analytics?.clicks || 0;
+              totalSaves += post.analytics?.saves || 0;
               totalEngagementRate += post.platforms?.[0]?.analytics?.engagementRate || post.analytics?.engagementRate || 0;
             }
 
@@ -557,6 +560,7 @@ Deno.serve(async (req) => {
                 comments: totalComments,
                 shares: totalShares,
                 clicks: totalClicks,
+                saves: totalSaves,
                 engagement_rate: avgEngagementRate,
                 snapshot_date: today,
                 is_active: account.isActive ?? true,

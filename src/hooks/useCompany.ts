@@ -23,7 +23,7 @@ export interface CompanyMember {
   full_name: string | null;
   email: string | null;
   avatar_url: string | null;
-  role: 'owner' | 'admin' | 'member';
+  role: 'owner' | 'admin' | 'manager' | 'collaborator' | 'community_manager' | 'member';
 }
 
 /**
@@ -166,7 +166,7 @@ export function useCompanyMembers() {
         const membership = memberships.find(m => m.user_id === profile.id);
         return {
           ...profile,
-          role: (membership?.role as 'owner' | 'admin' | 'member') || 'member',
+          role: (membership?.role as 'owner' | 'admin' | 'manager' | 'collaborator' | 'community_manager' | 'member') || 'member',
         };
       });
 
@@ -199,7 +199,7 @@ export function useUserRole() {
         .maybeSingle();
 
       if (error || !data) return null;
-      return data.role as 'owner' | 'admin' | 'member';
+      return data.role as 'owner' | 'admin' | 'manager' | 'collaborator' | 'community_manager' | 'member';
     },
     enabled: !!user?.id,
   });

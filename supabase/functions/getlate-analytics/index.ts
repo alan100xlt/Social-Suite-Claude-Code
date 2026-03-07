@@ -81,6 +81,13 @@ const ACTIONS: Record<string, ActionConfig> = {
     needsProfileId: false,
     responseKey: 'timeline',
   },
+  'account-health': {
+    path: '/accounts/health',
+    method: 'GET',
+    forwardFields: [],
+    needsProfileId: true,
+    responseKey: 'health',
+  },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

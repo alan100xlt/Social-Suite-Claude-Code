@@ -181,17 +181,6 @@ export const getlateAccounts = {
     return { success: data.success, error: data.error };
   },
 
-  // Get follower stats
-  async getFollowerStats(accountId: string): Promise<ApiResponse<{ stats: Array<{ date: string; followers: number }> }>> {
-    const { data, error } = await supabase.functions.invoke('getlate-accounts', {
-      body: { action: 'follower-stats', accountId },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: data.success, data: { stats: data.stats }, error: data.error };
-  },
 };
 
 // Posts API
@@ -332,6 +321,111 @@ export const getlateAnalytics = {
       return { success: false, error: error.message };
     }
     return { success: data.success, data: { analytics: data.analytics }, error: data.error };
+  },
+
+  // Get post timeline (engagement over time for a single post)
+  async getPostTimeline(params: {
+    postId: string;
+    fromDate?: string;
+    toDate?: string;
+    companyId?: string;
+  }): Promise<ApiResponse<{ timeline: unknown }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'post-timeline', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { timeline: data.timeline }, error: data.error };
+  },
+
+  // Get YouTube daily views for a video post
+  async getYouTubeDailyViews(params: {
+    postId: string;
+    companyId?: string;
+  }): Promise<ApiResponse<{ dailyViews: unknown }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'youtube-daily', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { dailyViews: data.dailyViews }, error: data.error };
+  },
+
+  // Get follower stats (via getlate-accounts edge function)
+  async getFollowerStats(accountId: string): Promise<ApiResponse<{ stats: unknown; accounts: unknown; dateRange: unknown; granularity: string }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-accounts', {
+      body: { action: 'follower-stats', accountId },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { stats: data.stats, accounts: data.accounts, dateRange: data.dateRange, granularity: data.granularity }, error: data.error };
+  },
+
+  // Get posting frequency analysis
+  async getPostingFrequency(params: {
+    platform?: string;
+    companyId?: string;
+  }): Promise<ApiResponse<{ frequency: unknown }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'posting-frequency', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { frequency: data }, error: data.error };
+  },
+
+  // Get content decay analysis
+  async getContentDecay(params: {
+    platform?: string;
+    accountId?: string;
+    postId?: string;
+    companyId?: string;
+  }): Promise<ApiResponse<{ decay: unknown }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'content-decay', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { decay: data }, error: data.error };
+  },
+
+  // Get best time to post
+  async getBestTime(params: {
+    platform?: string;
+    companyId?: string;
+  }): Promise<ApiResponse<{ slots: unknown }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'best-time', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { slots: data.slots || data }, error: data.error };
+  },
+
+  // Get account health status (token validity, posting ability, etc.)
+  async getAccountHealth(params: {
+    companyId?: string;
+  }): Promise<ApiResponse<{ health: { summary: { total: number; healthy: number; warning: number; error: number; needsReconnect: number }; accounts: Array<{ accountId: string; platform: string; username: string; displayName: string; status: string; canPost: boolean; canFetchAnalytics: boolean; tokenValid: boolean; tokenExpiresAt: string; needsReconnect: boolean; issues: string[] }> } }>> {
+    const { data, error } = await supabase.functions.invoke('getlate-analytics', {
+      body: { action: 'account-health', ...params },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: data.success, data: { health: data.health }, error: data.error };
   },
 
   // Get daily metrics

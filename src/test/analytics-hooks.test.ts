@@ -85,7 +85,6 @@ describe("Dead GetLate analytics hooks removed", () => {
 
 describe("Deleted analytics hooks no longer exist", () => {
   const deletedHooks = [
-    "usePostingFrequency.ts",
     "useViewsByPublishDate.ts",
     "useHistoricalAnalytics.ts",
     "useDailyPlatformMetrics.ts",
@@ -98,4 +97,70 @@ describe("Deleted analytics hooks no longer exist", () => {
       expect(fs.existsSync(path.join(hooksDir, hookFile))).toBe(false);
     });
   }
+});
+
+describe("New analytics hooks (SOC-217 + SOC-261)", () => {
+  const newHooks = [
+    { file: "usePostTimeline.ts", queryKey: "post-timeline" },
+    { file: "useYouTubeDailyViews.ts", queryKey: "youtube-daily-views" },
+    { file: "useFollowerStats.ts", queryKey: "follower-stats" },
+    { file: "useAccountHealth.ts", queryKey: "account-health" },
+  ];
+
+  for (const { file, queryKey } of newHooks) {
+    describe(file, () => {
+      const filePath = path.join(hooksDir, file);
+
+      it("exists", () => {
+        expect(fs.existsSync(filePath)).toBe(true);
+      });
+
+      it(`uses '${queryKey}' query key`, () => {
+        const source = fs.readFileSync(filePath, "utf-8");
+        expect(source).toContain(`'${queryKey}'`);
+      });
+
+      it("uses useQuery", () => {
+        const source = fs.readFileSync(filePath, "utf-8");
+        expect(source).toContain("useQuery");
+      });
+    });
+  }
+});
+
+describe("useSyncAnalytics invalidation keys (SOC-217)", () => {
+  const syncSource = fs.readFileSync(
+    path.join(hooksDir, "useSyncAnalytics.ts"),
+    "utf-8"
+  );
+
+  const requiredKeys = [
+    "account-growth",
+    "aggregated-followers",
+    "top-posts",
+    "analytics-by-publish-date",
+    "platform-breakdown",
+    "content-decay",
+    "analytics-stats",
+    "last-sync-time",
+    "all-posts-with-analytics",
+    "best-time-to-post",
+    "inactive-account-ids",
+    "dashboard-trends",
+    "post-timeline",
+    "youtube-daily-views",
+    "follower-stats",
+    "account-health",
+  ];
+
+  for (const key of requiredKeys) {
+    it(`invalidates '${key}'`, () => {
+      expect(syncSource).toContain(`'${key}'`);
+    });
+  }
+
+  it("has at least 16 invalidation calls", () => {
+    const count = (syncSource.match(/invalidateQueries/g) || []).length;
+    expect(count).toBeGreaterThanOrEqual(16);
+  });
 });

@@ -31,6 +31,7 @@ export type Database = {
           platform: string
           posts_count: number
           reach: number
+          saves: number | null
           shares: number
           snapshot_date: string
           views: number
@@ -51,6 +52,7 @@ export type Database = {
           platform: string
           posts_count?: number
           reach?: number
+          saves?: number | null
           shares?: number
           snapshot_date: string
           views?: number
@@ -71,6 +73,7 @@ export type Database = {
           platform?: string
           posts_count?: number
           reach?: number
+          saves?: number | null
           shares?: number
           snapshot_date?: string
           views?: number
@@ -284,6 +287,88 @@ export type Database = {
           },
         ]
       }
+      campaign_posts: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          campaign_id: string
+          id: string
+          post_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          campaign_id: string
+          id?: string
+          post_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          campaign_id?: string
+          id?: string
+          post_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_posts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           actions: Json | null
@@ -463,6 +548,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "company_email_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_feature_config: {
+        Row: {
+          company_id: string
+          config: Json
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          config?: Json
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          config?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_feature_config_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: true
             referencedRelation: "companies"
@@ -746,6 +857,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "discovery_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evergreen_queue: {
+        Row: {
+          article_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          original_post_id: string | null
+          published_at: string | null
+          published_post_id: string | null
+          scheduled_for: string | null
+          status: Database["public"]["Enums"]["evergreen_status"]
+          updated_at: string
+          variation_text: string
+        }
+        Insert: {
+          article_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          original_post_id?: string | null
+          published_at?: string | null
+          published_post_id?: string | null
+          scheduled_for?: string | null
+          status?: Database["public"]["Enums"]["evergreen_status"]
+          updated_at?: string
+          variation_text: string
+        }
+        Update: {
+          article_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          original_post_id?: string | null
+          published_at?: string | null
+          published_post_id?: string | null
+          scheduled_for?: string | null
+          status?: Database["public"]["Enums"]["evergreen_status"]
+          updated_at?: string
+          variation_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evergreen_queue_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "rss_feed_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evergreen_queue_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -1110,11 +1278,15 @@ export type Database = {
           company_id: string
           completed_at: string | null
           created_at: string
+          cursor_state: Json | null
           error: string | null
           id: string
+          job_type: string
           report_data: Json | null
           started_at: string | null
           status: string
+          synced_conversations: number | null
+          synced_messages: number | null
           total_conversations: number | null
           total_posts: number | null
           updated_at: string
@@ -1125,11 +1297,15 @@ export type Database = {
           company_id: string
           completed_at?: string | null
           created_at?: string
+          cursor_state?: Json | null
           error?: string | null
           id?: string
+          job_type?: string
           report_data?: Json | null
           started_at?: string | null
           status?: string
+          synced_conversations?: number | null
+          synced_messages?: number | null
           total_conversations?: number | null
           total_posts?: number | null
           updated_at?: string
@@ -1140,11 +1316,15 @@ export type Database = {
           company_id?: string
           completed_at?: string | null
           created_at?: string
+          cursor_state?: Json | null
           error?: string | null
           id?: string
+          job_type?: string
           report_data?: Json | null
           started_at?: string | null
           status?: string
+          synced_conversations?: number | null
+          synced_messages?: number | null
           total_conversations?: number | null
           total_posts?: number | null
           updated_at?: string
@@ -1623,6 +1803,47 @@ export type Database = {
           },
         ]
       }
+      journalists: {
+        Row: {
+          bio: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          photo_url: string | null
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          photo_url?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          photo_url?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journalists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_companies: {
         Row: {
           contact_email: string | null
@@ -1920,6 +2141,7 @@ export type Database = {
           post_url: string | null
           published_at: string | null
           reach: number
+          saves: number | null
           shares: number
           snapshot_date: string
           source: string | null
@@ -1943,6 +2165,7 @@ export type Database = {
           post_url?: string | null
           published_at?: string | null
           reach?: number
+          saves?: number | null
           shares?: number
           snapshot_date: string
           source?: string | null
@@ -1966,6 +2189,7 @@ export type Database = {
           post_url?: string | null
           published_at?: string | null
           reach?: number
+          saves?: number | null
           shares?: number
           snapshot_date?: string
           source?: string | null
@@ -2057,6 +2281,7 @@ export type Database = {
           created_at: string
           created_by: string
           current_step: number | null
+          feed_item_id: string | null
           id: string
           image_url: string | null
           objective: string | null
@@ -2076,6 +2301,7 @@ export type Database = {
           created_at?: string
           created_by: string
           current_step?: number | null
+          feed_item_id?: string | null
           id?: string
           image_url?: string | null
           objective?: string | null
@@ -2095,6 +2321,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           current_step?: number | null
+          feed_item_id?: string | null
           id?: string
           image_url?: string | null
           objective?: string | null
@@ -2114,6 +2341,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_drafts_feed_item_id_fkey"
+            columns: ["feed_item_id"]
+            isOneToOne: false
+            referencedRelation: "rss_feed_items"
             referencedColumns: ["id"]
           },
         ]
@@ -2156,8 +2390,31 @@ export type Database = {
           },
         ]
       }
+      role_default_permissions: {
+        Row: {
+          granted: boolean
+          id: string
+          permission_name: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          granted?: boolean
+          id?: string
+          permission_name: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          granted?: boolean
+          id?: string
+          permission_name?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       rss_feed_items: {
         Row: {
+          byline: string | null
+          content_classification: Json | null
           created_at: string
           description: string | null
           feed_id: string
@@ -2165,6 +2422,8 @@ export type Database = {
           guid: string
           id: string
           image_url: string | null
+          journalist_id: string | null
+          last_recycled_at: string | null
           link: string | null
           og_ai_reasoning: string | null
           og_image_url: string | null
@@ -2176,6 +2435,8 @@ export type Database = {
           title: string | null
         }
         Insert: {
+          byline?: string | null
+          content_classification?: Json | null
           created_at?: string
           description?: string | null
           feed_id: string
@@ -2183,6 +2444,8 @@ export type Database = {
           guid: string
           id?: string
           image_url?: string | null
+          journalist_id?: string | null
+          last_recycled_at?: string | null
           link?: string | null
           og_ai_reasoning?: string | null
           og_image_url?: string | null
@@ -2194,6 +2457,8 @@ export type Database = {
           title?: string | null
         }
         Update: {
+          byline?: string | null
+          content_classification?: Json | null
           created_at?: string
           description?: string | null
           feed_id?: string
@@ -2201,6 +2466,8 @@ export type Database = {
           guid?: string
           id?: string
           image_url?: string | null
+          journalist_id?: string | null
+          last_recycled_at?: string | null
           link?: string | null
           og_ai_reasoning?: string | null
           og_image_url?: string | null
@@ -2212,6 +2479,13 @@ export type Database = {
           title?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_rss_feed_items_journalist"
+            columns: ["journalist_id"]
+            isOneToOne: false
+            referencedRelation: "journalists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rss_feed_items_feed_id_fkey"
             columns: ["feed_id"]
@@ -2294,6 +2568,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_permissions: {
+        Row: {
+          company_id: string
+          created_at: string
+          granted: boolean
+          id: string
+          permission_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          granted?: boolean
+          id?: string
+          permission_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          granted?: boolean
+          id?: string
+          permission_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -2590,6 +2902,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_has_permission: {
+        Args: { _company_id: string; _permission: string; _user_id: string }
+        Returns: boolean
+      }
       user_is_media_company_admin: {
         Args: { _user_id: string }
         Returns: string[]
@@ -2602,7 +2918,15 @@ export type Database = {
       user_team_member_ids: { Args: { _user_id: string }; Returns: string[] }
     }
     Enums: {
-      app_role: "owner" | "admin" | "member"
+      app_role:
+        | "owner"
+        | "admin"
+        | "member"
+        | "manager"
+        | "collaborator"
+        | "community_manager"
+      campaign_status: "draft" | "active" | "completed" | "archived"
+      evergreen_status: "pending" | "published" | "skipped" | "failed"
       rss_item_status: "pending" | "posted" | "failed" | "skipped"
     }
     CompositeTypes: {
@@ -2731,7 +3055,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "admin", "member"],
+      app_role: [
+        "owner",
+        "admin",
+        "member",
+        "manager",
+        "collaborator",
+        "community_manager",
+      ],
+      campaign_status: ["draft", "active", "completed", "archived"],
+      evergreen_status: ["pending", "published", "skipped", "failed"],
       rss_item_status: ["pending", "posted", "failed", "skipped"],
     },
   },

@@ -1384,3 +1384,199 @@ DEMO_INBOX_MESSAGES['demo-conv-5'].push({
   media_url: 'https://images.unsplash.com/photo-1536240478700-b869070f9279?w=400&h=300&fit=crop',
   parent_message_id: null, is_internal_note: false, metadata: {}, created_at: hoursAgo(1),
 });
+
+// ─── Post Timeline (engagement over time for a single post) ─────
+
+export const DEMO_POST_TIMELINE = {
+  postId: 'demo-post-pub-1',
+  timeline: Array.from({ length: 14 }, (_, i) => ({
+    date: format(subDays(NOW, 13 - i), 'yyyy-MM-dd'),
+    impressions: 500 + i * 150 + (i > 5 ? 200 : 0),
+    likes: 20 + i * 8,
+    comments: 2 + Math.floor(i * 1.5),
+    shares: 1 + Math.floor(i * 0.8),
+    engagementRate: 3.2 + i * 0.15,
+  })),
+};
+
+// ─── YouTube Daily Views (for video posts) ─────
+
+export const DEMO_YOUTUBE_DAILY_VIEWS = {
+  postId: 'demo-post-pub-3',
+  dailyViews: Array.from({ length: 7 }, (_, i) => ({
+    date: format(subDays(NOW, 6 - i), 'yyyy-MM-dd'),
+    views: 120 + i * 45 + (i === 3 ? 300 : 0),
+    watchTimeMinutes: 60 + i * 20,
+    averageViewDuration: 42 + i * 3,
+  })),
+};
+
+// ─── Follower Stats (historical follower growth per account) ─────
+
+export const DEMO_FOLLOWER_STATS = {
+  accounts: DEMO_ACCOUNTS.map(a => ({
+    _id: a.id,
+    platform: a.platform,
+    username: a.username,
+    displayName: a.displayName,
+  })),
+  stats: Array.from({ length: 30 }, (_, i) => ({
+    date: format(subDays(NOW, 29 - i), 'yyyy-MM-dd'),
+    twitter: 3800 + i * 14,
+    linkedin: 2900 + i * 7,
+    instagram: 2600 + i * 7,
+    facebook: 1700 + i * 3,
+    tiktok: 350 + i * 5,
+  })),
+  dateRange: { from: format(subDays(NOW, 29), 'yyyy-MM-dd'), to: TODAY },
+  granularity: 'daily',
+};
+
+// ─── Account Health (SOC-261) ────────────────────────────
+
+export const DEMO_ACCOUNT_HEALTH = {
+  summary: {
+    total: DEMO_ACCOUNTS.length,
+    healthy: DEMO_ACCOUNTS.length,
+    warning: 0,
+    error: 0,
+    needsReconnect: 0,
+  },
+  accounts: DEMO_ACCOUNTS.map(a => ({
+    accountId: a.id,
+    platform: a.platform,
+    username: a.username,
+    displayName: a.displayName || a.username,
+    profileId: 'demo-profile',
+    status: 'healthy',
+    canPost: true,
+    canFetchAnalytics: true,
+    analyticsSupported: true,
+    tokenValid: true,
+    tokenExpiresAt: addDays(NOW, 60).toISOString(),
+    needsReconnect: false,
+    issues: [],
+  })),
+};
+
+// ─── Campaigns (Phase 5) ─────────────────────────────────
+
+export const DEMO_CAMPAIGNS = [
+  {
+    id: 'demo-campaign-1',
+    company_id: DEMO_COMPANY_ID,
+    name: 'Product Launch Week',
+    description: 'Coordinated launch campaign across all platforms for new AI features.',
+    status: 'active' as const,
+    start_date: format(subDays(NOW, 2), 'yyyy-MM-dd'),
+    end_date: format(addDays(NOW, 5), 'yyyy-MM-dd'),
+    created_by: 'demo-user',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(1),
+    post_count: 5,
+  },
+  {
+    id: 'demo-campaign-2',
+    company_id: DEMO_COMPANY_ID,
+    name: 'Thought Leadership Series',
+    description: 'Weekly expert insights on social media trends.',
+    status: 'draft' as const,
+    start_date: format(addDays(NOW, 7), 'yyyy-MM-dd'),
+    end_date: format(addDays(NOW, 28), 'yyyy-MM-dd'),
+    created_by: 'demo-user',
+    created_at: daysAgo(1),
+    updated_at: daysAgo(1),
+    post_count: 0,
+  },
+  {
+    id: 'demo-campaign-3',
+    company_id: DEMO_COMPANY_ID,
+    name: 'Customer Stories Sprint',
+    description: 'Showcase customer success stories and testimonials.',
+    status: 'completed' as const,
+    start_date: format(subDays(NOW, 14), 'yyyy-MM-dd'),
+    end_date: format(subDays(NOW, 7), 'yyyy-MM-dd'),
+    created_by: 'demo-user',
+    created_at: daysAgo(15),
+    updated_at: daysAgo(7),
+    post_count: 7,
+  },
+];
+
+// ─── Journalists (Phase 6) ─────────────────────────────────
+
+export const DEMO_JOURNALISTS = [
+  { id: 'demo-journalist-1', company_id: DEMO_COMPANY_ID, name: 'Sarah Chen', slug: 'sarah-chen', bio: 'Tech editor covering AI and social media.', photo_url: null, created_at: daysAgo(30), updated_at: daysAgo(1) },
+  { id: 'demo-journalist-2', company_id: DEMO_COMPANY_ID, name: 'Marcus Rivera', slug: 'marcus-rivera', bio: 'Senior reporter on digital marketing trends.', photo_url: null, created_at: daysAgo(30), updated_at: daysAgo(5) },
+  { id: 'demo-journalist-3', company_id: DEMO_COMPANY_ID, name: 'Aisha Patel', slug: 'aisha-patel', bio: 'Data journalist specializing in social analytics.', photo_url: null, created_at: daysAgo(20), updated_at: daysAgo(3) },
+];
+
+// ─── Evergreen Queue (Phase 8) ─────────────────────────────
+
+export const DEMO_EVERGREEN_QUEUE = [
+  {
+    id: 'demo-evergreen-1',
+    company_id: DEMO_COMPANY_ID,
+    original_post_id: 'demo-post-pub-1',
+    article_id: null,
+    variation_text: 'Did you know? The best time to post on LinkedIn is Tuesday at 10 AM. Here\'s our data-backed guide to maximize your reach.',
+    status: 'pending' as const,
+    scheduled_for: daysFromNow(3, 10),
+    published_at: null,
+    published_post_id: null,
+    created_at: daysAgo(1),
+    article_title: '10 Tips for Social Media Success',
+  },
+  {
+    id: 'demo-evergreen-2',
+    company_id: DEMO_COMPANY_ID,
+    original_post_id: 'demo-post-pub-2',
+    article_id: null,
+    variation_text: 'Your content strategy needs this: a complete framework for planning, creating, and measuring social media ROI.',
+    status: 'published' as const,
+    scheduled_for: daysAgo(2),
+    published_at: daysAgo(2),
+    published_post_id: 'recycled-001',
+    created_at: daysAgo(5),
+    article_title: 'The Complete Content Strategy Guide',
+  },
+];
+
+// ─── Feature Config (Phase 3/Feature Gating) ─────────────
+
+export const DEMO_FEATURE_CONFIG = {
+  company_id: DEMO_COMPANY_ID,
+  config: {
+    evergreen_recycling: { enabled: true, schedule: 'weekly', auto_publish: false },
+    breaking_news: { enabled: true },
+    quality_checker: { enabled: true, block_on_publish: true },
+    performance_alerts: { enabled: true, viral_threshold: 3.0, underperform_threshold: 0.3 },
+    posting_throttle: { enabled: true, max_posts: 5, per_hours: 4 },
+    media_library: { enabled: true, imagekit_url_endpoint: 'https://ik.imagekit.io/demo' },
+    brand_voice_learning: { enabled: true },
+  },
+  updated_at: daysAgo(1),
+};
+
+// ─── Permissions (Phase 1) ─────────────────────────────────
+
+export const DEMO_PERMISSIONS = {
+  role: 'owner' as const,
+  permissions: {
+    view_content: true,
+    create_content: true,
+    edit_content: true,
+    delete_content: true,
+    publish: true,
+    schedule: true,
+    manage_feeds: true,
+    manage_campaigns: true,
+    manage_team: true,
+    manage_settings: true,
+    view_analytics: true,
+    manage_breaking_news: true,
+    manage_automations: true,
+    manage_inbox: true,
+    respond_inbox: true,
+  },
+};

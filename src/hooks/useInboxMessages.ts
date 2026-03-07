@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { isDemoCompany } from '@/lib/demo/demo-constants';
 import { inboxApi } from '@/lib/api/inbox';
+import { sendNotification } from '@/lib/api/notifications';
+import { parseMentions } from '@/lib/mentions';
+import { useCompanyMembers } from '@/hooks/useCompany';
 
 export function useInboxMessages(conversationId: string | null) {
   const { selectedCompanyId } = useSelectedCompany();
@@ -64,8 +68,9 @@ export function useReplyToDM() {
   });
 }
 
-export function useAddInternalNote() {
+export function useAddInternalNote(companyMembers?: ReturnType<typeof useCompanyMembers>['data']) {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -77,6 +82,30 @@ export function useAddInternalNote() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-messages', selectedCompanyId, variables.conversationId] });
+
+      // Notify @mentioned users
+      if (companyMembers?.length) {
+        const mentions = parseMentions(variables.content);
+        if (mentions.length === 0) return;
+
+        const senderName = user?.user_metadata?.full_name || user?.email || 'Someone';
+
+        for (const mention of mentions) {
+          const lower = mention.toLowerCase();
+          const member = companyMembers.find(m =>
+            m.full_name?.toLowerCase() === lower ||
+            m.email?.split('@')[0].toLowerCase() === lower
+          );
+          if (member && member.id !== user?.id) {
+            sendNotification({
+              userId: member.id,
+              title: 'You were mentioned',
+              body: `${senderName} mentioned you in a note on a conversation`,
+              actionUrl: `/app/content?tab=inbox&conversation=${variables.conversationId}`,
+            }).catch(console.error);
+          }
+        }
+      }
     },
   });
 }

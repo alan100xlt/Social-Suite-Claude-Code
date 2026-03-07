@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,17 @@ import { Button } from '@/components/ui/button';
 import { StickyNote, Bot, Reply, Download, Play, Image as ImageIcon, X } from 'lucide-react';
 import { format } from 'date-fns';
 import type { InboxMessage } from '@/lib/api/inbox';
+
+function renderWithMentions(text: string): ReactNode[] {
+  const parts = text.split(/(@[\w.-]+(?:\s[\w.-]+)?)/g);
+  return parts.map((part, i) =>
+    part.startsWith('@') ? (
+      <span key={i} className="text-indigo-400 font-medium bg-indigo-500/10 rounded px-1">{part}</span>
+    ) : (
+      part
+    )
+  );
+}
 
 interface ChatBubbleProps {
   message: InboxMessage;
@@ -44,7 +55,7 @@ export function ChatBubble({ message, onReply }: ChatBubbleProps) {
               {format(new Date(message.created_at), 'HH:mm')}
             </span>
           </div>
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          <p className="text-sm whitespace-pre-wrap">{renderWithMentions(message.content)}</p>
         </div>
       </div>
     );

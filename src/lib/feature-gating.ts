@@ -9,10 +9,13 @@ export type CompanyTier = 'free' | 'pro' | 'enterprise';
 const TIER_FEATURES: Record<CompanyTier, Set<string>> = {
   free: new Set([
     'inbox',
-    'inbox-manual-ai', // sentiment, suggest, summarize
+    'inbox-manual-ai',
     'inbox-labels',
     'inbox-canned-replies',
-    'inbox-auto-rules-basic', // keyword, regex, all_new
+    'inbox-auto-rules-basic',
+    'breaking_news',
+    'quality_checker',
+    'evergreen-throwback-thursday', // free tier gets Throwback Thursday only
   ]),
   pro: new Set([
     'inbox',
@@ -24,7 +27,14 @@ const TIER_FEATURES: Record<CompanyTier, Set<string>> = {
     'inbox-smart-sort',
     'inbox-editorial-value',
     'inbox-translation',
-    'inbox-auto-rules-advanced', // message_type, editorial_value, language, repeat_contact, after_hours
+    'inbox-auto-rules-advanced',
+    'breaking_news',
+    'quality_checker',
+    'performance_alerts',
+    'evergreen_recycling',
+    'brand_voice_learning',
+    'media_library',
+    'posting_throttle',
   ]),
   enterprise: new Set([
     'inbox',
@@ -40,6 +50,14 @@ const TIER_FEATURES: Record<CompanyTier, Set<string>> = {
     'inbox-crisis-detection',
     'inbox-content-recycling',
     'inbox-social-audit',
+    'breaking_news',
+    'quality_checker',
+    'performance_alerts',
+    'evergreen_recycling',
+    'brand_voice_learning',
+    'media_library',
+    'posting_throttle',
+    'cross_outlet_analytics',
   ]),
 };
 

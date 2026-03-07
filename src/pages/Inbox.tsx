@@ -34,6 +34,7 @@ import {
   useBulkUpdateStatus,
 } from '@/hooks/useInboxConversations';
 import { useInboxMessages, useReplyToComment, useReplyToDM, useAddInternalNote } from '@/hooks/useInboxMessages';
+import { useCompanyMembers } from '@/hooks/useCompany';
 import { useInboxLabels, useInboxCannedReplies, useAddConversationLabel, useRemoveConversationLabel } from '@/hooks/useInboxLabels';
 import { useInboxSearch } from '@/hooks/useInboxSearch';
 import { useInboxRealtime } from '@/hooks/useInboxRealtime';
@@ -103,7 +104,8 @@ export default function InboxPage() {
   const bulkUpdate = useBulkUpdateStatus();
   const replyComment = useReplyToComment();
   const replyDM = useReplyToDM();
-  const addNote = useAddInternalNote();
+  const { data: companyMembers } = useCompanyMembers();
+  const addNote = useAddInternalNote(companyMembers);
   const addLabel = useAddConversationLabel();
   const removeLabel = useRemoveConversationLabel();
   const translateMessage = useTranslateMessage();
@@ -573,6 +575,7 @@ export default function InboxPage() {
                     defaultContent={composerContent}
                     onTranslate={handleTranslateComposer}
                     detectedLanguage={selectedConversation.detected_language || undefined}
+                    companyMembers={companyMembers}
                   />
                 </div>
               </>

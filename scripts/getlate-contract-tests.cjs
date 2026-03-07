@@ -5,7 +5,7 @@
  * Hits the REAL GetLate API to discover and validate exact request/response shapes.
  * Run: node scripts/getlate-contract-tests.cjs [--section <name>]
  *
- * Sections: profiles, accounts, inbox, posts, analytics, connect, webhooks, all (default)
+ * Sections: profiles, accounts, inbox, posts, analytics, analytics-extended, connect, webhooks, all (default)
  *
  * IMPORTANT: Some probes (DM reply, comment reply) send REAL messages.
  * Use --dry-run to skip write operations and only test reads.
@@ -452,6 +452,288 @@ async function run() {
       const syncProbe2 = await api('POST', '/analytics/sync', { accountId: sampleAccount?._id });
       probe('POST /analytics/sync (accountId only)', syncProbe2.status, syncProbe2.data);
     }
+    console.log('');
+  }
+
+  // ─── ANALYTICS EXTENDED (new endpoints) ────────────────────
+  if (shouldRun('analytics-extended')) {
+    console.log('── 17. Analytics: Saves field in response ──');
+    // Check if the analytics list response includes a saves field
+    if (sampleAccount) {
+      const now = new Date();
+      const monthAgo = new Date(now - 30 * 86400000);
+      const analyticsList = await api('GET', `/analytics?profileId=${DIARIO_PROFILE}&limit=5&fromDate=${monthAgo.toISOString()}&toDate=${now.toISOString()}`);
+      record('GET /analytics (list) → 200', analyticsList.ok, { status: analyticsList.status });
+      if (analyticsList.ok && analyticsList.data) {
+        const posts = analyticsList.data.posts || [];
+        if (posts.length > 0) {
+          const sampleAnalytics = posts[0].analytics || {};
+          const hasSaves = 'saves' in sampleAnalytics;
+          record('Analytics post has .saves field', hasSaves, { keys: Object.keys(sampleAnalytics).join(', ') });
+          console.log(`    Analytics keys: ${Object.keys(sampleAnalytics).join(', ')}`);
+          console.log(`    saves present: ${hasSaves}, value: ${sampleAnalytics.saves}`);
+          contracts['GET /analytics (saves check)'] = {
+            hasSaves,
+            analyticsKeys: Object.keys(sampleAnalytics),
+            sampleValue: sampleAnalytics.saves,
+          };
+        }
+
+        // Check pagination shape
+        const pagination = analyticsList.data.pagination;
+        if (pagination) {
+          logKeys('Pagination', pagination);
+          contracts['GET /analytics (pagination shape)'] = {
+            keys: Object.keys(pagination),
+            sample: pagination,
+          };
+        }
+      }
+    }
+
+    console.log('\n── 18. Analytics: Post Timeline ──');
+    // post-timeline endpoint — need a real post ID
+    if (sampleAccount) {
+      // First get a post ID from analytics
+      const now = new Date();
+      const monthAgo = new Date(now - 30 * 86400000);
+      const listResp = await api('GET', `/analytics?profileId=${DIARIO_PROFILE}&limit=1&fromDate=${monthAgo.toISOString()}&toDate=${now.toISOString()}`);
+      const firstPost = listResp.data?.posts?.[0];
+      if (firstPost) {
+        const postId = firstPost._id;
+        const timeline = await api('GET', `/analytics/post-timeline?postId=${postId}`);
+        record('GET /analytics/post-timeline → response', timeline.status < 500, { status: timeline.status });
+        if (timeline.ok) {
+          logKeys('Post timeline', timeline.data);
+          contracts['GET /analytics/post-timeline'] = {
+            exists: true,
+            status: timeline.status,
+            responseKeys: timeline.data ? Object.keys(timeline.data) : [],
+            sample: JSON.stringify(timeline.data).slice(0, 500),
+          };
+        } else {
+          console.log(`    Status: ${timeline.status}`);
+          contracts['GET /analytics/post-timeline'] = {
+            exists: false,
+            status: timeline.status,
+          };
+        }
+      } else {
+        recordSkip('Post timeline', 'no post ID available');
+      }
+    }
+
+    console.log('\n── 19. Analytics: YouTube Daily Views ──');
+    {
+      // Try with a fake postId first to see if endpoint exists
+      const ytDaily = await api('GET', '/analytics/youtube/daily-views?postId=fake_post_id');
+      record('GET /analytics/youtube/daily-views → response', ytDaily.status < 500, { status: ytDaily.status });
+      if (ytDaily.ok || ytDaily.status === 400) {
+        console.log(`    Status: ${ytDaily.status}`);
+        if (ytDaily.data) logKeys('YouTube daily views', ytDaily.data);
+        contracts['GET /analytics/youtube/daily-views'] = {
+          exists: true,
+          status: ytDaily.status,
+          responseKeys: ytDaily.data ? Object.keys(ytDaily.data) : [],
+        };
+      } else {
+        console.log(`    Status: ${ytDaily.status} — endpoint may not exist`);
+        contracts['GET /analytics/youtube/daily-views'] = {
+          exists: ytDaily.status !== 404,
+          status: ytDaily.status,
+        };
+      }
+    }
+
+    console.log('\n── 20. Analytics: Follower Stats ──');
+    if (sampleAccount) {
+      const stats = await api('GET', `/accounts/follower-stats?accountId=${sampleAccount._id}`);
+      record('GET /accounts/follower-stats → response', stats.status < 500, { status: stats.status });
+      if (stats.ok) {
+        logKeys('Follower stats response', stats.data);
+        console.log(`    Data sample: ${JSON.stringify(stats.data).slice(0, 500)}`);
+        contracts['GET /accounts/follower-stats'] = {
+          exists: true,
+          status: stats.status,
+          responseKeys: stats.data ? Object.keys(stats.data) : [],
+          sample: JSON.stringify(stats.data).slice(0, 500),
+        };
+      } else {
+        console.log(`    Status: ${stats.status}`);
+        contracts['GET /accounts/follower-stats'] = {
+          exists: stats.status !== 404,
+          status: stats.status,
+        };
+      }
+    }
+
+    console.log('\n── 21. Analytics: Posting Frequency ──');
+    {
+      const freq = await api('GET', `/analytics/get-posting-frequency?profileId=${DIARIO_PROFILE}&platform=facebook`);
+      record('GET /analytics/get-posting-frequency → response', freq.status < 500, { status: freq.status });
+      if (freq.ok) {
+        logKeys('Posting frequency', freq.data);
+        console.log(`    Data sample: ${JSON.stringify(freq.data).slice(0, 500)}`);
+        contracts['GET /analytics/get-posting-frequency'] = {
+          exists: true,
+          status: freq.status,
+          responseKeys: freq.data ? Object.keys(freq.data) : [],
+          sample: JSON.stringify(freq.data).slice(0, 500),
+        };
+      } else {
+        contracts['GET /analytics/get-posting-frequency'] = {
+          exists: freq.status !== 404,
+          status: freq.status,
+        };
+      }
+    }
+
+    console.log('\n── 22. Analytics: Content Decay ──');
+    {
+      const decay = await api('GET', `/analytics/get-content-decay?profileId=${DIARIO_PROFILE}`);
+      record('GET /analytics/get-content-decay → response', decay.status < 500, { status: decay.status });
+      if (decay.ok) {
+        logKeys('Content decay', decay.data);
+        console.log(`    Data sample: ${JSON.stringify(decay.data).slice(0, 500)}`);
+        contracts['GET /analytics/get-content-decay'] = {
+          exists: true,
+          status: decay.status,
+          responseKeys: decay.data ? Object.keys(decay.data) : [],
+        };
+      } else {
+        contracts['GET /analytics/get-content-decay'] = {
+          exists: decay.status !== 404,
+          status: decay.status,
+        };
+      }
+    }
+
+    console.log('\n── 23. Analytics: LinkedIn Aggregate ──');
+    {
+      // Probe the LinkedIn aggregate analytics endpoint
+      const linkedinAgg = await api('GET', `/analytics/linkedin-aggregate-analytics?profileId=${DIARIO_PROFILE}`);
+      record('GET /analytics/linkedin-aggregate-analytics → response', linkedinAgg.status < 500, { status: linkedinAgg.status });
+      if (linkedinAgg.ok) {
+        logKeys('LinkedIn aggregate', linkedinAgg.data);
+        console.log(`    Data sample: ${JSON.stringify(linkedinAgg.data).slice(0, 500)}`);
+        contracts['GET /analytics/linkedin-aggregate-analytics'] = {
+          exists: true,
+          status: linkedinAgg.status,
+          responseKeys: linkedinAgg.data ? Object.keys(linkedinAgg.data) : [],
+        };
+      } else {
+        console.log(`    Status: ${linkedinAgg.status}`);
+        // Try alternate path
+        const alt = await api('GET', `/analytics/linkedin-aggregate?profileId=${DIARIO_PROFILE}`);
+        probe('GET /analytics/linkedin-aggregate (alt path)', alt.status, alt.data);
+        contracts['GET /analytics/linkedin-aggregate-analytics'] = {
+          exists: false,
+          status: linkedinAgg.status,
+          altPath: '/analytics/linkedin-aggregate',
+          altStatus: alt.status,
+          altExists: alt.status !== 404 && alt.status < 500,
+        };
+      }
+    }
+
+    console.log('\n── 24. Account Health ──');
+    {
+      // Probe account-health endpoint
+      const health = await api('GET', `/accounts/health?profileId=${DIARIO_PROFILE}`);
+      record('GET /accounts/health → response', health.status < 500, { status: health.status });
+      if (health.ok) {
+        logKeys('Account health', health.data);
+        contracts['GET /accounts/health'] = {
+          exists: true,
+          status: health.status,
+          responseKeys: health.data ? Object.keys(health.data) : [],
+        };
+      } else {
+        console.log(`    Status: ${health.status}`);
+        // Try alternate path
+        const alt = await api('GET', `/accounts/account-health?profileId=${DIARIO_PROFILE}`);
+        probe('GET /accounts/account-health (alt)', alt.status, alt.data);
+        contracts['GET /accounts/health'] = {
+          exists: false,
+          status: health.status,
+          altStatus: alt.status,
+        };
+      }
+    }
+
+    console.log('\n── 25. Reviews ──');
+    {
+      const reviews = await api('GET', `/reviews?profileId=${DIARIO_PROFILE}`);
+      record('GET /reviews → response', reviews.status < 500, { status: reviews.status });
+      console.log(`    Status: ${reviews.status}`);
+      if (reviews.ok) {
+        logKeys('Reviews', reviews.data);
+        contracts['GET /reviews'] = {
+          exists: true,
+          status: reviews.status,
+          responseKeys: reviews.data ? Object.keys(reviews.data) : [],
+        };
+      } else {
+        contracts['GET /reviews'] = {
+          exists: false,
+          status: reviews.status,
+        };
+      }
+    }
+
+    console.log('\n── 26. Queue ──');
+    {
+      const queue = await api('GET', `/posts/queue?profileId=${DIARIO_PROFILE}`);
+      record('GET /posts/queue → response', queue.status < 500, { status: queue.status });
+      console.log(`    Status: ${queue.status}`);
+      if (queue.ok) {
+        logKeys('Queue', queue.data);
+        contracts['GET /posts/queue'] = {
+          exists: true,
+          status: queue.status,
+          responseKeys: queue.data ? Object.keys(queue.data) : [],
+        };
+      } else {
+        // Try alternate path
+        const alt = await api('GET', `/queue?profileId=${DIARIO_PROFILE}`);
+        probe('GET /queue (alt)', alt.status, alt.data);
+        contracts['GET /posts/queue'] = {
+          exists: false,
+          status: queue.status,
+          altStatus: alt.status,
+        };
+      }
+    }
+
+    console.log('\n── 27. Inbox Pagination Shape ──');
+    {
+      // Verify conversations pagination shape
+      const convPag = await api('GET', `/inbox/conversations?profileId=${DIARIO_PROFILE}&limit=1`);
+      if (convPag.ok && convPag.data?.pagination) {
+        logKeys('Conversations pagination', convPag.data.pagination);
+        console.log(`    Pagination: ${JSON.stringify(convPag.data.pagination)}`);
+        contracts['GET /inbox/conversations (pagination)'] = {
+          keys: Object.keys(convPag.data.pagination),
+          sample: convPag.data.pagination,
+          hasCursor: 'cursor' in convPag.data.pagination,
+          hasHasMore: 'hasMore' in convPag.data.pagination,
+        };
+      }
+
+      // Verify comments pagination shape
+      const commentsPag = await api('GET', `/inbox/comments?profile=${DIARIO_PROFILE}&limit=1`);
+      if (commentsPag.ok && commentsPag.data?.pagination) {
+        logKeys('Comments pagination', commentsPag.data.pagination);
+        console.log(`    Pagination: ${JSON.stringify(commentsPag.data.pagination)}`);
+        contracts['GET /inbox/comments (pagination)'] = {
+          keys: Object.keys(commentsPag.data.pagination),
+          sample: commentsPag.data.pagination,
+          hasCursor: 'cursor' in commentsPag.data.pagination,
+          hasHasMore: 'hasMore' in commentsPag.data.pagination,
+        };
+      }
+    }
+
     console.log('');
   }
 

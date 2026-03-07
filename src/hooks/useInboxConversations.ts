@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { isDemoCompany } from '@/lib/demo/demo-constants';
+import { DEMO_INBOX_CONVERSATIONS } from '@/lib/demo/demo-data';
 import { inboxApi, type ConversationStatus, type ConversationType } from '@/lib/api/inbox';
+import { sendNotification } from '@/lib/api/notifications';
 
 export interface InboxFilters {
   status?: ConversationStatus;
@@ -18,12 +21,14 @@ export function useInboxConversations(filters?: InboxFilters) {
     queryKey: ['inbox-conversations', selectedCompanyId, filters],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
+      if (isDemo) return DEMO_INBOX_CONVERSATIONS;
       const result = await inboxApi.conversations.list(selectedCompanyId, filters);
       if (!result.success) throw new Error(result.error);
       return result.conversations;
     },
-    enabled: !!selectedCompanyId && !isDemo,
-    refetchInterval: 30000, // Poll every 30s for near-real-time
+    enabled: !!selectedCompanyId,
+    staleTime: isDemo ? Infinity : 0,
+    refetchInterval: isDemo ? false : 30000,
   });
 }
 
@@ -62,6 +67,7 @@ export function useUpdateConversationStatus() {
 
 export function useAssignConversation() {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -71,8 +77,20 @@ export function useAssignConversation() {
       if (!result.success) throw new Error(result.error);
       return result.conversation;
     },
-    onSuccess: () => {
+    onSuccess: (conversation, { conversationId, assigneeId }) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+
+      // Notify assignee (skip self-assignment and unassignment)
+      if (assigneeId && assigneeId !== user?.id) {
+        const assignerName = user?.user_metadata?.full_name || user?.email || 'Someone';
+        const subject = conversation?.subject || conversation?.contact_name || 'a conversation';
+        sendNotification({
+          userId: assigneeId,
+          title: 'New assignment',
+          body: `${assignerName} assigned you to ${subject}`,
+          actionUrl: `/app/content?tab=inbox&conversation=${conversationId}`,
+        }).catch(console.error);
+      }
     },
   });
 }

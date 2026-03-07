@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { Tip } from '@/components/ui/tooltip';
 import { useGlossary } from '@/components/inbox/GlossaryDialog';
 import type { InboxMessage } from '@/lib/api/inbox';
+import type { CompanyMember } from '@/hooks/useCompany';
 
 interface MessageComposerProps {
   onSend: (content: string, mediaUrl?: string) => void;
@@ -25,6 +26,7 @@ interface MessageComposerProps {
   defaultContent?: string;
   onTranslate?: (content: string) => void;
   detectedLanguage?: string;
+  companyMembers?: CompanyMember[];
 }
 
 export function MessageComposer({
@@ -39,13 +41,25 @@ export function MessageComposer({
   defaultContent,
   onTranslate,
   detectedLanguage,
+  companyMembers,
 }: MessageComposerProps) {
   const glossary = useGlossary();
   const [content, setContent] = useState('');
   const [isNoteMode, setIsNoteMode] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const [showAttachment, setShowAttachment] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const filteredMembers = useMemo(() => {
+    if (mentionQuery === null || !companyMembers) return [];
+    const q = mentionQuery.toLowerCase();
+    return companyMembers.filter(m =>
+      (m.full_name && m.full_name.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q))
+    ).slice(0, 6);
+  }, [mentionQuery, companyMembers]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -74,7 +88,53 @@ export function MessageComposer({
     setIsNoteMode(false);
   };
 
+  const insertMention = (member: CompanyMember) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const cursorPos = textarea.selectionStart;
+    const textBefore = content.slice(0, cursorPos);
+    const textAfter = content.slice(cursorPos);
+    // Find the @ that triggered this mention
+    const atIndex = textBefore.lastIndexOf('@');
+    if (atIndex === -1) return;
+    const name = member.full_name || member.email?.split('@')[0] || 'user';
+    const newContent = textBefore.slice(0, atIndex) + `@${name} ` + textAfter;
+    setContent(newContent);
+    setMentionQuery(null);
+    setMentionIndex(0);
+    // Restore focus after state update
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const newCursor = atIndex + name.length + 2; // @name + space
+      textarea.setSelectionRange(newCursor, newCursor);
+    });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Mention dropdown navigation
+    if (mentionQuery !== null && filteredMembers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(i => (i + 1) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(i => (i - 1 + filteredMembers.length) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredMembers[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -88,6 +148,21 @@ export function MessageComposer({
     // Trigger canned reply picker on "/" at start of input or after a space
     if (onSlashTrigger && value.endsWith('/') && (value.length === 1 || value.charAt(value.length - 2) === ' ')) {
       onSlashTrigger();
+    }
+
+    // @mention detection (note mode only)
+    if (isNoteMode && companyMembers?.length) {
+      const cursorPos = e.target.selectionStart;
+      const textBefore = value.slice(0, cursorPos);
+      const atMatch = textBefore.match(/@([\w.-]*)$/);
+      if (atMatch) {
+        setMentionQuery(atMatch[1]);
+        setMentionIndex(0);
+      } else {
+        setMentionQuery(null);
+      }
+    } else {
+      setMentionQuery(null);
     }
   };
 
@@ -145,6 +220,30 @@ export function MessageComposer({
           <button onClick={() => { setMediaUrl(''); setShowAttachment(false); }} className="text-muted-foreground hover:text-foreground">
             <X className="h-3.5 w-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* @mention autocomplete dropdown */}
+      {mentionQuery !== null && filteredMembers.length > 0 && (
+        <div className="bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-48">
+          {filteredMembers.map((member, i) => (
+            <button
+              key={member.id}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
+                i === mentionIndex && 'bg-accent'
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault(); // Keep textarea focus
+                insertMention(member);
+              }}
+            >
+              <span className="font-medium truncate">{member.full_name || member.email}</span>
+              {member.full_name && member.email && (
+                <span className="text-xs text-muted-foreground truncate">{member.email}</span>
+              )}
+            </button>
+          ))}
         </div>
       )}
 

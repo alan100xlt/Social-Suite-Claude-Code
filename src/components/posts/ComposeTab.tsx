@@ -23,7 +23,7 @@ import {
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook } from "react-icons/fa";
 import { SiBluesky } from "react-icons/si";
 import { useAccounts } from "@/hooks/useGetLateAccounts";
-import { useCreatePost, useValidatePost } from "@/hooks/useGetLatePosts";
+import { useCreatePost, useValidatePost, usePosts } from "@/hooks/useGetLatePosts";
 import { useGenerateSocialPost } from "@/hooks/useGenerateSocialPost";
 import { useAllFeedItems } from "@/hooks/useAllFeedItems";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,9 @@ import { useSaveDraft, usePostDraft, usePostDrafts, useDeleteDraft } from "@/hoo
 import { useCompany } from "@/hooks/useCompany";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSelectedCompany } from "@/contexts/SelectedCompanyContext";
+import { useThrottleCheck } from "@/hooks/useThrottleCheck";
+import { useQualityCheck } from "@/hooks/useQualityCheck";
+import { QualityCheckPanel } from "@/components/posts/QualityCheckPanel";
 
 const platformIcons: Partial<Record<Platform, React.ElementType>> = {
   instagram: FaInstagram, twitter: FaTwitter, tiktok: FaTiktok, linkedin: FaLinkedin,
@@ -95,6 +98,8 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
   const validatePostMutation = useValidatePost();
   const { generateStrategy, generatePosts, checkCompliance, isGeneratingStrategy, isGeneratingPosts, isCheckingCompliance } = useGenerateSocialPost();
   const { data: feedItems } = useAllFeedItems();
+  const qualityCheckMutation = useQualityCheck();
+  const { data: allPosts = [] } = usePosts();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState(0);
@@ -123,6 +128,16 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [activePlatformTab, setActivePlatformTab] = useState<Platform>("facebook");
   const [linkAsComment, setLinkAsComment] = useState<Record<string, boolean>>({ instagram: true, facebook: false });
+
+  // Throttle check for scheduling
+  const scheduledForStr = useMemo(() => {
+    if (!date) return null;
+    const [hours, minutes] = time.split(":").map(Number);
+    const d = new Date(date);
+    d.setHours(hours, minutes, 0, 0);
+    return d.toISOString();
+  }, [date, time]);
+  const throttle = useThrottleCheck(scheduledForStr, allPosts);
 
   // Reset selections when company changes (prevents cross-company posting)
   const prevCompanyIdRef = useRef(company?.id);
@@ -590,6 +605,11 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
       .map(id => connectedAccounts.find(a => a.id === id)?.platform)
       .filter(Boolean) as string[];
     const firstText = Object.values(platformContents).find(c => c.trim()) || "";
+
+    // Run quality check (advisory — don't block)
+    if (firstText && company?.id) {
+      qualityCheckMutation.mutate({ text: firstText, platforms: selectedPlatforms, companyId: company.id });
+    }
 
     if (firstText && selectedPlatforms.length > 0) {
       try {
@@ -1155,8 +1175,26 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
             </div>
             {date && <Button variant="ghost" size="sm" onClick={() => setDate(undefined)}>Clear</Button>}
           </div>
+          {throttle.enabled && throttle.isOverLimit && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+              <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  {throttle.currentCount} posts already scheduled in this {throttle.perHours}-hour window
+                </p>
+                <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-0.5">
+                  Your throttle limit is {throttle.maxPosts} posts per {throttle.perHours} hours. You can still publish — this is advisory.
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Quality Check */}
+      {qualityCheckMutation.data && (
+        <QualityCheckPanel result={qualityCheckMutation.data} />
+      )}
 
       {/* Send for Approval */}
       <Card>

@@ -34,6 +34,16 @@ export interface RssFeedItem {
   og_image_url: string | null;
   og_template_id: string | null;
   og_ai_reasoning: string | null;
+  byline: string | null;
+  journalist_id: string | null;
+  content_classification: {
+    type?: 'evergreen' | 'timely' | 'seasonal';
+    is_evergreen?: boolean;
+    evergreen_score?: number;
+    suggested_reshare_window?: string;
+    ai_reasoning?: string;
+  } | null;
+  last_recycled_at: string | null;
 }
 
 export function useRssFeeds() {

@@ -41,6 +41,7 @@ export interface ArticleRowData {
   title: string | null;
   link: string | null;
   feedName: string;
+  byline?: string | null;
   publishedAt: string | null;
   status: string;
   imageUrl: string | null;
@@ -114,6 +115,12 @@ export function ArticleRow({ article, onGeneratePosts }: ArticleRowProps) {
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
             <span>{article.feedName}</span>
+            {article.byline && (
+              <>
+                <span>&middot;</span>
+                <span>{article.byline}</span>
+              </>
+            )}
             {article.publishedAt && (
               <>
                 <span>&middot;</span>

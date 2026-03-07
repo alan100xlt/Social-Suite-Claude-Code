@@ -26,6 +26,15 @@ import {
   DEMO_INBOX_LABELS,
   DEMO_INBOX_CANNED_REPLIES,
   DEMO_INBOX_AUTO_RULES,
+  DEMO_POST_TIMELINE,
+  DEMO_YOUTUBE_DAILY_VIEWS,
+  DEMO_FOLLOWER_STATS,
+  DEMO_ACCOUNT_HEALTH,
+  DEMO_CAMPAIGNS,
+  DEMO_JOURNALISTS,
+  DEMO_EVERGREEN_QUEUE,
+  DEMO_FEATURE_CONFIG,
+  DEMO_PERMISSIONS,
 } from './demo-data';
 
 interface DemoContextValue {
@@ -235,6 +244,44 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
 
     // No active crisis events for demo
     queryClient.setQueryData(['inbox-crisis-events', DEMO_COMPANY_ID], []);
+
+    // Post timeline (for PostTimeline widget)
+    queryClient.setQueryData(['post-timeline', 'demo-post-pub-1'], DEMO_POST_TIMELINE);
+
+    // YouTube daily views (for YouTube analytics)
+    queryClient.setQueryData(['youtube-daily-views', 'demo-post-pub-3'], DEMO_YOUTUBE_DAILY_VIEWS);
+
+    // Follower stats (historical follower growth)
+    for (const account of DEMO_ACCOUNTS) {
+      queryClient.setQueryData(['follower-stats', account.id], DEMO_FOLLOWER_STATS);
+    }
+
+    // Account health (SOC-261)
+    queryClient.setQueryData(['account-health', DEMO_COMPANY_ID], DEMO_ACCOUNT_HEALTH);
+
+    // ─── Content Page Overhaul (Phases 0-14) ───
+
+    // Campaigns (Phase 5)
+    queryClient.setQueryData(['campaigns', DEMO_COMPANY_ID], DEMO_CAMPAIGNS);
+    // Campaign posts (empty for demo campaigns)
+    for (const campaign of DEMO_CAMPAIGNS) {
+      queryClient.setQueryData(['campaign-posts', campaign.id], []);
+    }
+
+    // Feature config (Phase 3)
+    queryClient.setQueryData(['feature-config', DEMO_COMPANY_ID], DEMO_FEATURE_CONFIG);
+
+    // Permissions (Phase 1)
+    queryClient.setQueryData(['user-permissions', undefined, DEMO_COMPANY_ID], DEMO_PERMISSIONS);
+
+    // Evergreen queue (Phase 8)
+    queryClient.setQueryData(['evergreen-queue', DEMO_COMPANY_ID], DEMO_EVERGREEN_QUEUE);
+
+    // Performance alerts (Phase 10 — no active alerts for demo)
+    queryClient.setQueryData(['performance-alerts', DEMO_COMPANY_ID], []);
+
+    // Cross-outlet analytics (Phase 11 — empty for demo, no media company)
+    queryClient.setQueryData(['cross-outlet-analytics', undefined], []);
   }, [isDemo, queryClient]);
 
   const value = useMemo(() => ({ isDemo }), [isDemo]);

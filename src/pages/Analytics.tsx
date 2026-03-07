@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, Eye, Users, MousePointer, TrendingUp, BarChart3, Layers, Heart, UserCheck } from "lucide-react";
+import { RefreshCw, Eye, Users, MousePointer, TrendingUp, BarChart3, Layers, Heart, UserCheck, Building2 } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
 import { useAnalyticsByPublishDate } from "@/hooks/useAnalyticsByPublishDate";
 import { useAccountGrowth, useAggregatedFollowers } from "@/hooks/useAccountGrowth";
@@ -44,6 +44,8 @@ import {
   computeChangePercent,
 } from "@/lib/analytics/transforms";
 import { AnalyticsErrorBoundary } from "@/components/analytics/AnalyticsErrorBoundary";
+import { CrossOutletAnalytics } from "@/components/analytics/CrossOutletAnalytics";
+import { FeatureGate } from "@/components/auth/FeatureGate";
 
 function WidgetSkeleton() {
   return (
@@ -157,6 +159,7 @@ export default function Analytics() {
             <TabsTrigger value="engagement" className="gap-1.5"><Heart className="w-4 h-4" /> Engagement</TabsTrigger>
             <TabsTrigger value="audience" className="gap-1.5"><UserCheck className="w-4 h-4" /> Audience</TabsTrigger>
             <TabsTrigger value="posts" className="gap-1.5"><Eye className="w-4 h-4" /> All Posts</TabsTrigger>
+            <TabsTrigger value="outlets" className="gap-1.5"><Building2 className="w-4 h-4" /> Outlets</TabsTrigger>
           </TabsList>
 
           {/* ── Overview Tab ── */}
@@ -315,6 +318,13 @@ export default function Analytics() {
                 posts={allPosts || topPosts || []}
                 isLoading={allPostsLoading || topPostsLoading}
               />
+            </AnalyticsErrorBoundary>
+          </TabsContent>
+
+          {/* ── Outlets Tab ── */}
+          <TabsContent value="outlets" className="space-y-6">
+            <AnalyticsErrorBoundary>
+              <CrossOutletAnalytics mediaCompanyId={companyId || null} />
             </AnalyticsErrorBoundary>
           </TabsContent>
         </Tabs>
