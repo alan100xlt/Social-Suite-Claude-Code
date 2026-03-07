@@ -3,15 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
 import { isDemoCompany } from '@/lib/demo/demo-constants';
+import { allGranted, mergePermissions, type AppRole, type PermissionName } from '@/lib/permissions';
 
-export type AppRole = 'owner' | 'admin' | 'manager' | 'collaborator' | 'community_manager' | 'member';
-
-export type PermissionName =
-  | 'view_content' | 'create_content' | 'edit_content' | 'delete_content'
-  | 'publish' | 'schedule'
-  | 'manage_feeds' | 'manage_campaigns' | 'manage_team' | 'manage_settings'
-  | 'view_analytics' | 'manage_breaking_news' | 'manage_automations'
-  | 'manage_inbox' | 'respond_inbox';
+export type { AppRole, PermissionName };
 
 interface EffectivePermissions {
   role: AppRole;
@@ -63,13 +57,7 @@ export function usePermissions() {
         .eq('company_id', selectedCompanyId);
 
       // Merge: defaults first, overrides take precedence
-      const permissions: Record<string, boolean> = {};
-      for (const d of defaults || []) {
-        permissions[d.permission_name] = d.granted;
-      }
-      for (const o of overrides || []) {
-        permissions[o.permission_name] = o.granted;
-      }
+      const permissions = mergePermissions(defaults || [], overrides || []);
 
       return { role, permissions };
     },
@@ -81,14 +69,4 @@ export function usePermissions() {
 export function useHasPermission(permission: PermissionName): boolean {
   const { data } = usePermissions();
   return data?.permissions[permission] ?? false;
-}
-
-function allGranted(): Record<string, boolean> {
-  const perms: PermissionName[] = [
-    'view_content', 'create_content', 'edit_content', 'delete_content',
-    'publish', 'schedule', 'manage_feeds', 'manage_campaigns',
-    'manage_team', 'manage_settings', 'view_analytics',
-    'manage_breaking_news', 'manage_automations', 'manage_inbox', 'respond_inbox',
-  ];
-  return Object.fromEntries(perms.map(p => [p, true]));
 }
