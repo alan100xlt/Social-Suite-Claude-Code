@@ -12,11 +12,713 @@
 
 ---
 
-## Phase 0: Database Schema + Google OAuth Connection
+## Never-Deploy-Without Gates
 
-> **Session boundary:** Complete Phase 0 and Phase 1 (backend) before starting Phase 2 (frontend) in a new session.
+| Change Type | Required Tests | Status |
+|-------------|---------------|--------|
+| Edge function (google-analytics-auth) | L1 contract (GA4 API) + L3 smoke auth | ☐ |
+| Edge function (ga-analytics-sync) | L1 contract (GA4 API) + L2 integration + L3 smoke auth | ☐ |
+| Migration (4 tables + RPCs) | L2 RLS isolation + L2 RPC existence | ☐ |
+| Cron/dispatcher | L2 pipeline health + L3 cron registration | ☐ |
+| Frontend hooks (5 hooks) | L4 unit (query keys, enabled guards) + L3 smoke imports | ☐ |
+| Frontend page (ContentJourney) | L3 smoke import + L5 E2E page load | ☐ |
 
-### Task 1: Create the Google Analytics migration
+**Do NOT deploy until all boxes are checked.**
+
+---
+
+## Phase 0: L1 Contract Tests — GA4 API Shape Verification
+
+> **Why first:** The GA4 Data API is an external API. Per TDD standards, we verify real response shapes BEFORE writing any sync code. This prevents the "mocked tests pass, production fails" anti-pattern.
+
+### Task 1: Write L1 contract test for GA4 Data API
+
+**Files:**
+- Create: `scripts/ga4-contract-tests.cjs`
+
+**Step 1: Write the failing test**
+
+```javascript
+#!/usr/bin/env node
+/**
+ * GA4 Data API Contract Tests
+ *
+ * Hits the REAL Google Analytics Data API to discover and validate
+ * exact request/response shapes before writing sync code.
+ *
+ * Prerequisites:
+ *   - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local
+ *   - GA4_TEST_REFRESH_TOKEN in .env.local (from a test OAuth flow)
+ *   - GA4_TEST_PROPERTY_ID in .env.local (e.g., "properties/123456")
+ *
+ * Run: node scripts/ga4-contract-tests.cjs
+ * Dry run: node scripts/ga4-contract-tests.cjs --dry-run
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+// ─── Config ──────────────────────────────────────────────────
+const envPath = path.join(__dirname, '..', '.env.local');
+const envContent = fs.readFileSync(envPath, 'utf8');
+
+const CLIENT_ID = envContent.match(/GOOGLE_CLIENT_ID="([^"]+)"/)?.[1];
+const CLIENT_SECRET = envContent.match(/GOOGLE_CLIENT_SECRET="([^"]+)"/)?.[1];
+const REFRESH_TOKEN = envContent.match(/GA4_TEST_REFRESH_TOKEN="([^"]+)"/)?.[1];
+const PROPERTY_ID = envContent.match(/GA4_TEST_PROPERTY_ID="([^"]+)"/)?.[1];
+
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local');
+  process.exit(1);
+}
+if (!REFRESH_TOKEN || !PROPERTY_ID) {
+  console.error('Missing GA4_TEST_REFRESH_TOKEN or GA4_TEST_PROPERTY_ID in .env.local');
+  console.error('Run the OAuth flow manually first to obtain a refresh token.');
+  process.exit(1);
+}
+
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GA_DATA_API = 'https://analyticsdata.googleapis.com/v1beta';
+const GA_ADMIN_API = 'https://analyticsadmin.googleapis.com/v1beta';
+
+const args = process.argv.slice(2);
+const DRY_RUN = args.includes('--dry-run');
+
+let passed = 0, failed = 0, skipped = 0;
+const results = [];
+const contracts = {};
+
+// ─── Helpers ─────────────────────────────────────────────────
+function record(test, result, details = {}) {
+  const status = result ? 'PASS' : 'FAIL';
+  if (result) passed++; else failed++;
+  results.push({ test, status, ...details });
+  console.log(`  ${result ? '✓' : '✗'} ${test}`);
+  if (!result && details.error) console.log(`    → ${details.error}`);
+}
+
+function recordSkip(test, reason) {
+  skipped++;
+  results.push({ test, status: 'SKIP', reason });
+  console.log(`  ○ ${test} (${reason})`);
+}
+
+function logKeys(label, obj) {
+  if (!obj) return;
+  console.log(`    ${label} keys: ${Object.keys(obj).join(', ')}`);
+}
+
+// ─── Token Refresh ───────────────────────────────────────────
+async function getAccessToken() {
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      refresh_token: REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Token refresh failed: ${response.status} — ${error}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+// ─── Section: Token Refresh ──────────────────────────────────
+async function testTokenRefresh() {
+  console.log('\n── Token Refresh ──');
+
+  const tokenData = await getAccessToken();
+
+  record('Token refresh returns access_token', !!tokenData.access_token);
+  record('Token refresh returns expires_in', typeof tokenData.expires_in === 'number');
+  record('Token refresh returns token_type', tokenData.token_type === 'Bearer');
+
+  contracts.tokenRefresh = {
+    fields: Object.keys(tokenData),
+    expiresIn: tokenData.expires_in,
+    tokenType: tokenData.token_type,
+  };
+
+  logKeys('Token response', tokenData);
+
+  return tokenData.access_token;
+}
+
+// ─── Section: Account Summaries (Admin API) ──────────────────
+async function testAccountSummaries(accessToken) {
+  console.log('\n── Account Summaries (Admin API) ──');
+
+  const response = await fetch(`${GA_ADMIN_API}/accountSummaries`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  record('accountSummaries endpoint returns 200', response.ok, { status: response.status });
+
+  if (!response.ok) return;
+
+  const data = await response.json();
+
+  record('Response has accountSummaries array', Array.isArray(data.accountSummaries));
+
+  if (data.accountSummaries?.length > 0) {
+    const first = data.accountSummaries[0];
+    record('Account has name field', !!first.name);
+    record('Account has account field', !!first.account);
+    record('Account has displayName field', !!first.displayName);
+    record('Account has propertySummaries array', Array.isArray(first.propertySummaries));
+
+    logKeys('AccountSummary', first);
+
+    if (first.propertySummaries?.length > 0) {
+      const prop = first.propertySummaries[0];
+      record('Property has property field (ID)', !!prop.property);
+      record('Property has displayName', !!prop.displayName);
+      record('Property has propertyType', !!prop.propertyType);
+
+      logKeys('PropertySummary', prop);
+
+      contracts.accountSummaries = {
+        accountFields: Object.keys(first),
+        propertyFields: Object.keys(prop),
+        samplePropertyId: prop.property,
+        samplePropertyType: prop.propertyType,
+      };
+    }
+  } else {
+    recordSkip('Property field checks', 'No accounts found');
+  }
+}
+
+// ─── Section: runReport — Page Metrics ───────────────────────
+async function testRunReportPageMetrics(accessToken) {
+  console.log('\n── runReport: Page Metrics ──');
+
+  const today = new Date().toISOString().split('T')[0];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+
+  const body = {
+    dateRanges: [{ startDate: sevenDaysAgo, endDate: today }],
+    dimensions: [
+      { name: 'pagePath' },
+      { name: 'pageTitle' },
+      { name: 'dateHour' },
+    ],
+    metrics: [
+      { name: 'screenPageViews' },
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'bounceRate' },
+      { name: 'averageSessionDuration' },
+    ],
+    limit: 10,
+  };
+
+  const response = await fetch(`${GA_DATA_API}/${PROPERTY_ID}:runReport`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  record('runReport (page metrics) returns 200', response.ok, { status: response.status });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.log(`    Error body: ${error.slice(0, 500)}`);
+    return;
+  }
+
+  const data = await response.json();
+
+  record('Response has dimensionHeaders', Array.isArray(data.dimensionHeaders));
+  record('Response has metricHeaders', Array.isArray(data.metricHeaders));
+  record('Response has rows (or rowCount=0)', Array.isArray(data.rows) || data.rowCount === 0);
+
+  if (data.dimensionHeaders) {
+    const dimNames = data.dimensionHeaders.map(h => h.name);
+    record('Dimension: pagePath present', dimNames.includes('pagePath'));
+    record('Dimension: pageTitle present', dimNames.includes('pageTitle'));
+    record('Dimension: dateHour present', dimNames.includes('dateHour'));
+    console.log(`    Dimensions: ${dimNames.join(', ')}`);
+  }
+
+  if (data.metricHeaders) {
+    const metNames = data.metricHeaders.map(h => h.name);
+    record('Metric: screenPageViews present', metNames.includes('screenPageViews'));
+    record('Metric: sessions present', metNames.includes('sessions'));
+    record('Metric: totalUsers present', metNames.includes('totalUsers'));
+    record('Metric: bounceRate present', metNames.includes('bounceRate'));
+    record('Metric: averageSessionDuration present', metNames.includes('averageSessionDuration'));
+    console.log(`    Metrics: ${metNames.join(', ')}`);
+  }
+
+  if (data.rows?.length > 0) {
+    const row = data.rows[0];
+    record('Row has dimensionValues array', Array.isArray(row.dimensionValues));
+    record('Row has metricValues array', Array.isArray(row.metricValues));
+    record('dimensionValues has 3 entries', row.dimensionValues?.length === 3);
+    record('metricValues has 5 entries', row.metricValues?.length === 5);
+
+    // Verify dateHour format (YYYYMMDDHH)
+    const dateHour = row.dimensionValues?.[2]?.value;
+    record('dateHour matches YYYYMMDDHH format', /^\d{10}$/.test(dateHour || ''));
+    console.log(`    Sample dateHour: ${dateHour}`);
+    console.log(`    Sample pagePath: ${row.dimensionValues?.[0]?.value}`);
+    console.log(`    Sample pageviews: ${row.metricValues?.[0]?.value}`);
+
+    contracts.pageMetricsReport = {
+      dimensionOrder: ['pagePath', 'pageTitle', 'dateHour'],
+      metricOrder: ['screenPageViews', 'sessions', 'totalUsers', 'bounceRate', 'averageSessionDuration'],
+      dateHourFormat: 'YYYYMMDDHH',
+      sampleRow: {
+        dimensions: row.dimensionValues?.map(d => d.value),
+        metrics: row.metricValues?.map(m => m.value),
+      },
+    };
+  } else {
+    recordSkip('Row structure checks', 'No rows returned (empty property?)');
+  }
+}
+
+// ─── Section: runReport — Traffic Sources ────────────────────
+async function testRunReportTrafficSources(accessToken) {
+  console.log('\n── runReport: Traffic Sources ──');
+
+  const today = new Date().toISOString().split('T')[0];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+
+  const body = {
+    dateRanges: [{ startDate: sevenDaysAgo, endDate: today }],
+    dimensions: [
+      { name: 'pagePath' },
+      { name: 'sessionSource' },
+      { name: 'sessionMedium' },
+      { name: 'sessionCampaignName' },
+      { name: 'dateHour' },
+    ],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'totalUsers' },
+      { name: 'screenPageViews' },
+      { name: 'bounceRate' },
+      { name: 'averageSessionDuration' },
+    ],
+    limit: 10,
+  };
+
+  const response = await fetch(`${GA_DATA_API}/${PROPERTY_ID}:runReport`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  record('runReport (traffic sources) returns 200', response.ok, { status: response.status });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.log(`    Error body: ${error.slice(0, 500)}`);
+    return;
+  }
+
+  const data = await response.json();
+
+  if (data.dimensionHeaders) {
+    const dimNames = data.dimensionHeaders.map(h => h.name);
+    record('Dimension: sessionSource present', dimNames.includes('sessionSource'));
+    record('Dimension: sessionMedium present', dimNames.includes('sessionMedium'));
+    record('Dimension: sessionCampaignName present', dimNames.includes('sessionCampaignName'));
+    console.log(`    Dimensions: ${dimNames.join(', ')}`);
+  }
+
+  if (data.rows?.length > 0) {
+    const row = data.rows[0];
+    record('Row has 5 dimensionValues', row.dimensionValues?.length === 5);
+    record('Row has 5 metricValues', row.metricValues?.length === 5);
+
+    const source = row.dimensionValues?.[1]?.value;
+    const medium = row.dimensionValues?.[2]?.value;
+    const campaign = row.dimensionValues?.[3]?.value;
+    console.log(`    Sample: source=${source}, medium=${medium}, campaign=${campaign}`);
+
+    contracts.trafficSourcesReport = {
+      dimensionOrder: ['pagePath', 'sessionSource', 'sessionMedium', 'sessionCampaignName', 'dateHour'],
+      metricOrder: ['sessions', 'totalUsers', 'screenPageViews', 'bounceRate', 'averageSessionDuration'],
+      sampleRow: {
+        source,
+        medium,
+        campaign,
+      },
+    };
+  } else {
+    recordSkip('Traffic source row checks', 'No rows returned');
+  }
+}
+
+// ─── Section: OAuth Scopes ───────────────────────────────────
+async function testUserInfo(accessToken) {
+  console.log('\n── User Info (OAuth scope check) ──');
+
+  const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  record('userinfo endpoint returns 200', response.ok, { status: response.status });
+
+  if (response.ok) {
+    const data = await response.json();
+    record('Response has email', !!data.email);
+    logKeys('UserInfo', data);
+    contracts.userInfo = { fields: Object.keys(data) };
+  }
+}
+
+// ─── Main ────────────────────────────────────────────────────
+async function main() {
+  console.log('GA4 Data API Contract Tests');
+  console.log(`Property: ${PROPERTY_ID}`);
+  console.log(`Mode: ${DRY_RUN ? 'DRY RUN' : 'LIVE'}`);
+  console.log('═'.repeat(60));
+
+  try {
+    const accessToken = await testTokenRefresh();
+    await testAccountSummaries(accessToken);
+    await testRunReportPageMetrics(accessToken);
+    await testRunReportTrafficSources(accessToken);
+    await testUserInfo(accessToken);
+  } catch (err) {
+    console.error('\nFATAL:', err.message);
+    failed++;
+  }
+
+  // ─── Summary ──────────────────────────────────────────────
+  console.log('\n' + '═'.repeat(60));
+  console.log(`Results: ${passed} passed, ${failed} failed, ${skipped} skipped`);
+
+  // Write contracts to file for reference by unit tests
+  const contractsPath = path.join(__dirname, '..', 'docs', 'ga4-api-contracts.json');
+  fs.writeFileSync(contractsPath, JSON.stringify(contracts, null, 2));
+  console.log(`Contracts written to: ${contractsPath}`);
+
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+main();
+```
+
+**Step 2: Run it — expect it to fail (no credentials yet)**
+Run: `node scripts/ga4-contract-tests.cjs`
+Expected: `Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in .env.local` (exit 1)
+
+**Step 3: Set up test credentials and run again**
+1. Add to `.env.local`:
+   ```
+   GOOGLE_CLIENT_ID="your-test-client-id"
+   GOOGLE_CLIENT_SECRET="your-test-secret"
+   GA4_TEST_REFRESH_TOKEN="your-test-refresh-token"
+   GA4_TEST_PROPERTY_ID="properties/123456"
+   ```
+2. Run: `node scripts/ga4-contract-tests.cjs`
+3. Expected: All probes pass, `docs/ga4-api-contracts.json` written
+
+**Step 4: Commit**
+`git commit -m "test(L1): add GA4 Data API contract tests — token refresh, account summaries, runReport shapes"`
+
+---
+
+## Phase 1: Database Schema + RLS Tests
+
+> **Session boundary:** Complete Phase 1 (schema + L2 tests) before moving to Phase 2 (edge functions).
+
+### Task 2: Write L2 integration test for GA tables (RED — write failing test first)
+
+**Files:**
+- Create: `src/tests/integration/google-analytics-rls.test.ts`
+
+**Step 1: Write the failing RLS isolation test**
+
+```typescript
+import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import {
+  adminClient,
+  createTestUser,
+  deleteTestUser,
+  createTestCompany,
+  deleteTestCompany,
+  addMembership,
+  signInAsUser,
+} from "./setup";
+
+/**
+ * Google Analytics RLS Isolation Tests
+ *
+ * Verifies:
+ * 1. User A cannot read Company B's GA connections
+ * 2. User A cannot read Company B's page snapshots
+ * 3. User A cannot read Company B's referral snapshots
+ * 4. User A cannot read Company B's post-page correlations
+ * 5. RPC functions enforce company membership
+ * 6. Service role can read/write all tables
+ */
+
+let userA: { id: string; email: string };
+let userB: { id: string; email: string };
+let companyA: string;
+let companyB: string;
+let connectionIdB: string | null = null;
+
+beforeAll(async () => {
+  userA = await createTestUser("ga-rls-a");
+  userB = await createTestUser("ga-rls-b");
+  companyA = await createTestCompany("GA RLS Co A", userA.id);
+  companyB = await createTestCompany("GA RLS Co B", userB.id);
+  await addMembership(userA.id, companyA, "owner");
+  await addMembership(userB.id, companyB, "owner");
+
+  // Seed Company B with GA data that User A should never see
+  const { data: conn } = await adminClient
+    .from("google_analytics_connections")
+    .insert({
+      company_id: companyB,
+      google_email: "test@example.com",
+      property_id: "properties/999999",
+      property_name: "Secret Property",
+      refresh_token: "secret-refresh-token",
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  connectionIdB = conn?.id ?? null;
+
+  if (connectionIdB) {
+    await adminClient.from("ga_page_snapshots").insert({
+      company_id: companyB,
+      connection_id: connectionIdB,
+      page_path: "/secret-article",
+      pageviews: 1000,
+      snapshot_hour: new Date().toISOString(),
+    });
+
+    await adminClient.from("ga_referral_snapshots").insert({
+      company_id: companyB,
+      connection_id: connectionIdB,
+      page_path: "/secret-article",
+      source: "twitter.com",
+      medium: "social",
+      sessions: 50,
+      snapshot_hour: new Date().toISOString(),
+    });
+
+    await adminClient.from("post_page_correlations").insert({
+      company_id: companyB,
+      post_id: "secret-post-id",
+      platform: "twitter",
+      page_path: "/secret-article",
+      match_type: "url",
+    });
+  }
+}, 30000);
+
+afterAll(async () => {
+  // Clean up in reverse order
+  await adminClient.from("post_page_correlations").delete().eq("company_id", companyB);
+  await adminClient.from("ga_referral_snapshots").delete().eq("company_id", companyB);
+  await adminClient.from("ga_page_snapshots").delete().eq("company_id", companyB);
+  if (connectionIdB) {
+    await adminClient.from("google_analytics_connections").delete().eq("id", connectionIdB);
+  }
+  await deleteTestCompany(companyA);
+  await deleteTestCompany(companyB);
+  await deleteTestUser(userA.id);
+  await deleteTestUser(userB.id);
+}, 30000);
+
+describe("GA connections — cross-tenant isolation", () => {
+  test("User A cannot read Company B connections", async () => {
+    const clientA = await signInAsUser(userA);
+    const { data } = await clientA
+      .from("google_analytics_connections")
+      .select("*")
+      .eq("company_id", companyB);
+    expect(data).toEqual([]);
+  });
+
+  test("Service role can read all connections", async () => {
+    const { data } = await adminClient
+      .from("google_analytics_connections")
+      .select("*")
+      .eq("company_id", companyB);
+    expect(data?.length).toBeGreaterThan(0);
+  });
+});
+
+describe("GA page snapshots — cross-tenant isolation", () => {
+  test("User A cannot read Company B page snapshots", async () => {
+    const clientA = await signInAsUser(userA);
+    const { data } = await clientA
+      .from("ga_page_snapshots")
+      .select("*")
+      .eq("company_id", companyB);
+    expect(data).toEqual([]);
+  });
+});
+
+describe("GA referral snapshots — cross-tenant isolation", () => {
+  test("User A cannot read Company B referral snapshots", async () => {
+    const clientA = await signInAsUser(userA);
+    const { data } = await clientA
+      .from("ga_referral_snapshots")
+      .select("*")
+      .eq("company_id", companyB);
+    expect(data).toEqual([]);
+  });
+});
+
+describe("Post-page correlations — cross-tenant isolation", () => {
+  test("User A cannot read Company B correlations", async () => {
+    const clientA = await signInAsUser(userA);
+    const { data } = await clientA
+      .from("post_page_correlations")
+      .select("*")
+      .eq("company_id", companyB);
+    expect(data).toEqual([]);
+  });
+});
+
+describe("RPC functions — access control", () => {
+  test("get_ga_page_metrics denies access for non-member", async () => {
+    const clientA = await signInAsUser(userA);
+    const { error } = await clientA.rpc("get_ga_page_metrics", {
+      _company_id: companyB,
+      _start_date: "2026-01-01",
+      _end_date: "2026-12-31",
+    });
+    expect(error).toBeTruthy();
+    expect(error?.message).toContain("Access denied");
+  });
+
+  test("get_ga_traffic_sources denies access for non-member", async () => {
+    const clientA = await signInAsUser(userA);
+    const { error } = await clientA.rpc("get_ga_traffic_sources", {
+      _company_id: companyB,
+      _start_date: "2026-01-01",
+      _end_date: "2026-12-31",
+    });
+    expect(error).toBeTruthy();
+    expect(error?.message).toContain("Access denied");
+  });
+
+  test("get_content_journey denies access for non-member", async () => {
+    const clientA = await signInAsUser(userA);
+    const { error } = await clientA.rpc("get_content_journey", {
+      _company_id: companyB,
+      _start_date: "2026-01-01",
+      _end_date: "2026-12-31",
+    });
+    expect(error).toBeTruthy();
+    expect(error?.message).toContain("Access denied");
+  });
+
+  test("get_ga_page_metrics returns data for own company member", async () => {
+    const clientB = await signInAsUser(userB);
+    const { error } = await clientB.rpc("get_ga_page_metrics", {
+      _company_id: companyB,
+      _start_date: "2026-01-01",
+      _end_date: "2026-12-31",
+    });
+    expect(error).toBeNull();
+  });
+});
+
+describe("Table existence", () => {
+  test("google_analytics_connections table exists", async () => {
+    const { error } = await adminClient
+      .from("google_analytics_connections")
+      .select("id")
+      .limit(0);
+    expect(error).toBeNull();
+  });
+
+  test("ga_page_snapshots table exists", async () => {
+    const { error } = await adminClient
+      .from("ga_page_snapshots")
+      .select("id")
+      .limit(0);
+    expect(error).toBeNull();
+  });
+
+  test("ga_referral_snapshots table exists", async () => {
+    const { error } = await adminClient
+      .from("ga_referral_snapshots")
+      .select("id")
+      .limit(0);
+    expect(error).toBeNull();
+  });
+
+  test("post_page_correlations table exists", async () => {
+    const { error } = await adminClient
+      .from("post_page_correlations")
+      .select("id")
+      .limit(0);
+    expect(error).toBeNull();
+  });
+
+  test("get_ga_page_metrics function exists", async () => {
+    const { error } = await adminClient.rpc("get_ga_page_metrics", {
+      _company_id: "00000000-0000-0000-0000-000000000000",
+      _start_date: "2026-01-01",
+      _end_date: "2026-01-01",
+    });
+    // Function exists but returns empty — no error about function not found
+    expect(error?.message).not.toContain("function");
+  });
+
+  test("get_ga_traffic_sources function exists", async () => {
+    const { error } = await adminClient.rpc("get_ga_traffic_sources", {
+      _company_id: "00000000-0000-0000-0000-000000000000",
+      _start_date: "2026-01-01",
+      _end_date: "2026-01-01",
+    });
+    expect(error?.message).not.toContain("function");
+  });
+
+  test("get_content_journey function exists", async () => {
+    const { error } = await adminClient.rpc("get_content_journey", {
+      _company_id: "00000000-0000-0000-0000-000000000000",
+      _start_date: "2026-01-01",
+      _end_date: "2026-01-01",
+    });
+    expect(error?.message).not.toContain("function");
+  });
+});
+```
+
+**Step 2: Run the test — confirm it fails (tables don't exist yet)**
+Run: `npm run test:integration -- --run src/tests/integration/google-analytics-rls.test.ts`
+Expected: All tests fail with "relation does not exist" errors
+
+**Step 3: Commit the RED test**
+`git commit -m "test(L2): add GA RLS isolation tests — tables, RPCs, cross-tenant (RED)"`
+
+---
+
+### Task 3: Create the Google Analytics migration (GREEN — make tests pass)
 
 **Files:**
 - Create: `supabase/migrations/20260307200000_google_analytics.sql`
@@ -33,11 +735,11 @@ CREATE TABLE IF NOT EXISTS google_analytics_connections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   google_email TEXT NOT NULL,
-  property_id TEXT NOT NULL,           -- GA4 property ID (e.g., "properties/123456")
-  property_name TEXT,                  -- Human-readable property name
-  refresh_token TEXT NOT NULL,         -- Encrypted Google OAuth refresh token
-  access_token TEXT,                   -- Short-lived access token (cached)
-  token_expires_at TIMESTAMPTZ,       -- When cached access token expires
+  property_id TEXT NOT NULL,
+  property_name TEXT,
+  refresh_token TEXT NOT NULL,
+  access_token TEXT,
+  token_expires_at TIMESTAMPTZ,
   is_active BOOLEAN DEFAULT true,
   connected_at TIMESTAMPTZ DEFAULT NOW(),
   last_sync_at TIMESTAMPTZ,
@@ -52,16 +754,16 @@ CREATE TABLE IF NOT EXISTS ga_page_snapshots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   connection_id UUID NOT NULL REFERENCES google_analytics_connections(id) ON DELETE CASCADE,
-  page_path TEXT NOT NULL,             -- e.g., "/blog/my-article"
+  page_path TEXT NOT NULL,
   page_title TEXT,
   pageviews INTEGER DEFAULT 0,
   unique_pageviews INTEGER DEFAULT 0,
   sessions INTEGER DEFAULT 0,
   users INTEGER DEFAULT 0,
-  avg_time_on_page DECIMAL(8,2) DEFAULT 0,   -- seconds
-  bounce_rate DECIMAL(5,2) DEFAULT 0,         -- percentage
+  avg_time_on_page DECIMAL(8,2) DEFAULT 0,
+  bounce_rate DECIMAL(5,2) DEFAULT 0,
   exit_rate DECIMAL(5,2) DEFAULT 0,
-  snapshot_hour TIMESTAMPTZ NOT NULL,          -- Truncated to hour
+  snapshot_hour TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (company_id, page_path, snapshot_hour)
 );
@@ -72,16 +774,16 @@ CREATE TABLE IF NOT EXISTS ga_referral_snapshots (
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   connection_id UUID NOT NULL REFERENCES google_analytics_connections(id) ON DELETE CASCADE,
   page_path TEXT NOT NULL,
-  source TEXT NOT NULL,                -- e.g., "twitter.com", "google", "direct"
-  medium TEXT NOT NULL,                -- e.g., "social", "organic", "referral", "(none)"
-  campaign TEXT,                       -- UTM campaign (nullable)
+  source TEXT NOT NULL,
+  medium TEXT NOT NULL,
+  campaign TEXT,
   sessions INTEGER DEFAULT 0,
   users INTEGER DEFAULT 0,
   pageviews INTEGER DEFAULT 0,
   bounce_rate DECIMAL(5,2) DEFAULT 0,
   avg_session_duration DECIMAL(8,2) DEFAULT 0,
   snapshot_hour TIMESTAMPTZ NOT NULL,
-  short_link_id TEXT,                  -- Future: link tracking integration (nullable)
+  short_link_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (company_id, page_path, source, medium, snapshot_hour)
 );
@@ -90,11 +792,11 @@ CREATE TABLE IF NOT EXISTS ga_referral_snapshots (
 CREATE TABLE IF NOT EXISTS post_page_correlations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  post_id TEXT NOT NULL,               -- From post_analytics_snapshots.post_id
+  post_id TEXT NOT NULL,
   platform TEXT NOT NULL,
-  page_path TEXT NOT NULL,             -- Matched GA4 page path
-  match_type TEXT NOT NULL DEFAULT 'url',  -- 'url' | 'utm' | 'manual'
-  match_confidence DECIMAL(3,2) DEFAULT 1.0,  -- 0.0-1.0
+  page_path TEXT NOT NULL,
+  match_type TEXT NOT NULL DEFAULT 'url',
+  match_confidence DECIMAL(3,2) DEFAULT 1.0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (company_id, post_id, page_path)
@@ -106,53 +808,36 @@ ALTER TABLE ga_page_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ga_referral_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_page_correlations ENABLE ROW LEVEL SECURITY;
 
--- Tenant isolation (same pattern as post_analytics_snapshots)
 CREATE POLICY "tenant_isolation" ON google_analytics_connections
   FOR ALL USING (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   )
   WITH CHECK (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   );
 
 CREATE POLICY "tenant_isolation" ON ga_page_snapshots
   FOR ALL USING (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   )
   WITH CHECK (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   );
 
 CREATE POLICY "tenant_isolation" ON ga_referral_snapshots
   FOR ALL USING (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   )
   WITH CHECK (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   );
 
 CREATE POLICY "tenant_isolation" ON post_page_correlations
   FOR ALL USING (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   )
   WITH CHECK (
-    user_is_member(auth.uid(), company_id)
-    OR is_superadmin()
-    OR auth.role() = 'service_role'
+    user_is_member(auth.uid(), company_id) OR is_superadmin() OR auth.role() = 'service_role'
   );
 
 -- ── Indexes ──────────────────────────────────────────────────
@@ -177,32 +862,21 @@ GRANT ALL ON post_page_correlations TO service_role;
 
 -- ── RPC Functions ────────────────────────────────────────────
 
--- Get page metrics aggregated by day for a date range
 CREATE OR REPLACE FUNCTION get_ga_page_metrics(
-  _company_id UUID,
-  _start_date DATE,
-  _end_date DATE,
-  _page_path TEXT DEFAULT NULL
+  _company_id UUID, _start_date DATE, _end_date DATE, _page_path TEXT DEFAULT NULL
 )
 RETURNS TABLE (
-  metric_date DATE,
-  page_path TEXT,
-  total_pageviews BIGINT,
-  total_unique_pageviews BIGINT,
-  total_sessions BIGINT,
-  total_users BIGINT,
-  avg_bounce_rate NUMERIC,
-  avg_time_on_page NUMERIC
+  metric_date DATE, page_path TEXT,
+  total_pageviews BIGINT, total_unique_pageviews BIGINT,
+  total_sessions BIGINT, total_users BIGINT,
+  avg_bounce_rate NUMERIC, avg_time_on_page NUMERIC
 )
-LANGUAGE plpgsql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
 AS $function$
 BEGIN
   IF NOT user_is_member(auth.uid(), _company_id) AND NOT is_superadmin() THEN
     RAISE EXCEPTION 'Access denied';
   END IF;
-
   RETURN QUERY
   SELECT
     (gps.snapshot_hour AT TIME ZONE 'UTC')::DATE AS metric_date,
@@ -223,35 +897,23 @@ BEGIN
 END;
 $function$;
 
--- Get traffic sources for a page or all pages
 CREATE OR REPLACE FUNCTION get_ga_traffic_sources(
-  _company_id UUID,
-  _start_date DATE,
-  _end_date DATE,
-  _page_path TEXT DEFAULT NULL
+  _company_id UUID, _start_date DATE, _end_date DATE, _page_path TEXT DEFAULT NULL
 )
 RETURNS TABLE (
-  source TEXT,
-  medium TEXT,
-  total_sessions BIGINT,
-  total_users BIGINT,
-  total_pageviews BIGINT,
-  avg_bounce_rate NUMERIC,
-  avg_session_duration NUMERIC
+  source TEXT, medium TEXT,
+  total_sessions BIGINT, total_users BIGINT, total_pageviews BIGINT,
+  avg_bounce_rate NUMERIC, avg_session_duration NUMERIC
 )
-LANGUAGE plpgsql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
 AS $function$
 BEGIN
   IF NOT user_is_member(auth.uid(), _company_id) AND NOT is_superadmin() THEN
     RAISE EXCEPTION 'Access denied';
   END IF;
-
   RETURN QUERY
   SELECT
-    grs.source,
-    grs.medium,
+    grs.source, grs.medium,
     COALESCE(SUM(grs.sessions), 0)::BIGINT,
     COALESCE(SUM(grs.users), 0)::BIGINT,
     COALESCE(SUM(grs.pageviews), 0)::BIGINT,
@@ -267,79 +929,47 @@ BEGIN
 END;
 $function$;
 
--- Get content journey: social posts correlated with their page performance
 CREATE OR REPLACE FUNCTION get_content_journey(
-  _company_id UUID,
-  _start_date DATE,
-  _end_date DATE
+  _company_id UUID, _start_date DATE, _end_date DATE
 )
 RETURNS TABLE (
-  post_id TEXT,
-  platform TEXT,
-  post_content TEXT,
-  post_url TEXT,
+  post_id TEXT, platform TEXT, post_content TEXT, post_url TEXT,
   published_at TIMESTAMPTZ,
-  -- Social metrics
-  impressions BIGINT,
-  social_clicks BIGINT,
-  likes BIGINT,
-  shares BIGINT,
+  impressions BIGINT, social_clicks BIGINT, likes BIGINT, shares BIGINT,
   engagement_rate NUMERIC,
-  -- Web metrics (from GA)
-  page_path TEXT,
-  pageviews BIGINT,
-  sessions_from_social BIGINT,
-  bounce_rate NUMERIC,
-  avg_time_on_page NUMERIC,
-  -- Attribution
-  match_type TEXT,
-  match_confidence NUMERIC
+  page_path TEXT, pageviews BIGINT, sessions_from_social BIGINT,
+  bounce_rate NUMERIC, avg_time_on_page NUMERIC,
+  match_type TEXT, match_confidence NUMERIC
 )
-LANGUAGE plpgsql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
 AS $function$
 BEGIN
   IF NOT user_is_member(auth.uid(), _company_id) AND NOT is_superadmin() THEN
     RAISE EXCEPTION 'Access denied';
   END IF;
-
   RETURN QUERY
   SELECT
-    pas.post_id,
-    pas.platform,
-    pas.content AS post_content,
-    pas.post_url,
-    pas.published_at,
-    -- Social metrics
+    pas.post_id, pas.platform, pas.content, pas.post_url, pas.published_at,
     COALESCE(pas.impressions, 0)::BIGINT,
-    COALESCE(pas.clicks, 0)::BIGINT AS social_clicks,
+    COALESCE(pas.clicks, 0)::BIGINT,
     COALESCE(pas.likes, 0)::BIGINT,
     COALESCE(pas.shares, 0)::BIGINT,
     COALESCE(pas.engagement_rate, 0)::NUMERIC,
-    -- Web metrics
     ppc.page_path,
-    COALESCE(SUM(gps.pageviews), 0)::BIGINT AS pageviews,
-    COALESCE(SUM(
-      CASE WHEN grs.medium = 'social' THEN grs.sessions ELSE 0 END
-    ), 0)::BIGINT AS sessions_from_social,
-    ROUND(AVG(gps.bounce_rate), 2) AS bounce_rate,
-    ROUND(AVG(gps.avg_time_on_page), 2) AS avg_time_on_page,
-    -- Attribution
-    ppc.match_type,
-    ppc.match_confidence::NUMERIC
+    COALESCE(SUM(gps.pageviews), 0)::BIGINT,
+    COALESCE(SUM(CASE WHEN grs.medium = 'social' THEN grs.sessions ELSE 0 END), 0)::BIGINT,
+    ROUND(AVG(gps.bounce_rate), 2),
+    ROUND(AVG(gps.avg_time_on_page), 2),
+    ppc.match_type, ppc.match_confidence::NUMERIC
   FROM post_analytics_snapshots pas
   INNER JOIN post_page_correlations ppc
-    ON ppc.company_id = pas.company_id
-    AND ppc.post_id = pas.post_id
+    ON ppc.company_id = pas.company_id AND ppc.post_id = pas.post_id
   LEFT JOIN ga_page_snapshots gps
-    ON gps.company_id = ppc.company_id
-    AND gps.page_path = ppc.page_path
+    ON gps.company_id = ppc.company_id AND gps.page_path = ppc.page_path
     AND gps.snapshot_hour >= _start_date::TIMESTAMPTZ
     AND gps.snapshot_hour < (_end_date + 1)::TIMESTAMPTZ
   LEFT JOIN ga_referral_snapshots grs
-    ON grs.company_id = ppc.company_id
-    AND grs.page_path = ppc.page_path
+    ON grs.company_id = ppc.company_id AND grs.page_path = ppc.page_path
     AND grs.snapshot_hour >= _start_date::TIMESTAMPTZ
     AND grs.snapshot_hour < (_end_date + 1)::TIMESTAMPTZ
   WHERE pas.company_id = _company_id
@@ -354,789 +984,236 @@ BEGIN
 END;
 $function$;
 
--- Grant execute on functions
 GRANT EXECUTE ON FUNCTION get_ga_page_metrics TO authenticated;
 GRANT EXECUTE ON FUNCTION get_ga_traffic_sources TO authenticated;
 GRANT EXECUTE ON FUNCTION get_content_journey TO authenticated;
 ```
 
-**Step 2: Verify the migration file is valid SQL**
-Run: `cat supabase/migrations/20260307200000_google_analytics.sql | head -5`
-Expected: First 5 lines of the migration visible
+**Step 2: Apply the migration**
+Run: `npm run db:migrate`
+Expected: Migration applies successfully
 
-**Step 3: Commit**
-`git commit -m "feat: add Google Analytics schema — connections, page snapshots, referral snapshots, correlations"`
+**Step 3: Run L2 tests again — confirm they pass (GREEN)**
+Run: `npm run test:integration -- --run src/tests/integration/google-analytics-rls.test.ts`
+Expected: All tests pass
+
+**Step 4: Commit**
+`git commit -m "feat: add Google Analytics schema — connections, snapshots, correlations, RPCs (GREEN)"`
 
 ---
 
-### Task 2: Google OAuth edge function
+## Phase 2: Edge Functions + Auth Smoke Tests
+
+### Task 4: Write L3 smoke test for edge functions (RED)
+
+**Files:**
+- Create: `src/tests/smoke/google-analytics.test.ts`
+
+**Step 1: Write the smoke test**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    functions: { invoke: vi.fn() },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+    })),
+    rpc: vi.fn(),
+  },
+}));
+
+vi.mock('@/contexts/SelectedCompanyContext', () => ({
+  useSelectedCompany: () => ({ selectedCompanyId: 'demo-longtale' }),
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 'demo-user', email: 'demo@test.com' },
+    session: { access_token: 'mock-token' },
+    signOut: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/demo/demo-constants', () => ({
+  isDemoCompany: (id: string) => id === 'demo-longtale',
+  DEMO_COMPANY_ID: 'demo-longtale',
+  DEMO_COMPANY: { id: 'demo-longtale', name: 'Longtale Demo' },
+}));
+
+describe('Google Analytics smoke tests', () => {
+  it('should import ContentJourney page without errors', async () => {
+    const module = await import('@/pages/ContentJourney');
+    expect(module.default).toBeDefined();
+    expect(typeof module.default).toBe('function');
+  });
+
+  it('should import GA API client with all methods', async () => {
+    const { googleAnalyticsApi } = await import('@/lib/api/google-analytics');
+    expect(typeof googleAnalyticsApi.startAuth).toBe('function');
+    expect(typeof googleAnalyticsApi.handleCallback).toBe('function');
+    expect(typeof googleAnalyticsApi.selectProperty).toBe('function');
+    expect(typeof googleAnalyticsApi.disconnect).toBe('function');
+    expect(typeof googleAnalyticsApi.syncNow).toBe('function');
+  });
+
+  it('should import all GA hooks without errors', async () => {
+    const hooks = await Promise.all([
+      import('@/hooks/useGoogleAnalytics'),
+      import('@/hooks/useGAPageMetrics'),
+      import('@/hooks/useGATrafficSources'),
+      import('@/hooks/useContentJourney'),
+    ]);
+    hooks.forEach((mod) => {
+      const exported = Object.values(mod);
+      expect(exported.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should export useGAConnections from useGoogleAnalytics', async () => {
+    const mod = await import('@/hooks/useGoogleAnalytics');
+    expect(typeof mod.useGAConnections).toBe('function');
+    expect(typeof mod.useConnectGA).toBe('function');
+    expect(typeof mod.useSyncGA).toBe('function');
+    expect(typeof mod.useDisconnectGA).toBe('function');
+  });
+
+  it('should export useGAPageMetrics', async () => {
+    const mod = await import('@/hooks/useGAPageMetrics');
+    expect(typeof mod.useGAPageMetrics).toBe('function');
+  });
+
+  it('should export useGATrafficSources', async () => {
+    const mod = await import('@/hooks/useGATrafficSources');
+    expect(typeof mod.useGATrafficSources).toBe('function');
+  });
+
+  it('should export useContentJourney', async () => {
+    const mod = await import('@/hooks/useContentJourney');
+    expect(typeof mod.useContentJourney).toBe('function');
+  });
+
+  it('should import GAPropertySelectionDialog', async () => {
+    const mod = await import('@/components/connections/GAPropertySelectionDialog');
+    expect(mod.default || mod.GAPropertySelectionDialog).toBeDefined();
+  });
+
+  it('should load demo data with GA datasets', async () => {
+    const demoData = await import('@/lib/demo/demo-data');
+    expect(demoData.DEMO_GA_CONNECTIONS).toBeDefined();
+    expect(demoData.DEMO_GA_CONNECTIONS.length).toBeGreaterThanOrEqual(1);
+    expect(demoData.DEMO_GA_PAGE_SNAPSHOTS).toBeDefined();
+    expect(demoData.DEMO_GA_PAGE_SNAPSHOTS.length).toBeGreaterThanOrEqual(5);
+    expect(demoData.DEMO_GA_REFERRAL_SNAPSHOTS).toBeDefined();
+    expect(demoData.DEMO_GA_CONTENT_JOURNEY).toBeDefined();
+  });
+});
+```
+
+**Step 2: Run — confirm it fails (files don't exist yet)**
+Run: `npm run test:smoke -- --run src/tests/smoke/google-analytics.test.ts`
+Expected: All tests fail with import errors
+
+**Step 3: Commit**
+`git commit -m "test(L3): add GA smoke tests — page, hooks, API client, demo data (RED)"`
+
+---
+
+### Task 5: Google OAuth edge function
 
 **Files:**
 - Create: `supabase/functions/google-analytics-auth/index.ts`
 
 **Step 1: Write the edge function**
 
-This function handles three actions:
-- `start` — returns the Google OAuth consent URL
-- `callback` — exchanges the auth code for tokens, stores refresh token
-- `properties` — lists GA4 properties the user has access to (for property selection)
-- `disconnect` — removes the connection
+Handles four actions: `start`, `callback`, `select-property`, `disconnect`.
 
-```typescript
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { authorize, corsHeaders } from '../_shared/authorize.ts';
+Follow the exact pattern from `supabase/functions/getlate-connect/index.ts`:
+- `Deno.serve(async (req) => { ... })`
+- OPTIONS handler with `corsHeaders`
+- `authorize(req, { allowServiceRole: true })` for auth
+- JSON response with `{ success: boolean, error?: string, data?: T }`
+- `AbortSignal.timeout(FETCH_TIMEOUT_MS)` on all external fetches
 
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GA_ADMIN_API = 'https://analyticsadmin.googleapis.com/v1beta';
+**Action: start** — builds Google OAuth consent URL with `analytics.readonly` scope, `access_type: 'offline'`, `prompt: 'consent'`. State param encodes `{ companyId, userId }`.
 
-interface GoogleTokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  expires_in: number;
-  token_type: string;
-  scope: string;
-}
+**Action: callback** — exchanges auth code for tokens via `https://oauth2.googleapis.com/token`. Fetches GA4 properties via Admin API `accountSummaries`. Returns `{ properties, refreshToken, accessToken, googleEmail }` to frontend for property selection.
 
-interface GA4Property {
-  name: string;         // "properties/123456"
-  displayName: string;  // "My Website"
-  propertyType: string;
-  createTime: string;
-  parent?: string;
-}
+**Action: select-property** — upserts to `google_analytics_connections` with the chosen property + tokens.
 
-interface GA4AccountSummary {
-  name: string;
-  account: string;
-  displayName: string;
-  propertySummaries?: {
-    property: string;
-    displayName: string;
-    propertyType: string;
-    parent?: string;
-  }[];
-}
+**Action: disconnect** — sets `is_active = false` on the connection.
 
-async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresAt: Date }> {
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!;
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
+See full implementation in the previous version of this plan (same code, no changes needed).
 
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Token refresh failed: ${error}`);
-  }
-
-  const data: GoogleTokenResponse = await response.json();
-  const expiresAt = new Date(Date.now() + (data.expires_in - 60) * 1000); // 60s buffer
-
-  return { accessToken: data.access_token, expiresAt };
-}
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const auth = await authorize(req, { allowServiceRole: true });
-    const body = await req.json();
-    const { action } = body;
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-
-    if (!clientId || !clientSecret) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Google OAuth not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // ── ACTION: start ────────────────────────────────────────
-    if (action === 'start') {
-      const { redirectUrl, companyId } = body;
-      if (!redirectUrl || !companyId) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Missing redirectUrl or companyId' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const state = btoa(JSON.stringify({ companyId, userId: auth.userId }));
-
-      const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUrl,
-        response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/analytics.readonly',
-        access_type: 'offline',
-        prompt: 'consent',
-        state,
-        include_granted_scopes: 'true',
-      });
-
-      return new Response(
-        JSON.stringify({ success: true, authUrl: `${GOOGLE_AUTH_URL}?${params}` }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── ACTION: callback ─────────────────────────────────────
-    if (action === 'callback') {
-      const { code, redirectUrl, state } = body;
-      if (!code || !redirectUrl || !state) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Missing code, redirectUrl, or state' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Decode state
-      let stateData: { companyId: string; userId: string };
-      try {
-        stateData = JSON.parse(atob(state));
-      } catch {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Invalid state parameter' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Exchange code for tokens
-      const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-          grant_type: 'authorization_code',
-          redirect_uri: redirectUrl,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        const error = await tokenResponse.text();
-        return new Response(
-          JSON.stringify({ success: false, error: `Token exchange failed: ${error}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const tokens: GoogleTokenResponse = await tokenResponse.json();
-
-      if (!tokens.refresh_token) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'No refresh token received. Revoke app access in Google account settings and try again.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Get user email
-      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${tokens.access_token}` },
-      });
-      const userInfo = await userInfoResponse.json();
-      const googleEmail = userInfo.email || 'unknown';
-
-      // Fetch available GA4 properties
-      const propertiesResponse = await fetch(`${GA_ADMIN_API}/accountSummaries`, {
-        headers: { Authorization: `Bearer ${tokens.access_token}` },
-      });
-
-      let properties: { id: string; name: string }[] = [];
-      if (propertiesResponse.ok) {
-        const propertiesData = await propertiesResponse.json();
-        const summaries: GA4AccountSummary[] = propertiesData.accountSummaries || [];
-        properties = summaries.flatMap(account =>
-          (account.propertySummaries || []).map(prop => ({
-            id: prop.property,       // "properties/123456"
-            name: `${account.displayName} — ${prop.displayName}`,
-          }))
-        );
-      }
-
-      // Return tokens + properties for the frontend to complete the flow
-      // (Frontend will call 'select-property' with the chosen property)
-      return new Response(
-        JSON.stringify({
-          success: true,
-          googleEmail,
-          refreshToken: tokens.refresh_token,
-          accessToken: tokens.access_token,
-          expiresIn: tokens.expires_in,
-          properties,
-          companyId: stateData.companyId,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── ACTION: select-property ──────────────────────────────
-    if (action === 'select-property') {
-      const { companyId, propertyId, propertyName, googleEmail, refreshToken, accessToken, expiresIn } = body;
-
-      if (!companyId || !propertyId || !refreshToken) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Missing required fields' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const tokenExpiresAt = new Date(Date.now() + (expiresIn || 3600 - 60) * 1000);
-
-      const { data, error } = await supabase
-        .from('google_analytics_connections')
-        .upsert({
-          company_id: companyId,
-          google_email: googleEmail || 'unknown',
-          property_id: propertyId,
-          property_name: propertyName || propertyId,
-          refresh_token: refreshToken,
-          access_token: accessToken || null,
-          token_expires_at: tokenExpiresAt.toISOString(),
-          is_active: true,
-          connected_at: new Date().toISOString(),
-        }, { onConflict: 'company_id,property_id' })
-        .select()
-        .single();
-
-      if (error) {
-        return new Response(
-          JSON.stringify({ success: false, error: `Failed to save connection: ${error.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ success: true, connection: data }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ── ACTION: disconnect ───────────────────────────────────
-    if (action === 'disconnect') {
-      const { connectionId, companyId } = body;
-
-      const { error } = await supabase
-        .from('google_analytics_connections')
-        .update({ is_active: false })
-        .eq('id', connectionId)
-        .eq('company_id', companyId);
-
-      if (error) {
-        return new Response(
-          JSON.stringify({ success: false, error: error.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ success: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ success: false, error: `Unknown action: ${action}` }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    if (error instanceof Response) return error;
-    console.error('google-analytics-auth error:', error);
-    return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-});
-```
-
-**Step 2: Verify file compiles (syntax check)**
-Run: `cd supabase/functions/google-analytics-auth && deno check index.ts` (or just verify the file exists)
-Expected: File created at `supabase/functions/google-analytics-auth/index.ts`
+**Step 2: Verify**
+Run: `ls supabase/functions/google-analytics-auth/index.ts`
+Expected: File exists
 
 **Step 3: Commit**
 `git commit -m "feat: add google-analytics-auth edge function — OAuth start, callback, property selection, disconnect"`
 
 ---
 
-### Task 3: GA4 Data Sync edge function
+### Task 6: GA4 Data Sync edge function
 
 **Files:**
 - Create: `supabase/functions/ga-analytics-sync/index.ts`
 
 **Step 1: Write the sync edge function**
 
-This function is called by the cron dispatcher hourly per company. It:
-1. Loads active GA connections for the company
-2. Refreshes the access token if expired
-3. Calls GA4 Data API `runReport` for page metrics
-4. Calls GA4 Data API `runReport` for traffic source breakdown
-5. Upserts snapshots into `ga_page_snapshots` and `ga_referral_snapshots`
-6. Runs post-to-page URL correlation
+Follow the exact pattern from `supabase/functions/analytics-sync/index.ts`:
+- `DEADLINE_MS = 50_000` with `pastDeadline()` guard
+- `FETCH_TIMEOUT_MS = 15_000` on all API calls
+- `CronMonitor` for health logging
+- `authorize(req, { allowServiceRole: true })`
+- Batch upserts in chunks of `BATCH_SIZE = 50`
+- Per-company dispatch via `companyId` body param
 
-```typescript
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { authorize, corsHeaders } from '../_shared/authorize.ts';
-import { CronMonitor } from '../_shared/cron-monitor.ts';
+**Report 1: Page metrics** — calls `GA_DATA_API/{propertyId}:runReport` with dimensions `[pagePath, pageTitle, dateHour]` and metrics `[screenPageViews, sessions, totalUsers, bounceRate, averageSessionDuration]`. Upserts into `ga_page_snapshots`.
 
-const GA_DATA_API = 'https://analyticsdata.googleapis.com/v1beta';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const DEADLINE_MS = 50_000;
-const FETCH_TIMEOUT_MS = 15_000;
-const BATCH_SIZE = 50;
+**Report 2: Traffic sources** — calls `runReport` with dimensions `[pagePath, sessionSource, sessionMedium, sessionCampaignName, dateHour]` and same metrics. Upserts into `ga_referral_snapshots`.
 
-interface GA4ReportRow {
-  dimensionValues: { value: string }[];
-  metricValues: { value: string }[];
-}
+**Step 3: Post-to-page URL correlation** — queries recent `post_analytics_snapshots` for URLs, matches against known `ga_page_snapshots.page_path` values, upserts matches into `post_page_correlations`.
 
-interface GA4RunReportResponse {
-  rows?: GA4ReportRow[];
-  rowCount?: number;
-  metadata?: unknown;
-}
+Use verified field names from `docs/ga4-api-contracts.json` (output of L1 contract tests).
 
-interface GAConnection {
-  id: string;
-  company_id: string;
-  property_id: string;
-  property_name: string;
-  refresh_token: string;
-  access_token: string | null;
-  token_expires_at: string | null;
-}
+See full implementation in the previous version of this plan (same code, no changes needed).
 
-async function getAccessToken(
-  connection: GAConnection,
-  supabase: ReturnType<typeof createClient>
-): Promise<string> {
-  // Check if cached token is still valid (with 60s buffer)
-  if (connection.access_token && connection.token_expires_at) {
-    const expiresAt = new Date(connection.token_expires_at);
-    if (expiresAt > new Date(Date.now() + 60_000)) {
-      return connection.access_token;
-    }
-  }
-
-  // Refresh the token
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!;
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
-
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: connection.refresh_token,
-      grant_type: 'refresh_token',
-    }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Token refresh failed for ${connection.property_id}: ${error}`);
-  }
-
-  const data = await response.json();
-  const expiresAt = new Date(Date.now() + (data.expires_in - 60) * 1000);
-
-  // Cache the new token
-  await supabase
-    .from('google_analytics_connections')
-    .update({
-      access_token: data.access_token,
-      token_expires_at: expiresAt.toISOString(),
-    })
-    .eq('id', connection.id);
-
-  return data.access_token;
-}
-
-async function runGA4Report(
-  propertyId: string,
-  accessToken: string,
-  dimensions: string[],
-  metrics: string[],
-  startDate: string,
-  endDate: string
-): Promise<GA4ReportRow[]> {
-  const response = await fetch(`${GA_DATA_API}/${propertyId}:runReport`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      dateRanges: [{ startDate, endDate }],
-      dimensions: dimensions.map(name => ({ name })),
-      metrics: metrics.map(name => ({ name })),
-      limit: 10000,
-    }),
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`GA4 runReport failed: ${response.status} — ${error}`);
-  }
-
-  const data: GA4RunReportResponse = await response.json();
-  return data.rows || [];
-}
-
-function extractUrl(content: string | null, postUrl: string | null): string | null {
-  // Try post URL first
-  if (postUrl) return postUrl;
-  if (!content) return null;
-
-  // Extract first URL from post content
-  const urlMatch = content.match(/https?:\/\/[^\s"'<>]+/);
-  return urlMatch ? urlMatch[0] : null;
-}
-
-function urlToPagePath(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    return parsed.pathname;
-  } catch {
-    return null;
-  }
-}
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  const startTime = Date.now();
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Missing env vars' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  let targetCompanyId: string | null = null;
-  try {
-    const body = await req.clone().json();
-    targetCompanyId = body.companyId || null;
-  } catch { /* no body */ }
-
-  const monitorName = targetCompanyId
-    ? `ga-analytics-sync:${targetCompanyId.slice(0, 8)}`
-    : 'ga-analytics-sync';
-  const monitor = new CronMonitor(monitorName, supabase);
-  await monitor.start();
-
-  const pastDeadline = () => Date.now() - startTime > DEADLINE_MS;
-
-  try {
-    try {
-      await authorize(req, { allowServiceRole: true });
-    } catch (authError) {
-      if (authError instanceof Response) return authError;
-      throw authError;
-    }
-
-    // Load active GA connections
-    let query = supabase
-      .from('google_analytics_connections')
-      .select('*')
-      .eq('is_active', true);
-
-    if (targetCompanyId) {
-      query = query.eq('company_id', targetCompanyId);
-    }
-
-    const { data: connections, error: connError } = await query;
-    if (connError) throw new Error(`Failed to load connections: ${connError.message}`);
-
-    if (!connections || connections.length === 0) {
-      await monitor.success({ message: 'No active GA connections' });
-      return new Response(
-        JSON.stringify({ success: true, message: 'No active GA connections' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const results = {
-      connectionsSynced: 0,
-      totalConnections: connections.length,
-      pageSnapshots: 0,
-      referralSnapshots: 0,
-      correlationsCreated: 0,
-      errors: [] as string[],
-      bailedEarly: false,
-      durationMs: 0,
-    };
-
-    // Use last hour as the snapshot window (hourly cron)
-    const now = new Date();
-    const snapshotHour = new Date(now);
-    snapshotHour.setMinutes(0, 0, 0);
-
-    // GA4 API uses YYYY-MM-DD format for date ranges
-    const today = now.toISOString().split('T')[0];
-    // For hourly, we just pull today's data and upsert (idempotent)
-    const startDate = today;
-    const endDate = today;
-
-    for (const connection of connections as GAConnection[]) {
-      if (pastDeadline()) {
-        results.bailedEarly = true;
-        break;
-      }
-
-      try {
-        const accessToken = await getAccessToken(connection, supabase);
-
-        // ── Report 1: Page metrics ─────────────────────────
-        if (!pastDeadline()) {
-          const pageRows = await runGA4Report(
-            connection.property_id,
-            accessToken,
-            ['pagePath', 'pageTitle', 'dateHour'],
-            ['screenPageViews', 'sessions', 'totalUsers', 'bounceRate', 'averageSessionDuration'],
-            startDate,
-            endDate
-          );
-
-          const pageSnapshots = pageRows.map(row => {
-            const dateHour = row.dimensionValues[2]?.value || ''; // YYYYMMDDHH
-            const year = dateHour.slice(0, 4);
-            const month = dateHour.slice(4, 6);
-            const day = dateHour.slice(6, 8);
-            const hour = dateHour.slice(8, 10);
-            const hourTs = `${year}-${month}-${day}T${hour}:00:00Z`;
-
-            return {
-              company_id: connection.company_id,
-              connection_id: connection.id,
-              page_path: row.dimensionValues[0]?.value || '/',
-              page_title: row.dimensionValues[1]?.value || null,
-              pageviews: parseInt(row.metricValues[0]?.value || '0'),
-              unique_pageviews: parseInt(row.metricValues[0]?.value || '0'), // GA4 doesn't have unique, use total
-              sessions: parseInt(row.metricValues[1]?.value || '0'),
-              users: parseInt(row.metricValues[2]?.value || '0'),
-              bounce_rate: parseFloat(row.metricValues[3]?.value || '0') * 100,
-              avg_time_on_page: parseFloat(row.metricValues[4]?.value || '0'),
-              snapshot_hour: hourTs,
-            };
-          });
-
-          // Batch upsert
-          for (let i = 0; i < pageSnapshots.length && !pastDeadline(); i += BATCH_SIZE) {
-            const batch = pageSnapshots.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase
-              .from('ga_page_snapshots')
-              .upsert(batch, { onConflict: 'company_id,page_path,snapshot_hour', ignoreDuplicates: false });
-
-            if (error) {
-              results.errors.push(`Page snapshot batch error: ${error.message}`);
-            } else {
-              results.pageSnapshots += batch.length;
-            }
-          }
-        }
-
-        // ── Report 2: Traffic source breakdown ─────────────
-        if (!pastDeadline()) {
-          const referralRows = await runGA4Report(
-            connection.property_id,
-            accessToken,
-            ['pagePath', 'sessionSource', 'sessionMedium', 'sessionCampaignName', 'dateHour'],
-            ['sessions', 'totalUsers', 'screenPageViews', 'bounceRate', 'averageSessionDuration'],
-            startDate,
-            endDate
-          );
-
-          const referralSnapshots = referralRows.map(row => {
-            const dateHour = row.dimensionValues[4]?.value || '';
-            const year = dateHour.slice(0, 4);
-            const month = dateHour.slice(4, 6);
-            const day = dateHour.slice(6, 8);
-            const hour = dateHour.slice(8, 10);
-            const hourTs = `${year}-${month}-${day}T${hour}:00:00Z`;
-
-            return {
-              company_id: connection.company_id,
-              connection_id: connection.id,
-              page_path: row.dimensionValues[0]?.value || '/',
-              source: row.dimensionValues[1]?.value || '(direct)',
-              medium: row.dimensionValues[2]?.value || '(none)',
-              campaign: row.dimensionValues[3]?.value || null,
-              sessions: parseInt(row.metricValues[0]?.value || '0'),
-              users: parseInt(row.metricValues[1]?.value || '0'),
-              pageviews: parseInt(row.metricValues[2]?.value || '0'),
-              bounce_rate: parseFloat(row.metricValues[3]?.value || '0') * 100,
-              avg_session_duration: parseFloat(row.metricValues[4]?.value || '0'),
-              snapshot_hour: hourTs,
-            };
-          });
-
-          for (let i = 0; i < referralSnapshots.length && !pastDeadline(); i += BATCH_SIZE) {
-            const batch = referralSnapshots.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase
-              .from('ga_referral_snapshots')
-              .upsert(batch, { onConflict: 'company_id,page_path,source,medium,snapshot_hour', ignoreDuplicates: false });
-
-            if (error) {
-              results.errors.push(`Referral snapshot batch error: ${error.message}`);
-            } else {
-              results.referralSnapshots += batch.length;
-            }
-          }
-        }
-
-        // ── Step 3: Post-to-page URL correlation ───────────
-        if (!pastDeadline()) {
-          // Get recent social posts with URLs
-          const { data: recentPosts } = await supabase
-            .from('post_analytics_snapshots')
-            .select('post_id, platform, content, post_url')
-            .eq('company_id', connection.company_id)
-            .not('published_at', 'is', null)
-            .order('published_at', { ascending: false })
-            .limit(500);
-
-          if (recentPosts && recentPosts.length > 0) {
-            // Get known GA page paths for this company
-            const { data: knownPages } = await supabase
-              .from('ga_page_snapshots')
-              .select('page_path')
-              .eq('company_id', connection.company_id)
-              .order('snapshot_hour', { ascending: false })
-              .limit(1000);
-
-            const pagePathSet = new Set((knownPages || []).map(p => p.page_path));
-
-            const correlations: any[] = [];
-            for (const post of recentPosts) {
-              const url = extractUrl(post.content, post.post_url);
-              if (!url) continue;
-
-              const pagePath = urlToPagePath(url);
-              if (!pagePath || !pagePathSet.has(pagePath)) continue;
-
-              correlations.push({
-                company_id: connection.company_id,
-                post_id: post.post_id,
-                platform: post.platform,
-                page_path: pagePath,
-                match_type: 'url',
-                match_confidence: 1.0,
-              });
-            }
-
-            if (correlations.length > 0) {
-              const { error } = await supabase
-                .from('post_page_correlations')
-                .upsert(correlations, { onConflict: 'company_id,post_id,page_path', ignoreDuplicates: true });
-
-              if (!error) {
-                results.correlationsCreated += correlations.length;
-              }
-            }
-          }
-        }
-
-        // Update last sync time
-        await supabase
-          .from('google_analytics_connections')
-          .update({ last_sync_at: new Date().toISOString(), sync_error: null })
-          .eq('id', connection.id);
-
-        results.connectionsSynced++;
-      } catch (connError) {
-        const errMsg = connError instanceof Error ? connError.message : 'Unknown error';
-        results.errors.push(`Connection ${connection.id}: ${errMsg}`);
-
-        await supabase
-          .from('google_analytics_connections')
-          .update({ sync_error: errMsg })
-          .eq('id', connection.id);
-      }
-    }
-
-    results.durationMs = Date.now() - startTime;
-    await monitor.success(results);
-
-    return new Response(
-      JSON.stringify({ success: true, ...results }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('ga-analytics-sync error:', error);
-    await monitor.error(error instanceof Error ? error : new Error(String(error)));
-    return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-});
-```
-
-**Step 2: Verify file exists**
-Run: `ls -la supabase/functions/ga-analytics-sync/index.ts`
+**Step 2: Verify**
+Run: `ls supabase/functions/ga-analytics-sync/index.ts`
 Expected: File exists
 
 **Step 3: Commit**
-`git commit -m "feat: add ga-analytics-sync edge function — hourly page metrics, traffic sources, post-to-page correlation"`
+`git commit -m "feat: add ga-analytics-sync edge function — hourly page metrics, traffic sources, URL correlation"`
 
 ---
 
-### Task 4: Register GA sync in cron dispatcher
+### Task 7: Register in cron dispatcher + cron job migration
 
 **Files:**
 - Modify: `supabase/functions/cron-dispatcher/index.ts`
 - Create: `supabase/migrations/20260307200100_ga_analytics_cron.sql`
 
-**Step 1: Add `ga-analytics-sync` to the cron dispatcher allowed list and fan-out list**
+**Step 1: Add to cron dispatcher**
 
 In `supabase/functions/cron-dispatcher/index.ts`:
-- Add `'ga-analytics-sync'` to `ALLOWED_FUNCTIONS` array
-- Add `'ga-analytics-sync'` to `fanOutFunctions` array
+- Add `'ga-analytics-sync'` to `ALLOWED_FUNCTIONS` array (line ~22)
+- Add `'ga-analytics-sync'` to `fanOutFunctions` array (line ~75)
 
-**Step 2: Create the cron job migration**
+**Step 2: Write cron registration migration**
 
 ```sql
 -- Register hourly cron job for GA analytics sync
--- Uses the cron dispatcher for per-company fan-out
-
--- Only register if pg_cron and pg_net are available
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    -- Remove if exists (idempotent)
-    PERFORM cron.unschedule('ga-analytics-sync-hourly');
-  EXCEPTION WHEN OTHERS THEN
-    NULL;
+    BEGIN
+      PERFORM cron.unschedule('ga-analytics-sync-hourly');
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
   END IF;
 END $$;
 
@@ -1154,7 +1231,6 @@ BEGIN
   END IF;
 END $$;
 
--- Also register in cron_job_settings for the health dashboard
 INSERT INTO cron_job_settings (job_name, display_name, description, schedule, is_enabled, category)
 VALUES (
   'ga-analytics-sync-hourly',
@@ -1170,14 +1246,158 @@ ON CONFLICT (job_name) DO UPDATE SET
   schedule = EXCLUDED.schedule;
 ```
 
-**Step 3: Commit**
+**Step 3: Run L2 cron pipeline test to verify registration**
+Run: `npm run test:integration -- --run src/tests/integration/cron-pipeline-health.test.ts`
+Expected: `ga-analytics-sync-hourly` appears in job settings
+
+**Step 4: Commit**
 `git commit -m "feat: register ga-analytics-sync in cron dispatcher — hourly fan-out per company"`
 
 ---
 
-## Phase 1: Frontend Hooks + Connection UI
+## Phase 3: Frontend — Hooks, API Client, Demo Data
 
-### Task 5: Create Google Analytics API client and hooks
+> **Session boundary:** Start a new session for Phase 3. Phases 0-2 should be complete and all L1/L2 tests passing.
+
+### Task 8: Write L4 unit tests for hooks and URL correlation (RED)
+
+**Files:**
+- Create: `src/test/google-analytics-hooks.test.ts`
+
+**Step 1: Write the failing unit tests**
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ─── Mocks ──────────────────────────────────────────────────
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    functions: { invoke: vi.fn() },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    })),
+    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+  },
+}));
+
+vi.mock('@/contexts/SelectedCompanyContext', () => ({
+  useSelectedCompany: () => ({ selectedCompanyId: 'test-company-id' }),
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 'test-user', email: 'test@test.com' },
+    session: { access_token: 'mock-token' },
+    signOut: vi.fn(),
+  }),
+}));
+
+vi.mock('@/hooks/useCompany', () => ({
+  useCompany: () => ({
+    data: { id: 'test-company-id', name: 'Test Co' },
+    isLoading: false,
+  }),
+}));
+
+vi.mock('@/lib/demo/demo-constants', () => ({
+  isDemoCompany: (id: string) => id === 'demo-longtale',
+  DEMO_COMPANY_ID: 'demo-longtale',
+  DEMO_COMPANY: { id: 'demo-longtale', name: 'Longtale Demo' },
+}));
+
+// ─── API Client Tests ───────────────────────────────────────
+describe('googleAnalyticsApi', () => {
+  it('should export all required methods', async () => {
+    const { googleAnalyticsApi } = await import('@/lib/api/google-analytics');
+    expect(googleAnalyticsApi.startAuth).toBeDefined();
+    expect(googleAnalyticsApi.handleCallback).toBeDefined();
+    expect(googleAnalyticsApi.selectProperty).toBeDefined();
+    expect(googleAnalyticsApi.disconnect).toBeDefined();
+    expect(googleAnalyticsApi.syncNow).toBeDefined();
+  });
+});
+
+// ─── Hook Query Key Tests ───────────────────────────────────
+describe('useGAPageMetrics', () => {
+  it('should use correct query key shape', async () => {
+    const { useGAPageMetrics } = await import('@/hooks/useGAPageMetrics');
+    expect(typeof useGAPageMetrics).toBe('function');
+    // Query key should be ['ga-page-metrics', companyId, params]
+  });
+});
+
+describe('useGATrafficSources', () => {
+  it('should use correct query key shape', async () => {
+    const { useGATrafficSources } = await import('@/hooks/useGATrafficSources');
+    expect(typeof useGATrafficSources).toBe('function');
+  });
+});
+
+describe('useContentJourney', () => {
+  it('should use correct query key shape', async () => {
+    const { useContentJourney } = await import('@/hooks/useContentJourney');
+    expect(typeof useContentJourney).toBe('function');
+  });
+});
+
+describe('useGAConnections', () => {
+  it('should export connection management hooks', async () => {
+    const mod = await import('@/hooks/useGoogleAnalytics');
+    expect(typeof mod.useGAConnections).toBe('function');
+    expect(typeof mod.useConnectGA).toBe('function');
+    expect(typeof mod.useSyncGA).toBe('function');
+    expect(typeof mod.useDisconnectGA).toBe('function');
+  });
+});
+
+// ─── URL Correlation Logic Tests ────────────────────────────
+// These test the pure functions used by ga-analytics-sync
+describe('URL-to-page-path correlation', () => {
+  it('should extract page path from full URL', () => {
+    // Test the URL parsing logic that will be used in correlation
+    const url = 'https://example.com/blog/my-article?utm_source=twitter';
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe('/blog/my-article');
+  });
+
+  it('should handle URLs without path', () => {
+    const url = 'https://example.com';
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe('/');
+  });
+
+  it('should handle URLs with trailing slash', () => {
+    const url = 'https://example.com/blog/';
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe('/blog/');
+  });
+
+  it('should extract first URL from post content', () => {
+    const content = 'Check out our latest article https://example.com/blog/post-1 and let us know!';
+    const match = content.match(/https?:\/\/[^\s"'<>]+/);
+    expect(match?.[0]).toBe('https://example.com/blog/post-1');
+  });
+
+  it('should return null for content without URLs', () => {
+    const content = 'Just a regular post with no links';
+    const match = content.match(/https?:\/\/[^\s"'<>]+/);
+    expect(match).toBeNull();
+  });
+});
+```
+
+**Step 2: Run — confirm it fails**
+Run: `npm run test -- --run src/test/google-analytics-hooks.test.ts`
+Expected: Import errors for files that don't exist yet
+
+**Step 3: Commit**
+`git commit -m "test(L4): add GA hooks unit tests — query keys, exports, URL correlation (RED)"`
+
+---
+
+### Task 9: Create API client + hooks (GREEN — make L4 + L3 tests pass)
 
 **Files:**
 - Create: `src/lib/api/google-analytics.ts`
@@ -1188,394 +1408,34 @@ ON CONFLICT (job_name) DO UPDATE SET
 
 **Step 1: Create the API client** (`src/lib/api/google-analytics.ts`)
 
-```typescript
-import { supabase } from '@/integrations/supabase/client';
+Follow exact pattern from `src/lib/api/getlate.ts`:
+- All methods return `{ success: boolean; error?: string; data?: T }`
+- All methods call `supabase.functions.invoke(...)` for edge function communication
+- Export as `googleAnalyticsApi` object
 
-export interface GAConnection {
-  id: string;
-  company_id: string;
-  google_email: string;
-  property_id: string;
-  property_name: string;
-  is_active: boolean;
-  connected_at: string;
-  last_sync_at: string | null;
-  sync_error: string | null;
-}
+Methods: `startAuth`, `handleCallback`, `selectProperty`, `disconnect`, `syncNow`
 
-export interface GAProperty {
-  id: string;
-  name: string;
-}
+**Step 2: Create hooks** following pattern from `src/hooks/useAnalyticsByPublishDate.ts`:
+- `useGAConnections` — `queryKey: ['ga-connections', companyId]`, `enabled: !!companyId`
+- `useGAPageMetrics` — `queryKey: ['ga-page-metrics', companyId, params]`, calls `supabase.rpc('get_ga_page_metrics', ...)`
+- `useGATrafficSources` — `queryKey: ['ga-traffic-sources', companyId, params]`, calls `supabase.rpc('get_ga_traffic_sources', ...)`
+- `useContentJourney` — `queryKey: ['content-journey', companyId, params]`, calls `supabase.rpc('get_content_journey', ...)`
+- `useConnectGA`, `useSyncGA`, `useDisconnectGA` — mutation hooks with query invalidation
 
-export const googleAnalyticsApi = {
-  async startAuth(companyId: string, redirectUrl: string) {
-    const { data, error } = await supabase.functions.invoke('google-analytics-auth', {
-      body: { action: 'start', companyId, redirectUrl },
-    });
-    if (error) return { success: false as const, error: error.message };
-    return data as { success: boolean; authUrl?: string; error?: string };
-  },
+**Step 3: Run L4 unit tests — confirm GREEN**
+Run: `npm run test -- --run src/test/google-analytics-hooks.test.ts`
+Expected: All tests pass
 
-  async handleCallback(code: string, redirectUrl: string, state: string) {
-    const { data, error } = await supabase.functions.invoke('google-analytics-auth', {
-      body: { action: 'callback', code, redirectUrl, state },
-    });
-    if (error) return { success: false as const, error: error.message };
-    return data as {
-      success: boolean;
-      googleEmail?: string;
-      refreshToken?: string;
-      accessToken?: string;
-      expiresIn?: number;
-      properties?: GAProperty[];
-      companyId?: string;
-      error?: string;
-    };
-  },
+**Step 4: Run L3 smoke tests — confirm some pass (hooks + API client should pass now)**
+Run: `npm run test:smoke -- --run src/tests/smoke/google-analytics.test.ts`
+Expected: Hook and API client tests pass; page + demo data tests still fail
 
-  async selectProperty(params: {
-    companyId: string;
-    propertyId: string;
-    propertyName: string;
-    googleEmail: string;
-    refreshToken: string;
-    accessToken: string;
-    expiresIn: number;
-  }) {
-    const { data, error } = await supabase.functions.invoke('google-analytics-auth', {
-      body: { action: 'select-property', ...params },
-    });
-    if (error) return { success: false as const, error: error.message };
-    return data as { success: boolean; connection?: GAConnection; error?: string };
-  },
-
-  async disconnect(connectionId: string, companyId: string) {
-    const { data, error } = await supabase.functions.invoke('google-analytics-auth', {
-      body: { action: 'disconnect', connectionId, companyId },
-    });
-    if (error) return { success: false as const, error: error.message };
-    return data as { success: boolean; error?: string };
-  },
-
-  async syncNow(companyId: string) {
-    const { data, error } = await supabase.functions.invoke('ga-analytics-sync', {
-      body: { companyId },
-    });
-    if (error) return { success: false as const, error: error.message };
-    return data as { success: boolean; pageSnapshots?: number; referralSnapshots?: number; error?: string };
-  },
-};
-```
-
-**Step 2: Create connection management hook** (`src/hooks/useGoogleAnalytics.ts`)
-
-```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from './useCompany';
-import { googleAnalyticsApi, GAConnection } from '@/lib/api/google-analytics';
-import { toast } from 'sonner';
-
-export function useGAConnections() {
-  const { data: company } = useCompany();
-  const companyId = company?.id;
-
-  return useQuery({
-    queryKey: ['ga-connections', companyId],
-    queryFn: async (): Promise<GAConnection[]> => {
-      if (!companyId) return [];
-
-      const { data, error } = await supabase
-        .from('google_analytics_connections')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('is_active', true);
-
-      if (error) throw error;
-      return (data || []) as GAConnection[];
-    },
-    enabled: !!companyId,
-  });
-}
-
-export function useConnectGA() {
-  const { data: company } = useCompany();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!company?.id) throw new Error('No company selected');
-      const redirectUrl = `${window.location.origin}/oauth-callback?platform=google-analytics`;
-      const result = await googleAnalyticsApi.startAuth(company.id, redirectUrl);
-      if (!result.success) throw new Error(result.error);
-
-      // Open popup
-      const width = 600, height = 700;
-      const left = window.screenX + (window.innerWidth - width) / 2;
-      const top = window.screenY + (window.innerHeight - height) / 2;
-      window.open(result.authUrl, 'google-analytics-auth', `width=${width},height=${height},left=${left},top=${top}`);
-    },
-  });
-}
-
-export function useSyncGA() {
-  const { data: company } = useCompany();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!company?.id) throw new Error('No company selected');
-      const result = await googleAnalyticsApi.syncNow(company.id);
-      if (!result.success) throw new Error(result.error);
-      return result;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['ga-page-metrics'] });
-      queryClient.invalidateQueries({ queryKey: ['ga-traffic-sources'] });
-      queryClient.invalidateQueries({ queryKey: ['content-journey'] });
-      queryClient.invalidateQueries({ queryKey: ['ga-connections'] });
-
-      toast.success('Google Analytics synced', {
-        description: `${data.pageSnapshots || 0} page metrics, ${data.referralSnapshots || 0} referral records`,
-      });
-    },
-    onError: (error) => {
-      toast.error('GA sync failed', { description: error.message });
-    },
-  });
-}
-
-export function useDisconnectGA() {
-  const { data: company } = useCompany();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (connectionId: string) => {
-      if (!company?.id) throw new Error('No company selected');
-      const result = await googleAnalyticsApi.disconnect(connectionId, company.id);
-      if (!result.success) throw new Error(result.error);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ga-connections'] });
-      toast.success('Google Analytics disconnected');
-    },
-  });
-}
-```
-
-**Step 3: Create data hooks** (`src/hooks/useGAPageMetrics.ts`, `src/hooks/useGATrafficSources.ts`, `src/hooks/useContentJourney.ts`)
-
-`src/hooks/useGAPageMetrics.ts`:
-```typescript
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from './useCompany';
-
-export interface GAPageMetric {
-  metricDate: string;
-  pagePath: string;
-  totalPageviews: number;
-  totalUniquePageviews: number;
-  totalSessions: number;
-  totalUsers: number;
-  avgBounceRate: number;
-  avgTimeOnPage: number;
-}
-
-export function useGAPageMetrics(params: { startDate: string; endDate: string; pagePath?: string }) {
-  const { data: company } = useCompany();
-  const companyId = company?.id;
-
-  return useQuery({
-    queryKey: ['ga-page-metrics', companyId, params],
-    queryFn: async (): Promise<GAPageMetric[]> => {
-      if (!companyId) return [];
-
-      const { data, error } = await supabase.rpc('get_ga_page_metrics', {
-        _company_id: companyId,
-        _start_date: params.startDate,
-        _end_date: params.endDate,
-        _page_path: params.pagePath || null,
-      });
-
-      if (error) throw error;
-      return (data || []).map((row: any) => ({
-        metricDate: row.metric_date,
-        pagePath: row.page_path,
-        totalPageviews: Number(row.total_pageviews) || 0,
-        totalUniquePageviews: Number(row.total_unique_pageviews) || 0,
-        totalSessions: Number(row.total_sessions) || 0,
-        totalUsers: Number(row.total_users) || 0,
-        avgBounceRate: Number(row.avg_bounce_rate) || 0,
-        avgTimeOnPage: Number(row.avg_time_on_page) || 0,
-      }));
-    },
-    enabled: !!companyId,
-  });
-}
-```
-
-`src/hooks/useGATrafficSources.ts`:
-```typescript
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from './useCompany';
-
-export interface GATrafficSource {
-  source: string;
-  medium: string;
-  totalSessions: number;
-  totalUsers: number;
-  totalPageviews: number;
-  avgBounceRate: number;
-  avgSessionDuration: number;
-}
-
-export function useGATrafficSources(params: { startDate: string; endDate: string; pagePath?: string }) {
-  const { data: company } = useCompany();
-  const companyId = company?.id;
-
-  return useQuery({
-    queryKey: ['ga-traffic-sources', companyId, params],
-    queryFn: async (): Promise<GATrafficSource[]> => {
-      if (!companyId) return [];
-
-      const { data, error } = await supabase.rpc('get_ga_traffic_sources', {
-        _company_id: companyId,
-        _start_date: params.startDate,
-        _end_date: params.endDate,
-        _page_path: params.pagePath || null,
-      });
-
-      if (error) throw error;
-      return (data || []).map((row: any) => ({
-        source: row.source,
-        medium: row.medium,
-        totalSessions: Number(row.total_sessions) || 0,
-        totalUsers: Number(row.total_users) || 0,
-        totalPageviews: Number(row.total_pageviews) || 0,
-        avgBounceRate: Number(row.avg_bounce_rate) || 0,
-        avgSessionDuration: Number(row.avg_session_duration) || 0,
-      }));
-    },
-    enabled: !!companyId,
-  });
-}
-```
-
-`src/hooks/useContentJourney.ts`:
-```typescript
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from './useCompany';
-
-export interface ContentJourneyItem {
-  postId: string;
-  platform: string;
-  postContent: string | null;
-  postUrl: string | null;
-  publishedAt: string;
-  // Social metrics
-  impressions: number;
-  socialClicks: number;
-  likes: number;
-  shares: number;
-  engagementRate: number;
-  // Web metrics
-  pagePath: string;
-  pageviews: number;
-  sessionsFromSocial: number;
-  bounceRate: number;
-  avgTimeOnPage: number;
-  // Attribution
-  matchType: string;
-  matchConfidence: number;
-}
-
-export function useContentJourney(params: { startDate: string; endDate: string }) {
-  const { data: company } = useCompany();
-  const companyId = company?.id;
-
-  return useQuery({
-    queryKey: ['content-journey', companyId, params],
-    queryFn: async (): Promise<ContentJourneyItem[]> => {
-      if (!companyId) return [];
-
-      const { data, error } = await supabase.rpc('get_content_journey', {
-        _company_id: companyId,
-        _start_date: params.startDate,
-        _end_date: params.endDate,
-      });
-
-      if (error) throw error;
-      return (data || []).map((row: any) => ({
-        postId: row.post_id,
-        platform: row.platform,
-        postContent: row.post_content,
-        postUrl: row.post_url,
-        publishedAt: row.published_at,
-        impressions: Number(row.impressions) || 0,
-        socialClicks: Number(row.social_clicks) || 0,
-        likes: Number(row.likes) || 0,
-        shares: Number(row.shares) || 0,
-        engagementRate: Number(row.engagement_rate) || 0,
-        pagePath: row.page_path,
-        pageviews: Number(row.pageviews) || 0,
-        sessionsFromSocial: Number(row.sessions_from_social) || 0,
-        bounceRate: Number(row.bounce_rate) || 0,
-        avgTimeOnPage: Number(row.avg_time_on_page) || 0,
-        matchType: row.match_type,
-        matchConfidence: Number(row.match_confidence) || 0,
-      }));
-    },
-    enabled: !!companyId,
-  });
-}
-```
-
-**Step 4: Commit**
-`git commit -m "feat: add Google Analytics API client, connection hooks, page metrics, traffic sources, and content journey hooks"`
+**Step 5: Commit**
+`git commit -m "feat: add GA API client + hooks — connections, page metrics, traffic sources, content journey (GREEN)"`
 
 ---
 
-### Task 6: Add Google Analytics card to Connections page
-
-**Files:**
-- Modify: `src/pages/Connections.tsx`
-- Create: `src/components/connections/GAPropertySelectionDialog.tsx`
-
-**Step 1: Add a "Google Analytics" section below the social platforms grid**
-
-This is a separate section because GA is not a social platform — it's a data source. Add it after the existing platforms grid with a distinct card style.
-
-The card shows:
-- Connection status (connected/disconnected)
-- Connected property name + Google email
-- Last sync time
-- Connect/Disconnect/Sync buttons
-
-**Step 2: Create the GA property selection dialog**
-
-After OAuth callback, the user needs to pick which GA4 property to connect. `GAPropertySelectionDialog` receives the list of properties from the callback response, shows them in a radio list, and calls `select-property` on the chosen one.
-
-Pattern: Follow `PageSelectionDialog.tsx` — same modal structure, same completion flow.
-
-**Step 3: Wire up the OAuth callback for google-analytics platform**
-
-In the `useEffect` message handler in `Connections.tsx`, handle `platform === 'google-analytics'`:
-1. Extract `code` and `state` from the callback URL params
-2. Call `googleAnalyticsApi.handleCallback(code, redirectUrl, state)`
-3. If properties returned, open `GAPropertySelectionDialog`
-4. On property selection, call `googleAnalyticsApi.selectProperty(...)`
-5. Invalidate `ga-connections` query
-
-**Step 4: Commit**
-`git commit -m "feat: add Google Analytics connection card + property selection dialog to Connections page"`
-
----
-
-### Task 7: Add demo data for Google Analytics
+### Task 10: Add demo data fixtures
 
 **Files:**
 - Modify: `src/lib/demo/demo-data.ts`
@@ -1583,139 +1443,227 @@ In the `useEffect` message handler in `Connections.tsx`, handle `platform === 'g
 
 **Step 1: Add demo GA fixtures to `demo-data.ts`**
 
-Add:
-- `DEMO_GA_CONNECTIONS` — one active connection with a demo property
-- `DEMO_GA_PAGE_SNAPSHOTS` — 30 days of page-level data for 5 articles
-- `DEMO_GA_REFERRAL_SNAPSHOTS` — traffic source breakdown (organic, social, direct, referral)
-- `DEMO_CONTENT_JOURNEY` — pre-correlated social posts → articles
+Add at bottom of file, following existing patterns (deterministic dates, `DEMO_COMPANY_ID`):
 
-**Step 2: Populate query cache in `DemoDataProvider.tsx`**
+- `DEMO_GA_CONNECTIONS` — 1 active connection: `{ id: 'demo-ga-conn-1', company_id: DEMO_COMPANY_ID, google_email: 'analytics@longtale.ai', property_id: 'properties/demo-123', property_name: 'Longtale Blog', is_active: true, ... }`
+
+- `DEMO_GA_PAGE_SNAPSHOTS` — 30 days × 5 articles = ~150 entries. Use `daysAgo(n)` helper. Articles: `/blog/ai-content-strategy`, `/blog/social-media-2026`, `/blog/content-calendar-tips`, `/blog/analytics-guide`, `/blog/brand-voice-ai`
+
+- `DEMO_GA_REFERRAL_SNAPSHOTS` — Traffic sources for each article: `{ source: 'twitter.com', medium: 'social' }`, `{ source: 'linkedin.com', medium: 'social' }`, `{ source: 'google', medium: 'organic' }`, `{ source: '(direct)', medium: '(none)' }`
+
+- `DEMO_GA_CONTENT_JOURNEY` — Pre-correlated items linking `DEMO_POSTS` to articles
+
+**Step 2: Populate cache in `DemoDataProvider.tsx`**
 
 Add `queryClient.setQueryData()` calls for:
-- `['ga-connections', DEMO_COMPANY_ID]`
-- `['ga-page-metrics', DEMO_COMPANY_ID, ...]`
-- `['ga-traffic-sources', DEMO_COMPANY_ID, ...]`
-- `['content-journey', DEMO_COMPANY_ID, ...]`
+- `['ga-connections', DEMO_COMPANY_ID]` → `DEMO_GA_CONNECTIONS`
+- `['ga-page-metrics', DEMO_COMPANY_ID, ...]` → aggregated from `DEMO_GA_PAGE_SNAPSHOTS`
+- `['ga-traffic-sources', DEMO_COMPANY_ID, ...]` → aggregated from `DEMO_GA_REFERRAL_SNAPSHOTS`
+- `['content-journey', DEMO_COMPANY_ID, ...]` → `DEMO_GA_CONTENT_JOURNEY`
 
-**Step 3: Commit**
-`git commit -m "feat: add demo data fixtures for Google Analytics connections, page metrics, and content journey"`
+**Step 3: Run L3 smoke tests — all should pass now (GREEN)**
+Run: `npm run test:smoke -- --run src/tests/smoke/google-analytics.test.ts`
+Expected: All tests pass including demo data assertions
+
+**Step 4: Commit**
+`git commit -m "feat: add demo data fixtures for GA — connections, page metrics, referrals, content journey (GREEN)"`
 
 ---
 
-## Phase 2: Content Journey Analytics Page
+## Phase 4: Frontend — Connection UI + Content Journey Page
 
-> **Session boundary:** Start a new session for Phase 2. Phase 0 + 1 should be complete and committed.
+### Task 11: Add Google Analytics card to Connections page
 
-### Task 8: Create Content Journey page and route
+**Files:**
+- Modify: `src/pages/Connections.tsx`
+- Create: `src/components/connections/GAPropertySelectionDialog.tsx`
+
+**Step 1: Add GA connection section below the social platforms grid**
+
+Separate section because GA is a data source, not a social platform. Card shows:
+- Connection status + property name + Google email
+- Last sync time + sync error (if any)
+- Connect / Disconnect / Sync Now buttons
+
+**Step 2: Create `GAPropertySelectionDialog`**
+
+Follow `PageSelectionDialog.tsx` pattern:
+- Dialog with radio list of GA4 properties
+- On select → calls `googleAnalyticsApi.selectProperty(...)`
+- On complete → invalidates `ga-connections` query
+
+**Step 3: Wire up OAuth callback**
+
+In `Connections.tsx` `useEffect` message handler, handle `platform === 'google-analytics'`:
+1. Extract `code` and `state` from callback URL params
+2. Call `googleAnalyticsApi.handleCallback(code, redirectUrl, state)`
+3. Open `GAPropertySelectionDialog` with returned properties
+
+**Step 4: Commit**
+`git commit -m "feat: add Google Analytics connection card + property selection dialog"`
+
+---
+
+### Task 12: Create Content Journey page and route
 
 **Files:**
 - Create: `src/pages/ContentJourney.tsx`
-- Modify: `src/App.tsx` (add route)
+- Modify: `src/App.tsx`
 
-**Step 1: Register the route in App.tsx**
+**Step 1: Register route in `App.tsx`**
 
-Add to the `/app/*` protected routes:
 ```typescript
 <Route path="/app/analytics/content-journey" element={<ProtectedRoute><ContentJourney /></ProtectedRoute>} />
 ```
 
 **Step 2: Build the Content Journey page**
 
-Layout (three sections in a single scrollable page):
+Layout — four sections in a scrollable page inside `<DashboardLayout>`:
 
-**Header:**
-- Title: "Content Journey"
-- Subtitle: "Track your content from social posts to website engagement"
-- Date range filter (reuse existing `DateRangeFilter` component)
-- "Sync GA" button (calls `useSyncGA`)
-- Connection status badge (shows connected property or "Connect GA" CTA)
+**Header:** Title, date range filter, sync button, connection status badge
 
-**Section 1: Overview KPI Cards (4-column grid)**
-- Total Pageviews (from GA)
-- Social Referral Traffic (from GA referral where medium=social)
-- Social → Web Conversion Rate (social referral sessions / total social clicks)
-- Avg Time on Page (from GA)
-
-Each card uses `StatSparklineWidget` pattern from analytics-v2.
+**Section 1: KPI Cards** (4-column grid)
+- Total Pageviews (GA)
+- Social Referral Traffic (GA referral where medium=social)
+- Social → Web Conversion Rate
+- Avg Time on Page
 
 **Section 2: Content Hub Table**
-- Table listing articles/pages with columns:
-  - Page Title / Path
-  - Total Pageviews
-  - Sessions from Social
-  - % of Traffic from Social
-  - Avg Bounce Rate
-  - Avg Time on Page
-  - # Social Posts Linked
-- Sortable columns
-- Click row → expands to show linked social posts
-- Use existing `Table` component from Shadcn
+- Sortable table: Page Title, Pageviews, Sessions from Social, % Social Traffic, Bounce Rate, Time on Page, # Linked Posts
+- Click row to expand linked social posts
 
 **Section 3: Top Content Journeys**
-- Cards showing the full journey for top-performing correlated content:
-  - Left: Social post preview (platform icon, content snippet, engagement metrics)
-  - Arrow / flow indicator
-  - Right: Web performance (pageviews, bounce rate, time on page)
-- Uses `useContentJourney` hook data
+- Cards: social post → arrow → web performance
+- Uses `useContentJourney` hook
 
 **Section 4: Traffic Source Breakdown**
-- Donut chart: traffic by source/medium (Nivo or Recharts)
-- Bar chart: social platform breakdown (Twitter vs LinkedIn vs Facebook referral traffic)
-- Uses `useGATrafficSources` hook
+- Donut chart by source/medium
+- Bar chart: social platform referral comparison
 
 **Step 3: Add sidebar navigation link**
+Add "Content Journey" under Analytics section in sidebar nav
 
-In `src/components/layout/DashboardLayout.tsx` (or wherever sidebar nav items are defined), add a "Content Journey" link under the Analytics section pointing to `/app/analytics/content-journey`.
+**Step 4: Run all smoke tests — confirm page import works**
+Run: `npm run test:smoke -- --run src/tests/smoke/google-analytics.test.ts`
+Expected: All tests pass
 
-**Step 4: Commit**
-`git commit -m "feat: add Content Journey analytics page — KPIs, content hub table, journey cards, traffic sources"`
+**Step 5: Commit**
+`git commit -m "feat: add Content Journey analytics page — KPIs, content hub, journey cards, traffic sources"`
 
 ---
 
-### Task 9: UTM auto-tagging in post composer
+### Task 13: UTM auto-tagging in post composer
 
 **Files:**
-- Modify: `src/components/posts/` (wherever the compose/create post form is)
+- Modify: post compose component (find in `src/components/posts/`)
 
 **Step 1: Add UTM parameter injection**
 
-When a user composes a post and includes a URL, auto-append UTM parameters:
-```
-?utm_source=longtale&utm_medium=social&utm_campaign={company_slug}&utm_content={post_id_or_hash}
-```
-
-Rules:
-- Only append to URLs that don't already have UTM params
-- Show a small toggle "Auto-tag links for tracking" (default on)
-- Preview the tagged URL before posting
-- Store the UTM-tagged URL in post metadata for later correlation
+When composing a post with a URL:
+- Auto-append: `?utm_source=longtale&utm_medium=social&utm_campaign={company_slug}&utm_content={post_hash}`
+- Skip if URL already has UTM params
+- Show toggle: "Auto-tag links for tracking" (default on)
+- Preview the tagged URL
 
 **Step 2: Commit**
 `git commit -m "feat: add UTM auto-tagging for links in post composer"`
 
 ---
 
-### Task 10: Update CLAUDE.md with GA integration docs
+## Phase 5: Test Manifest, Reports, Documentation
+
+### Task 14: Update test manifest
+
+**Files:**
+- Modify: `docs/test-manifest.json`
+
+**Step 1: Add google-analytics feature entry**
+
+```json
+{
+  "google-analytics": {
+    "description": "GA4 OAuth connection, hourly page metrics sync, traffic source attribution, post-to-page correlation, content journey analytics page",
+    "L1_contract": [
+      "scripts/ga4-contract-tests.cjs"
+    ],
+    "L2_integration": [
+      "src/tests/integration/google-analytics-rls.test.ts"
+    ],
+    "L3_smoke": [
+      "src/tests/smoke/google-analytics.test.ts"
+    ],
+    "L4_unit": [
+      "src/test/google-analytics-hooks.test.ts"
+    ],
+    "L5_e2e": []
+  }
+}
+```
+
+**Step 2: Commit**
+`git commit -m "test: update test manifest with google-analytics feature coverage"`
+
+---
+
+### Task 15: Write test report
+
+**Files:**
+- Create or append: `docs/test-reports/2026-03-07.md`
+
+**Step 1: Append test report block**
+
+```markdown
+## [HH:MM] - Google Analytics Integration
+
+**Trigger:** New GA4 OAuth integration — edge functions, migration, hooks, Content Journey page
+
+| Layer | File | Tests | Pass | Fail | Skip | Duration |
+|-------|------|-------|------|------|------|----------|
+| L1 Contract | `scripts/ga4-contract-tests.cjs` | XX | XX | 0 | 0 | X.Xs |
+| L2 Integration | `src/tests/integration/google-analytics-rls.test.ts` | XX | XX | 0 | 0 | X.Xs |
+| L3 Smoke | `src/tests/smoke/google-analytics.test.ts` | XX | XX | 0 | 0 | X.Xs |
+| L4 Unit | `src/test/google-analytics-hooks.test.ts` | XX | XX | 0 | 0 | X.Xs |
+| L5 E2E | — | — | — | — | — | — |
+
+**Coverage gaps:** L5 E2E not yet written (add after UI stabilizes)
+
+**Regressions:** None
+
+**Deploy Readiness:**
+- [ ] L1 Contract tests pass (GA4 API)
+- [ ] L2 Integration tests pass (RLS + RPCs)
+- [ ] L3 Smoke tests pass
+- [ ] L4 Unit tests pass
+- [ ] L5 E2E tests pass (deferred)
+- [ ] Test manifest updated (`docs/test-manifest.json`)
+```
+
+**Step 2: Commit**
+`git commit -m "docs: add GA integration test report"`
+
+---
+
+### Task 16: Update CLAUDE.md with GA integration docs
 
 **Files:**
 - Modify: `CLAUDE.md`
 
-**Step 1: Add section documenting:**
+**Step 1: Add to the Known Issues / Watch Out For section:**
 - New tables: `google_analytics_connections`, `ga_page_snapshots`, `ga_referral_snapshots`, `post_page_correlations`
 - New edge functions: `google-analytics-auth`, `ga-analytics-sync`
-- New hooks: `useGAConnections`, `useGAPageMetrics`, `useGATrafficSources`, `useContentJourney`
 - New route: `/app/analytics/content-journey`
-- Required secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Supabase Secrets only)
-- Cron job: `ga-analytics-sync-hourly` (runs at :15 every hour)
 
-**Step 2: Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to the secrets table**
+**Step 2: Add to the secrets table:**
 
 | Secret | Location | Used By |
 |--------|----------|---------|
 | `GOOGLE_CLIENT_ID` | Supabase Secrets only | Edge functions (prod only) |
 | `GOOGLE_CLIENT_SECRET` | Supabase Secrets only | Edge functions (prod only) |
 
-**Step 3: Commit**
+**Step 3: Add to the routing section:**
+- `/app/analytics/content-journey` — Content Journey (GA4 + social correlation)
+
+**Step 4: Commit**
 `git commit -m "docs: add Google Analytics integration to CLAUDE.md — tables, hooks, edge functions, secrets"`
 
 ---
@@ -1728,32 +1676,57 @@ Before starting Phase 0, the implementing engineer must:
    - Go to https://console.cloud.google.com/apis/credentials
    - Create OAuth 2.0 Client ID (Web application)
    - Add authorized redirect URIs: `https://your-domain.com/oauth-callback`
-   - Enable the "Google Analytics Data API" in the API library
-   - Enable the "Google Analytics Admin API" in the API library
-   - Note the Client ID and Client Secret
+   - Enable "Google Analytics Data API" and "Google Analytics Admin API"
+   - Note Client ID and Client Secret
 
-2. **Set Supabase secrets:**
+2. **Set Supabase secrets (production):**
    ```bash
    supabase secrets set GOOGLE_CLIENT_ID=your-client-id
    supabase secrets set GOOGLE_CLIENT_SECRET=your-client-secret
    ```
 
-3. **Verify the OAuth callback page handles the `google-analytics` platform:**
-   - Check `src/pages/OAuthCallback.tsx` passes query params back to the parent window
+3. **Set local test credentials (for L1 contract tests):**
+   ```bash
+   # Add to .env.local
+   GOOGLE_CLIENT_ID="your-client-id"
+   GOOGLE_CLIENT_SECRET="your-secret"
+   GA4_TEST_REFRESH_TOKEN="your-test-refresh-token"
+   GA4_TEST_PROPERTY_ID="properties/123456"
+   ```
+
+4. **Verify OAuth callback page handles `google-analytics` platform:**
+   - Check `src/pages/OAuthCallback.tsx` passes query params back to parent
 
 ---
 
 ## Summary of deliverables
 
-| # | Deliverable | Type | Files |
-|---|-------------|------|-------|
-| 1 | Database schema | Migration | `supabase/migrations/20260307200000_google_analytics.sql` |
-| 2 | Google OAuth auth | Edge function | `supabase/functions/google-analytics-auth/index.ts` |
-| 3 | GA4 data sync | Edge function | `supabase/functions/ga-analytics-sync/index.ts` |
-| 4 | Cron registration | Migration + edit | `supabase/migrations/20260307200100_ga_analytics_cron.sql`, `cron-dispatcher/index.ts` |
-| 5 | API client + hooks | Frontend | `src/lib/api/google-analytics.ts`, 4 hooks |
-| 6 | Connection UI | Frontend | `Connections.tsx` edit, `GAPropertySelectionDialog.tsx` |
-| 7 | Demo data | Frontend | `demo-data.ts`, `DemoDataProvider.tsx` |
-| 8 | Content Journey page | Frontend | `src/pages/ContentJourney.tsx`, `App.tsx` |
-| 9 | UTM auto-tagging | Frontend | Post composer edit |
-| 10 | Documentation | Docs | `CLAUDE.md` |
+| # | Deliverable | Type | Test Layer | Files |
+|---|-------------|------|------------|-------|
+| 1 | GA4 contract tests | L1 Test | Contract | `scripts/ga4-contract-tests.cjs` |
+| 2 | RLS isolation tests | L2 Test | Integration | `src/tests/integration/google-analytics-rls.test.ts` |
+| 3 | Database schema | Migration | — | `supabase/migrations/20260307200000_google_analytics.sql` |
+| 4 | Smoke tests | L3 Test | Smoke | `src/tests/smoke/google-analytics.test.ts` |
+| 5 | Google OAuth auth | Edge function | — | `supabase/functions/google-analytics-auth/index.ts` |
+| 6 | GA4 data sync | Edge function | — | `supabase/functions/ga-analytics-sync/index.ts` |
+| 7 | Cron registration | Migration + edit | — | `supabase/migrations/20260307200100_ga_analytics_cron.sql` |
+| 8 | Unit tests | L4 Test | Unit | `src/test/google-analytics-hooks.test.ts` |
+| 9 | API client + hooks | Frontend | — | `src/lib/api/google-analytics.ts` + 4 hooks |
+| 10 | Demo data | Frontend | — | `demo-data.ts`, `DemoDataProvider.tsx` |
+| 11 | Connection UI | Frontend | — | `Connections.tsx`, `GAPropertySelectionDialog.tsx` |
+| 12 | Content Journey page | Frontend | — | `src/pages/ContentJourney.tsx`, `App.tsx` |
+| 13 | UTM auto-tagging | Frontend | — | Post composer edit |
+| 14 | Test manifest | Docs | — | `docs/test-manifest.json` |
+| 15 | Test report | Docs | — | `docs/test-reports/2026-03-07.md` |
+| 16 | Documentation | Docs | — | `CLAUDE.md` |
+
+## Task execution order (TDD flow)
+
+```
+Phase 0: L1 Contract → verify GA4 API shapes
+Phase 1: L2 Test (RED) → Migration (GREEN) → verify RLS
+Phase 2: L3 Test (RED) → Edge functions → Cron registration
+Phase 3: L4 Test (RED) → API client + Hooks (GREEN) → Demo data (GREEN remaining L3)
+Phase 4: Connection UI → Content Journey page → UTM tagging
+Phase 5: Test manifest → Test report → CLAUDE.md docs
+```
