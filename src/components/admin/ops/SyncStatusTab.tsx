@@ -1,7 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import { AllCommunityModule, type ColDef } from 'ag-grid-community';
+import { gridTheme, gridThemeDark } from '@/lib/ag-grid-theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Server, AlertTriangle, MessageSquare } from 'lucide-react';
 import { useAdminSyncStatus, type SyncStateEntry, type CronHealthLog } from '@/hooks/useAdminSyncStatus';
 import { useAdminCompanies } from '@/hooks/useAdminInboxData';
@@ -16,6 +19,11 @@ function getSyncHealthStatus(lastSynced: string | null): { label: string; color:
 }
 
 export function SyncStatusTab() {
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === 'dark-pro' || currentTheme === 'aurora';
+  const syncGridRef = useRef<AgGridReact>(null);
+  const execGridRef = useRef<AgGridReact>(null);
+
   const { syncStates, cronLogs, messageCount24h, isLoading } = useAdminSyncStatus();
   const { data: companies } = useAdminCompanies();
 
@@ -26,24 +34,85 @@ export function SyncStatusTab() {
   }, [companies]);
 
   // Group sync states by company
-  const companySync = useMemo(() => {
+  const companySyncRows = useMemo(() => {
     const map: Record<string, { comments?: SyncStateEntry; dms?: SyncStateEntry }> = {};
     for (const s of syncStates) {
       if (!map[s.company_id]) map[s.company_id] = {};
       if (s.sync_type === 'comments') map[s.company_id].comments = s;
       if (s.sync_type === 'dms') map[s.company_id].dms = s;
     }
-    return map;
-  }, [syncStates]);
 
-  const uniqueCompanies = Object.keys(companySync);
-  const companiesWithErrors = uniqueCompanies.filter(id => {
-    const s = companySync[id];
-    return getSyncHealthStatus(s.comments?.last_synced_at || null).label === 'Error' ||
-           getSyncHealthStatus(s.dms?.last_synced_at || null).label === 'Error';
-  });
+    return Object.entries(map).map(([companyId, s]) => {
+      const commentHealth = getSyncHealthStatus(s.comments?.last_synced_at || null);
+      const dmHealth = getSyncHealthStatus(s.dms?.last_synced_at || null);
+      const worstHealth = commentHealth.label === 'Error' || dmHealth.label === 'Error' ? 'Error'
+        : commentHealth.label === 'Stale' || dmHealth.label === 'Stale' ? 'Stale' : 'Healthy';
+      return {
+        companyId,
+        companyName: companyMap[companyId] || companyId.slice(0, 8),
+        commentsLastSynced: s.comments?.last_synced_at || null,
+        dmsLastSynced: s.dms?.last_synced_at || null,
+        status: worstHealth,
+      };
+    });
+  }, [syncStates, companyMap]);
 
+  const companiesWithErrors = companySyncRows.filter(r => r.status === 'Error');
   const lastGlobalSync = cronLogs[0]?.created_at;
+
+  // Column defs for per-company sync table
+  const syncColDefs = useMemo<ColDef[]>(() => [
+    { field: 'companyName', headerName: 'Company', flex: 1, minWidth: 150, filter: true },
+    {
+      field: 'commentsLastSynced', headerName: 'Comments Last Synced', width: 180,
+      cellRenderer: (p: any) => p.value ? formatDistanceToNow(new Date(p.value), { addSuffix: true }) : 'Never',
+    },
+    {
+      field: 'dmsLastSynced', headerName: 'DMs Last Synced', width: 180,
+      cellRenderer: (p: any) => p.value ? formatDistanceToNow(new Date(p.value), { addSuffix: true }) : 'Never',
+    },
+    {
+      field: 'status', headerName: 'Status', width: 120, filter: true,
+      cellRenderer: (p: any) => {
+        const variant = p.value === 'Healthy' ? 'default' : p.value === 'Stale' ? 'secondary' : 'destructive';
+        return <Badge variant={variant as any}>{p.value}</Badge>;
+      },
+    },
+  ], []);
+
+  // Column defs for recent sync executions
+  const execColDefs = useMemo<ColDef[]>(() => [
+    {
+      field: 'created_at', headerName: 'Time', width: 160,
+      cellRenderer: (p: any) => format(new Date(p.value), 'MMM d, HH:mm:ss'),
+    },
+    {
+      field: 'status', headerName: 'Status', width: 110, filter: true,
+      cellRenderer: (p: any) => {
+        const variant = p.value === 'success' ? 'default' : p.value === 'partial' ? 'secondary' : 'destructive';
+        return <Badge variant={variant as any}>{p.value}</Badge>;
+      },
+    },
+    {
+      field: 'duration_ms', headerName: 'Duration', width: 110, type: 'numericColumn',
+      cellRenderer: (p: any) => p.value != null ? `${p.value}ms` : '\u2014',
+    },
+    {
+      field: 'details', headerName: 'Details', flex: 1, minWidth: 200,
+      cellRenderer: (p: any) => {
+        const d = p.value as Record<string, unknown> | null;
+        if (!d) return '';
+        if (d.totalNew != null) return `${d.totalNew} new, ${d.totalErrors} errors`;
+        return JSON.stringify(d).slice(0, 100);
+      },
+    },
+  ], []);
+
+  const defaultColDef = useMemo<ColDef>(() => ({
+    sortable: true,
+    resizable: true,
+    cellStyle: { display: 'flex', alignItems: 'center' },
+  }), []);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8"><RefreshCw className="h-5 w-5 animate-spin" /></div>;
@@ -59,7 +128,7 @@ export function SyncStatusTab() {
               <Server className="h-4 w-4" /> Companies Syncing
             </CardTitle>
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{uniqueCompanies.length}</p></CardContent>
+          <CardContent><p className="text-2xl font-bold">{companySyncRows.length}</p></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
@@ -93,84 +162,42 @@ export function SyncStatusTab() {
         </Card>
       </div>
 
-      {/* Per-company sync table */}
+      {/* Per-company sync grid */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Per-Company Sync Status</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-base">Per-Company Sync Status</CardTitle></CardHeader>
         <CardContent>
           <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Comments Last Synced</TableHead>
-                  <TableHead>DMs Last Synced</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {uniqueCompanies.map(companyId => {
-                  const s = companySync[companyId];
-                  const commentHealth = getSyncHealthStatus(s.comments?.last_synced_at || null);
-                  const dmHealth = getSyncHealthStatus(s.dms?.last_synced_at || null);
-                  const worstHealth = commentHealth.label === 'Error' || dmHealth.label === 'Error' ? 'Error'
-                    : commentHealth.label === 'Stale' || dmHealth.label === 'Stale' ? 'Stale' : 'Healthy';
-                  const badgeVariant = worstHealth === 'Healthy' ? 'default' : worstHealth === 'Stale' ? 'secondary' : 'destructive';
-                  return (
-                    <TableRow key={companyId}>
-                      <TableCell className="font-medium">{companyMap[companyId] || companyId.slice(0, 8)}</TableCell>
-                      <TableCell>{s.comments?.last_synced_at ? formatDistanceToNow(new Date(s.comments.last_synced_at), { addSuffix: true }) : 'Never'}</TableCell>
-                      <TableCell>{s.dms?.last_synced_at ? formatDistanceToNow(new Date(s.dms.last_synced_at), { addSuffix: true }) : 'Never'}</TableCell>
-                      <TableCell><Badge variant={badgeVariant as any}>{worstHealth}</Badge></TableCell>
-                    </TableRow>
-                  );
-                })}
-                {uniqueCompanies.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No sync data yet</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <AgGridReact
+              ref={syncGridRef}
+              theme={isDark ? gridThemeDark : gridTheme}
+              modules={[AllCommunityModule]}
+              rowData={companySyncRows}
+              columnDefs={syncColDefs}
+              defaultColDef={defaultColDef}
+              domLayout="autoHeight"
+              suppressCellFocus
+              getRowId={(p) => p.data.companyId}
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Recent sync executions */}
+      {/* Recent sync executions grid */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Sync Executions</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-base">Recent Sync Executions</CardTitle></CardHeader>
         <CardContent>
           <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cronLogs.slice(0, 20).map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>{format(new Date(log.created_at), 'MMM d, HH:mm:ss')}</TableCell>
-                    <TableCell>
-                      <Badge variant={log.status === 'success' ? 'default' : log.status === 'partial' ? 'secondary' : 'destructive'}>
-                        {log.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{log.duration_ms}ms</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                      {(log.details as any)?.totalNew != null ? `${(log.details as any).totalNew} new, ${(log.details as any).totalErrors} errors` : JSON.stringify(log.details).slice(0, 100)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {cronLogs.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No sync executions yet</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <AgGridReact
+              ref={execGridRef}
+              theme={isDark ? gridThemeDark : gridTheme}
+              modules={[AllCommunityModule]}
+              rowData={cronLogs.slice(0, 50)}
+              columnDefs={execColDefs}
+              defaultColDef={defaultColDef}
+              domLayout="autoHeight"
+              suppressCellFocus
+              getRowId={(p) => p.data.id}
+            />
           </div>
         </CardContent>
       </Card>

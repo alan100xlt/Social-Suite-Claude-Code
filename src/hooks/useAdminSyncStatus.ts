@@ -97,6 +97,33 @@ export function useAdminApiHealth(functionFilter?: string, actionFilter?: string
   });
 }
 
+export function useAdminApiErrors24h() {
+  return useQuery({
+    queryKey: ['admin-api-errors-24h'],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('api_call_logs' as any)
+        .select('id, function_name, action, company_id, response_summary, created_at, duration_ms')
+        .eq('success', false)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data || []) as Array<{
+        id: string;
+        function_name: string;
+        action: string;
+        company_id: string;
+        response_summary: string;
+        created_at: string;
+        duration_ms: number | null;
+      }>;
+    },
+    refetchInterval: 60000,
+  });
+}
+
 export function useAdminApiHealthSummary() {
   return useQuery({
     queryKey: ['admin-api-health-summary'],

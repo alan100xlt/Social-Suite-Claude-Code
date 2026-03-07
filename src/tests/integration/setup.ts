@@ -23,6 +23,8 @@ if (!supabaseAnonKey) {
   );
 }
 
+export { supabaseUrl };
+
 // Service role client — bypasses RLS, used for setup/cleanup
 export const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { persistSession: false, autoRefreshToken: false },

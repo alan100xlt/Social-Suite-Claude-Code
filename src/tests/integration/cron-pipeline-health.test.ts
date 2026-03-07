@@ -14,10 +14,11 @@ import { adminClient } from "./setup";
 // How far back to look (in minutes)
 const LOOKBACK_MINUTES = {
   "rss-poll": 15,                    // runs every 5min, should have entry within 15min
-  "inbox-sync-every-5-min": 15,     // runs every 5min
+  "inbox-sync": 45,                  // runs every 15min, should have entry within 45min
   "analytics-sync": 120,            // runs hourly — allow 2h lookback
   "getlate-changelog-monitor": 1500, // runs daily at 9am — 25h lookback
   "cron-watchdog": 30,              // runs every 10min
+  "cron-escalation": 90,            // runs every 30min — allow 90min lookback
 };
 
 interface CronLog {
@@ -31,7 +32,7 @@ interface CronLog {
 }
 
 let allLogs: CronLog[] = [];
-let jobSettings: Array<{ job_name: string; schedule: string; enabled: boolean }> = [];
+let jobSettings: Array<{ job_name: string; schedule: string; enabled: boolean; job_type: string }> = [];
 
 beforeAll(async () => {
   // Fetch last 100 cron health logs
@@ -47,7 +48,7 @@ beforeAll(async () => {
   // Fetch cron job settings
   const { data: settings, error: settingsError } = await adminClient
     .from("cron_job_settings")
-    .select("job_name, schedule, enabled");
+    .select("job_name, schedule, enabled, job_type");
 
   if (settingsError) throw new Error(`Failed to query cron_job_settings: ${settingsError.message}`);
   jobSettings = (settings || []) as typeof jobSettings;
@@ -56,19 +57,33 @@ beforeAll(async () => {
 // ─── Cron Job Registration ────────────────────────────────────
 
 describe("Cron job registration", () => {
-  const expectedJobs = [
+  const expectedEnabled = [
     "rss-poll-every-5-min",
-    "inbox-sync-every-5-min",
+    "inbox-sync-every-15-min",
     "analytics-sync-hourly",
-    "getlate-changelog-monitor",
     "cron-watchdog",
+    "cron-health-logs-cleanup",
+    "inbox-resurface-snoozed",
   ];
 
-  for (const jobName of expectedJobs) {
+  // These exist but are intentionally disabled (missing secrets)
+  const expectedDisabled = [
+    "getlate-changelog-monitor",
+    "cron-escalation-every-30-min",
+  ];
+
+  for (const jobName of expectedEnabled) {
     test(`${jobName} is registered and enabled`, () => {
       const setting = jobSettings.find((s) => s.job_name === jobName);
       expect(setting, `Job "${jobName}" not found in cron_job_settings`).toBeDefined();
       expect(setting!.enabled, `Job "${jobName}" is disabled`).toBe(true);
+    });
+  }
+
+  for (const jobName of expectedDisabled) {
+    test(`${jobName} is registered (disabled — missing secrets)`, () => {
+      const setting = jobSettings.find((s) => s.job_name === jobName);
+      expect(setting, `Job "${jobName}" not found in cron_job_settings`).toBeDefined();
     });
   }
 });
@@ -76,10 +91,13 @@ describe("Cron job registration", () => {
 // ─── RSS Poll Health ──────────────────────────────────────────
 
 describe("rss-poll pipeline health", () => {
+  // rss-poll logs as "rss-poll-every-5-min" (CronMonitor uses the job_name from settings)
+  const isRssPoll = (name: string) => name === "rss-poll" || name.startsWith("rss-poll");
+
   test("has recent successful executions", () => {
     const cutoff = new Date(Date.now() - LOOKBACK_MINUTES["rss-poll"] * 60000).toISOString();
     const recentLogs = allLogs.filter(
-      (l) => l.job_name === "rss-poll" && l.started_at > cutoff
+      (l) => isRssPoll(l.job_name) && l.started_at > cutoff
     );
 
     expect(recentLogs.length, "rss-poll should have recent log entries").toBeGreaterThan(0);
@@ -90,7 +108,7 @@ describe("rss-poll pipeline health", () => {
 
   test("completes within reasonable time (<10s)", () => {
     const successes = allLogs.filter(
-      (l) => l.job_name === "rss-poll" && l.status === "success" && l.duration_ms != null
+      (l) => isRssPoll(l.job_name) && l.status === "success" && l.duration_ms != null
     );
 
     if (successes.length === 0) return; // skip if no data
@@ -99,7 +117,7 @@ describe("rss-poll pipeline health", () => {
   });
 
   test("has no stuck 'running' entries", () => {
-    const running = allLogs.filter((l) => l.job_name === "rss-poll" && l.status === "running");
+    const running = allLogs.filter((l) => isRssPoll(l.job_name) && l.status === "running");
     expect(running.length, "rss-poll should not have stuck running entries").toBe(0);
   });
 });
@@ -107,12 +125,12 @@ describe("rss-poll pipeline health", () => {
 // ─── Inbox Sync Health ────────────────────────────────────────
 
 describe("inbox-sync pipeline health", () => {
-  // inbox-sync logs appear as either "inbox-sync-every-5-min" (legacy) or "inbox-sync:<companyId>" (fan-out dispatcher)
-  const isInboxSync = (name: string) => name === "inbox-sync-every-5-min" || name.startsWith("inbox-sync:");
+  // inbox-sync logs appear as "inbox-sync:<companyId>" (fan-out dispatcher)
+  const isInboxSync = (name: string) => name.startsWith("inbox-sync");
 
   test("has recent log entries", () => {
     const cutoff = new Date(
-      Date.now() - LOOKBACK_MINUTES["inbox-sync-every-5-min"] * 60000
+      Date.now() - LOOKBACK_MINUTES["inbox-sync"] * 60000
     ).toISOString();
     const recentLogs = allLogs.filter(
       (l) => isInboxSync(l.job_name) && l.started_at > cutoff
@@ -202,19 +220,64 @@ describe("analytics-sync pipeline health", () => {
 });
 
 // ─── GetLate Changelog Monitor Health ─────────────────────────
+// DISABLED — missing SLACK_WEBHOOK_URL secret. Re-enable when secret is added.
 
 describe("getlate-changelog-monitor health", () => {
-  test("has at least one log entry (proves function is being invoked)", () => {
-    const monitorLogs = allLogs.filter(
-      (l) => l.job_name === "getlate-changelog-monitor"
+  test("is disabled (missing SLACK_WEBHOOK_URL secret)", () => {
+    const job = jobSettings.find((j) => j.job_name === "getlate-changelog-monitor");
+    expect(job, "getlate-changelog-monitor should exist in cron_job_settings").toBeDefined();
+    expect(job!.enabled, "getlate-changelog-monitor should be disabled until SLACK_WEBHOOK_URL is configured").toBe(false);
+  });
+});
+
+// ─── Cron Escalation Health ──────────────────────────────────
+// DISABLED — missing LINEAR_API_KEY secret. Re-enable when secret is added.
+
+describe("cron-escalation pipeline health", () => {
+  test("is disabled (missing LINEAR_API_KEY secret)", () => {
+    const job = jobSettings.find((j) => j.job_name === "cron-escalation-every-30-min");
+    expect(job, "cron-escalation should exist in cron_job_settings").toBeDefined();
+    expect(job!.enabled, "cron-escalation should be disabled until LINEAR_API_KEY is configured").toBe(false);
+  });
+});
+
+// ─── Dispatcher Routing Verification ────────────────────────
+
+describe("Dispatcher routing", () => {
+  test("all edge function jobs in cron_job_settings have job_type = edge_function", () => {
+    const edgeFnJobs = jobSettings.filter(
+      (j) => !["cron-watchdog", "cron-health-logs-cleanup", "inbox-resurface-snoozed"].includes(j.job_name)
     );
 
-    // This is expected to fail if ANTHROPIC_API_KEY or SLACK_WEBHOOK_URL aren't set
-    // because the function returns early before CronMonitor.start()
-    expect(
-      monitorLogs.length,
-      "getlate-changelog-monitor has 0 log entries — function may be returning early before monitor.start() due to missing env vars (ANTHROPIC_API_KEY, SLACK_WEBHOOK_URL)"
-    ).toBeGreaterThan(0);
+    for (const job of edgeFnJobs) {
+      expect(
+        (job as any).job_type,
+        `${job.job_name} should have job_type = 'edge_function'`
+      ).toBe("edge_function");
+    }
+  });
+
+  test("SQL-type jobs are correctly tagged", () => {
+    const sqlJobNames = ["cron-watchdog", "cron-health-logs-cleanup", "inbox-resurface-snoozed"];
+    for (const name of sqlJobNames) {
+      const job = jobSettings.find((j) => j.job_name === name);
+      if (!job) continue; // registration test catches missing jobs
+      expect(
+        (job as any).job_type,
+        `${name} should have job_type = 'sql'`
+      ).toBe("sql");
+    }
+  });
+
+  test("inbox-sync schedule is 15min (not 5min)", () => {
+    const inboxJob = jobSettings.find((j) => j.job_name === "inbox-sync-every-15-min");
+    expect(inboxJob, "inbox-sync-every-15-min should exist in cron_job_settings").toBeDefined();
+    expect(inboxJob!.schedule).toBe("*/15 * * * *");
+  });
+
+  test("no inbox-sync-every-5-min job exists (superseded by 15-min)", () => {
+    const oldJob = jobSettings.find((j) => j.job_name === "inbox-sync-every-5-min");
+    expect(oldJob, "inbox-sync-every-5-min should not exist — it was renamed to inbox-sync-every-15-min").toBeUndefined();
   });
 });
 

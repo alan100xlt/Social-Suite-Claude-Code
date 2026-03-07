@@ -22,5 +22,7 @@ describe("Cron job health", () => {
     expect(jobNames).toContain("analytics-sync-hourly");
     expect(jobNames).toContain("rss-poll-every-5-min");
     expect(jobNames).toContain("getlate-changelog-monitor");
+    expect(jobNames).toContain("inbox-sync-every-15-min");
+    expect(jobNames).toContain("cron-escalation-every-30-min");
   });
 });
