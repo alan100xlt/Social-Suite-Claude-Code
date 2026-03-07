@@ -1113,6 +1113,8 @@ export type Database = {
           company_id: string
           conversation_id: string | null
           created_at: string | null
+          entity_id: string | null
+          entity_type: string
           id: string
           metadata: Json | null
           user_id: string
@@ -1122,6 +1124,8 @@ export type Database = {
           company_id: string
           conversation_id?: string | null
           created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string
           id?: string
           metadata?: Json | null
           user_id: string
@@ -1131,6 +1135,8 @@ export type Database = {
           company_id?: string
           conversation_id?: string | null
           created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string
           id?: string
           metadata?: Json | null
           user_id?: string
@@ -2465,17 +2471,23 @@ export type Database = {
       }
       post_drafts: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          assigned_to: string | null
           company_id: string
           compose_phase: string | null
           created_at: string
           created_by: string
           current_step: number | null
+          due_at: string | null
           feed_item_id: string | null
           id: string
           image_url: string | null
           objective: string | null
           platform_contents: Json | null
           post_source: string | null
+          rejection_reason: string | null
+          reviewer_id: string | null
           selected_account_ids: string[] | null
           selected_article_id: string | null
           status: string
@@ -2485,17 +2497,23 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_to?: string | null
           company_id: string
           compose_phase?: string | null
           created_at?: string
           created_by: string
           current_step?: number | null
+          due_at?: string | null
           feed_item_id?: string | null
           id?: string
           image_url?: string | null
           objective?: string | null
           platform_contents?: Json | null
           post_source?: string | null
+          rejection_reason?: string | null
+          reviewer_id?: string | null
           selected_account_ids?: string[] | null
           selected_article_id?: string | null
           status?: string
@@ -2505,17 +2523,23 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_to?: string | null
           company_id?: string
           compose_phase?: string | null
           created_at?: string
           created_by?: string
           current_step?: number | null
+          due_at?: string | null
           feed_item_id?: string | null
           id?: string
           image_url?: string | null
           objective?: string | null
           platform_contents?: Json | null
           post_source?: string | null
+          rejection_reason?: string | null
+          reviewer_id?: string | null
           selected_account_ids?: string[] | null
           selected_article_id?: string | null
           status?: string
@@ -2965,6 +2989,20 @@ export type Database = {
       get_accessible_companies: {
         Args: { _user_id: string }
         Returns: string[]
+      }
+      get_cron_jobs: {
+        Args: never
+        Returns: {
+          active: boolean
+          command: string
+          database: string
+          jobid: number
+          jobname: string
+          nodename: string
+          nodeport: number
+          schedule: string
+          username: string
+        }[]
       }
       get_followers_by_date_platform: {
         Args: { _company_id: string; _end_date: string; _start_date: string }
