@@ -37,6 +37,15 @@ For new hooks that call Supabase, verify one of:
 - Check for missing required fields or wrong types in mock data
 - New columns added via migrations should be reflected in demo data
 
+### 5. Schema Shape Verification
+
+Go beyond checking that a fixture exists — verify its **content** contains required fields and realistic values.
+
+- **Required fields present**: For each fixture, check that every non-nullable column from the migration/types has a value. Don't just grep for `DEMO_CAMPAIGNS` — verify it contains `name`, `status`, `company_id`, etc.
+- **Realistic values**: Fixtures should have varied, plausible data — not all the same status, not placeholder strings like "test" or "foo"
+- **Enum coverage**: If a field has an enum type (e.g., status: draft/active/completed), fixtures should include at least 2 different values
+- **Relationship integrity**: Foreign keys in fixtures should reference other fixtures that exist (e.g., `campaign_posts` references valid `campaign.id` values from `DEMO_CAMPAIGNS`)
+
 ## Key Files
 
 - `src/lib/demo/demo-constants.ts` — `DEMO_COMPANY_ID`, `isDemoCompany()`

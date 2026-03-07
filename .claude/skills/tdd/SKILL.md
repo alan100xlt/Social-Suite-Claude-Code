@@ -41,10 +41,58 @@ Supplements the `test-driven-development` superpower (Red-Green-Refactor discipl
 
 Before deploying, verify all required layers pass. If a layer is missing, write the test BEFORE deploying.
 
+## Hard Rules
+
+### No Duplicated Logic Rule
+Tests MUST import production functions from source — never redefine, copy, or reimplement production logic in test files. If a test contains a function that also exists in `src/lib/` or `src/hooks/`, the test is **invalid** — it tests a frozen copy, not the real code.
+
+**Wrong:**
+```typescript
+// test file
+function computeThrottle(config, scheduledFor, posts) { /* reimplemented */ }
+it('works', () => expect(computeThrottle(...)).toBe(...));
+```
+
+**Right:**
+```typescript
+import { computeThrottle } from '@/lib/throttle';
+it('works', () => expect(computeThrottle(...)).toBe(...));
+```
+
+### Extract-Before-Test Gate
+If a React hook contains pure computation that you need to test, **extract the pure function into `src/lib/`** before writing any test. The hook becomes a thin wrapper that calls the extracted function. Both the hook and tests import from the same source.
+
+Pattern: `src/hooks/useX.ts` → extract pure logic → `src/lib/x.ts` → test imports from `src/lib/x.ts`
+
+### Content Assertions Over Existence Checks
+`fs.existsSync()` and `expect(file).toBeDefined()` prove nothing about correctness. Tests MUST verify file **content** — DDL keywords in migrations, import chains in hooks, table references in edge functions, required fields in demo data.
+
+**Wrong:**
+```typescript
+it('migration exists', () => expect(fs.existsSync(path)).toBe(true));
+```
+
+**Right:**
+```typescript
+const sql = fs.readFileSync(path, 'utf8');
+expect(sql).toContain('CREATE TABLE evergreen_queue');
+expect(sql).toContain('ROW LEVEL SECURITY');
+```
+
+### Schema Changes Require Integration Tests
+Any migration that adds tables or columns MUST have an L2 integration test that:
+1. Inserts a row with the new columns
+2. Reads it back and verifies the values
+3. Tests RLS isolation (two companies, cross-read blocked)
+
+Unit tests asserting DDL strings are necessary but not sufficient.
+
 ## Anti-Patterns (from real failures)
 
 | Anti-Pattern | What Happened | Rule |
 |---|---|---|
+| Duplicated logic in tests | Tests passed but production function had a different bug — test had its own copy of the logic | Import from source, never redefine |
+| File existence tests | 42 tests checked `fs.existsSync()` — all passed even when file content was wrong | Assert file content, not existence |
 | Mocked tests pass therefore it works | GetLate field names wrong in mocks; 100% unit pass, 0% production | Contract tests FIRST for external APIs |
 | I'll test after deploying | Cron rebuilt 4x, each silent-failed in prod | Write health-log assertion BEFORE deploying |
 | The watchdog will catch it | If function never starts, no health logs to watch | Test vault secret presence and URL construction |

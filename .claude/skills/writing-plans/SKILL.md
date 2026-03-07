@@ -179,6 +179,28 @@ Expected: output
 
 This prevents context bloat from compressing frontend fidelity. The engineer implementing the plan should ship and QA the UI, then start fresh for backend work.
 
+## Test Architecture Section (MANDATORY for every plan)
+
+Every plan MUST include a **Test Architecture** section after the tasks, specifying for each phase:
+
+```markdown
+## Test Architecture
+
+| Phase | Test Layer | What to Test | Pure Logic to Extract | Source Import |
+|-------|-----------|-------------|----------------------|--------------|
+| Phase 0 | L2 Integration | RLS isolation, column existence | N/A (migrations) | N/A |
+| Phase 1 | L4 Unit + L2 Integration | Permission merge logic, role defaults | `src/lib/permissions.ts` | `import { mergePermissions } from '@/lib/permissions'` |
+| Phase 3 | L4 Unit | Throttle window counting, boundary conditions | `src/lib/throttle.ts` | `import { computeThrottle } from '@/lib/throttle'` |
+```
+
+### Rules for This Section
+1. **Every phase that adds pure computation** must specify which `src/lib/` module to extract it into
+2. **Every test must specify its source import** — if you can't name the import, the test design is wrong
+3. **Never plan tests that reimplement production logic** — plan the extraction first, then the test
+4. **Schema changes always require L2 integration tests** — unit tests on DDL strings are necessary but not sufficient
+
+This section prevents the "write tests later" anti-pattern and the "tests that duplicate production code" anti-pattern.
+
 ## Remember
 - Exact file paths always
 - Complete code in plan (not "add validation")
@@ -187,6 +209,7 @@ This prevents context bloat from compressing frontend fidelity. The engineer imp
 - **Design Checklist before any UI task** (when mockup exists)
 - **Visual QA Gate as last task of every UI phase**
 - **Session boundary between UI and backend phases**
+- **Test Architecture section in every plan** (what to test, what to extract, what to import)
 
 ---
 
