@@ -127,10 +127,24 @@ export function ActivityTimeline() {
 
   const allItems = useMemo<TimelineItem[]>(() => {
     const items: TimelineItem[] = [];
+    const seenContent = new Set<string>();
 
+    // Content fingerprint for deduplication (first 80 chars, lowercased, trimmed)
+    const fingerprint = (text: string) => text.toLowerCase().trim().slice(0, 80);
+
+    const addIfUnique = (item: TimelineItem) => {
+      const fp = fingerprint(item.content);
+      if (fp && fp !== "scheduled post" && fp !== "untitled draft" && fp !== "post awaiting approval" && seenContent.has(fp)) {
+        return; // Skip duplicate content
+      }
+      if (fp) seenContent.add(fp);
+      items.push(item);
+    };
+
+    // Scheduled posts first (highest priority — kept over drafts with same content)
     for (const post of scheduledPosts || []) {
       if (post.scheduledFor) {
-        items.push({
+        addIfUnique({
           id: `sched-${post.id}`,
           rawId: post.id,
           type: "scheduled",
@@ -142,6 +156,7 @@ export function ActivityTimeline() {
       }
     }
 
+    // Approvals second
     for (const approval of pendingApprovals || []) {
       const contents = approval.platform_contents as Record<string, { content?: string; text?: string }> | Array<{ content?: string }>;
       let preview = "Post awaiting approval";
@@ -161,7 +176,7 @@ export function ActivityTimeline() {
             ) || preview;
         }
       }
-      items.push({
+      addIfUnique({
         id: `approval-${approval.id}`,
         rawId: approval.id,
         type: "approval",
@@ -172,8 +187,9 @@ export function ActivityTimeline() {
       });
     }
 
+    // Drafts last (lowest priority — skipped if same content already scheduled)
     for (const draft of (drafts || []).slice(0, 5)) {
-      items.push({
+      addIfUnique({
         id: `draft-${draft.id}`,
         rawId: draft.id,
         type: "draft",
