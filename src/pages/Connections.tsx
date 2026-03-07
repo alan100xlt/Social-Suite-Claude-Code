@@ -242,12 +242,16 @@ export default function ConnectionsPage() {
 
       {/* Metrics by Platform */}
       <div className="mt-8">
-        <h2 className="font-display font-semibold text-xl text-foreground mb-4">
+        <h2 className="font-display font-semibold text-xl text-foreground mb-1">
           Metrics by Platform
         </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Live engagement data for connected platforms. Connect more to unlock tracking.
+        </p>
         <PlatformMetricsMatrix
           mode="connections"
           connectedPlatforms={(accounts ?? []).map((a) => a.platform)}
+          onConnect={handleConnect}
         />
       </div>
 

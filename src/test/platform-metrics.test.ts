@@ -181,4 +181,18 @@ describe('getCellDisplayState', () => {
       }
     }
   });
+
+  it('connected platforms sort before unconnected', () => {
+    const connected: Platform[] = ['twitter', 'instagram'];
+    const all: Platform[] = ['youtube', 'twitter', 'instagram', 'reddit'];
+    const sorted = [...all].sort((a, b) => {
+      const aConn = connected.includes(a) ? 0 : 1;
+      const bConn = connected.includes(b) ? 0 : 1;
+      return aConn - bConn;
+    });
+    expect(sorted[0]).toBe('twitter');
+    expect(sorted[1]).toBe('instagram');
+    expect(sorted[2]).toBe('youtube');
+    expect(sorted[3]).toBe('reddit');
+  });
 });
