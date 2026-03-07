@@ -10,6 +10,7 @@ import {
 import { Send, StickyNote, Loader2, Paperclip, Image, X, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tip } from '@/components/ui/tooltip';
+import { useGlossary } from '@/components/inbox/GlossaryDialog';
 import type { InboxMessage } from '@/lib/api/inbox';
 
 interface MessageComposerProps {
@@ -39,6 +40,7 @@ export function MessageComposer({
   onTranslate,
   detectedLanguage,
 }: MessageComposerProps) {
+  const glossary = useGlossary();
   const [content, setContent] = useState('');
   const [isNoteMode, setIsNoteMode] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
@@ -150,7 +152,7 @@ export function MessageComposer({
         {/* Tool buttons — left of input */}
         <div className="flex gap-1 flex-shrink-0">
           {!isNoteMode && conversationType === 'dm' && (
-            <Tip label="Attach media URL">
+            <Tip label="Attach media URL" onLabelClick={() => glossary.open('DM')}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -163,7 +165,7 @@ export function MessageComposer({
           )}
 
           {onAddNote && (
-            <Tip label="Internal note (not visible to contact)">
+            <Tip label="Internal note (not visible to contact)" onLabelClick={() => glossary.open('Internal Note')}>
               <Button
                 variant={isNoteMode ? 'secondary' : 'ghost'}
                 size="icon"
@@ -176,7 +178,7 @@ export function MessageComposer({
           )}
 
           {onTranslate && content.trim() && (
-            <Tip label={`Translate to ${detectedLanguage || 'detected language'}`}>
+            <Tip label={`Translate to ${detectedLanguage || 'detected language'}`} onLabelClick={() => glossary.open('Translate')}>
               <Button
                 variant="ghost"
                 size="icon"

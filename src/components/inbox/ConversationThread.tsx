@@ -17,7 +17,13 @@ export function ConversationThread({ messages, isLoading, onReplyToMessage, conv
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = bottomRef.current;
+    if (!el) return;
+    // Scroll only the ScrollArea viewport, not the whole page
+    const viewport = el.closest('[data-radix-scroll-area-viewport]') as HTMLElement;
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+    }
   }, [messages.length]);
 
   if (isLoading) {
@@ -60,14 +66,14 @@ export function ConversationThread({ messages, isLoading, onReplyToMessage, conv
 
   return (
     <ScrollArea className="h-full">
-      <div className={cn('p-6 space-y-4', isCommentThread ? 'bg-muted/30' : 'bg-muted/20')}>
+      <div className={cn('px-7 py-6 space-y-4', isCommentThread ? 'bg-muted/30' : 'bg-muted/20')}>
         {/* Comment thread: post reference bar */}
         {isCommentThread && conversation?.post_url && (
           <a
             href={conversation.post_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 -mx-2 mb-2 rounded-lg bg-background border hover:bg-accent/50 transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 px-6 py-3 -mx-7 -mt-6 mb-4 bg-muted/60 border-b border-border-light hover:bg-muted transition-colors cursor-pointer"
           >
             <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
               <Paperclip className="h-4 w-4 text-muted-foreground" />
@@ -90,7 +96,7 @@ export function ConversationThread({ messages, isLoading, onReplyToMessage, conv
             {/* Date separator */}
             <div className="flex items-center gap-4 my-4">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap px-4 py-1.5 bg-background rounded-full border">
+              <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap px-4 py-1.5 bg-card rounded-full border border-border-light">
                 {format(new Date(group.date), 'MMMM d, yyyy')}
               </span>
               <div className="flex-1 h-px bg-border" />
@@ -127,7 +133,7 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
   if (isSystem) {
     return (
       <div className="flex justify-center">
-        <span className="text-xs text-muted-foreground bg-background px-3 py-1 rounded-full border">
+        <span className="text-xs text-muted-foreground bg-card px-3 py-1 rounded-full border">
           {message.content}
         </span>
       </div>
@@ -152,7 +158,7 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
   }
 
   return (
-    <div className={cn('group flex gap-3 max-w-[70%]', isOutbound && 'ml-auto flex-row-reverse')}>
+    <div className={cn('group flex gap-3 max-w-[70%] mb-1', isOutbound && 'ml-auto flex-row-reverse')}>
       {/* Avatar */}
       {!isOutbound && (
         <div className="h-[34px] w-[34px] rounded-full bg-gradient-to-br from-orange-100 to-orange-200 text-orange-800 flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5">
@@ -178,12 +184,12 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
 
         {/* Bubble */}
         <div className={cn(
-          'px-4 py-3 text-[13.5px] leading-relaxed break-words',
+          'px-[18px] py-3.5 text-[13.5px] leading-[1.65] break-words',
           isAgent
             ? 'bg-primary text-primary-foreground rounded-[18px_18px_4px_18px]'
             : isBot
               ? 'bg-violet-50 dark:bg-violet-500/10 border-[1.5px] border-dashed border-violet-300 dark:border-violet-500/30 rounded-[18px_18px_4px_18px] text-foreground'
-              : 'bg-background border rounded-[18px_18px_18px_4px]'
+              : 'bg-card border border-border rounded-[18px_18px_18px_4px]'
         )}>
           {isBot && (
             <div className="flex items-center gap-1 mb-1.5">
@@ -270,7 +276,7 @@ function CommentBubble({ message, onReply }: { message: InboxMessage; onReply?: 
 
       <div className="flex-1">
         <div className={cn(
-          'inline-block px-3.5 py-2.5 rounded-[18px] text-[13.5px] leading-relaxed max-w-full',
+          'inline-block px-3.5 py-2.5 rounded-[18px] text-[13.5px] leading-[1.55] max-w-full',
           isPageResponse
             ? 'bg-primary/5 border border-primary/20'
             : 'bg-muted'
@@ -279,7 +285,7 @@ function CommentBubble({ message, onReply }: { message: InboxMessage; onReply?: 
           {message.content ? linkifyText(message.content) : <em className="text-muted-foreground">No content</em>}
         </div>
 
-        <div className="flex items-center gap-3 px-3.5 mt-1 text-[11.5px] font-semibold text-muted-foreground">
+        <div className="flex items-center gap-3 px-3.5 mt-1 text-[11.5px] font-semibold text-muted-foreground/80">
           <button className="hover:underline hover:text-foreground transition-colors" onClick={() => {}}>Like</button>
           {onReply && (
             <button className="hover:underline hover:text-foreground transition-colors" onClick={() => onReply(message)}>Reply</button>

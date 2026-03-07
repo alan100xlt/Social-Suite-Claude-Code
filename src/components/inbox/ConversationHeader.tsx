@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { Tip } from '@/components/ui/tooltip';
+import { useGlossary } from '@/components/inbox/GlossaryDialog';
 import type { InboxConversation, InboxLabel, ConversationStatus } from '@/lib/api/inbox';
 
 interface ConversationHeaderProps {
@@ -52,6 +53,7 @@ export function ConversationHeader({
   labels = [],
 }: ConversationHeaderProps) {
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const glossary = useGlossary();
   const contactName = conversation.contact?.display_name || conversation.contact?.username || conversation.subject || 'Unknown';
   const initials = contactName.slice(0, 2).toUpperCase();
 
@@ -117,7 +119,7 @@ export function ConversationHeader({
       {/* Status actions */}
       <div className="flex items-center gap-1">
         {conversation.status === 'open' && (
-          <Tip label="Mark this conversation as resolved">
+          <Tip label="Mark this conversation as resolved" onLabelClick={() => glossary.open('Resolve')}>
             <Button
               size="sm"
               className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -129,7 +131,7 @@ export function ConversationHeader({
           </Tip>
         )}
         {conversation.status === 'resolved' && (
-          <Tip label="Reopen this conversation">
+          <Tip label="Reopen this conversation" onLabelClick={() => glossary.open('Reopen')}>
             <Button
               variant="outline"
               size="sm"
@@ -143,7 +145,7 @@ export function ConversationHeader({
         )}
 
         {conversation.post_url && (
-          <Tip label="View on platform">
+          <Tip label="View on platform" onLabelClick={() => glossary.open('View on Platform')}>
             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
               <a href={conversation.post_url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4" />

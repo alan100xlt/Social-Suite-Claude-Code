@@ -41,6 +41,16 @@ Deno.serve(async (req) => {
 
     const profileId = company?.getlate_profile_id;
 
+    // Input validation for write actions
+    const requireParam = (name: string, value: unknown) => {
+      if (value === undefined || value === null || value === '') {
+        throw new Response(JSON.stringify({ success: false, error: `Missing required parameter: ${name}` }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    };
+
     let result: unknown;
 
     switch (action) {
@@ -54,15 +64,21 @@ Deno.serve(async (req) => {
         result = await getMessages(supabase, companyId, params.conversationId, params);
         break;
       case 'reply-comment':
+        requireParam('conversationId', params.conversationId);
+        requireParam('content', params.content);
         result = await replyToComment(supabase, companyId, profileId, getlateApiKey, params);
         break;
       case 'reply-dm':
+        requireParam('conversationId', params.conversationId);
+        requireParam('content', params.content);
         result = await replyToDM(supabase, companyId, profileId, getlateApiKey, params);
         break;
       case 'like-comment':
         result = await likeComment(profileId, getlateApiKey, params);
         break;
       case 'update-status':
+        requireParam('conversationId', params.conversationId);
+        requireParam('status', params.status);
         result = await updateConversationStatus(supabase, companyId, params.conversationId, params.status);
         break;
       case 'assign':
@@ -78,6 +94,8 @@ Deno.serve(async (req) => {
         result = await removeLabel(supabase, companyId, params.conversationId, params.labelId);
         break;
       case 'add-note':
+        requireParam('conversationId', params.conversationId);
+        requireParam('content', params.content);
         result = await addInternalNote(supabase, companyId, params.conversationId, auth.userId, params.content);
         break;
       case 'search':
@@ -87,6 +105,7 @@ Deno.serve(async (req) => {
         result = await listLabels(supabase, companyId);
         break;
       case 'create-label':
+        requireParam('name', params.name);
         result = await createLabel(supabase, companyId, params.name, params.color);
         break;
       case 'list-canned-replies':
@@ -102,6 +121,12 @@ Deno.serve(async (req) => {
         result = await deleteCannedReply(supabase, companyId, params.id);
         break;
       case 'bulk-update-status':
+        requireParam('status', params.status);
+        if (!Array.isArray(params.conversationIds) || params.conversationIds.length === 0) {
+          throw new Response(JSON.stringify({ success: false, error: 'conversationIds must be a non-empty array' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         result = await bulkUpdateStatus(supabase, companyId, params.conversationIds, params.status);
         break;
       case 'list-auto-rules':

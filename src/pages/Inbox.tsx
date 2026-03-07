@@ -25,6 +25,7 @@ import { FaFacebook, FaInstagram, FaTwitter, FaLinkedin, FaTiktok, FaYoutube } f
 import { SiBluesky, SiThreads } from 'react-icons/si';
 import { cn } from '@/lib/utils';
 import { Tip } from '@/components/ui/tooltip';
+import { GlossaryProvider, useGlossary } from '@/components/inbox/GlossaryDialog';
 import {
   useInboxConversations,
   useUpdateConversationStatus,
@@ -57,7 +58,7 @@ export default function InboxPage() {
   const { isDemo } = useDemo();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const [drawerTab, setDrawerTab] = useState<'contact' | 'post'>('contact');
   const [showCannedPicker, setShowCannedPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
@@ -276,6 +277,7 @@ export default function InboxPage() {
   }, [selectedIds, addLabel]);
 
   return (
+    <GlossaryProvider>
     <DashboardLayout noPadding>
       <div className="flex flex-col flex-1 min-h-0">
         {/* === TOPBAR === */}
@@ -286,15 +288,7 @@ export default function InboxPage() {
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">
               {totalCount} conversations
             </span>
-            <Tip label="Real-time sync with connected platforms">
-              <div className="flex items-center gap-1.5 ml-auto text-xs font-semibold text-emerald-600 cursor-help">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                Syncing
-              </div>
-            </Tip>
+            <SyncingIndicator />
           </div>
 
           {/* Row 2: Filters + drawer toggle */}
@@ -401,7 +395,7 @@ export default function InboxPage() {
         {/* === MAIN GRID === */}
         <div
           className={cn(
-            'flex-1 grid gap-3.5 p-3.5 min-h-0 transition-all',
+            'flex-1 grid gap-3.5 p-3.5 min-h-0 overflow-hidden transition-all',
             drawerOpen
               ? 'grid-cols-[480px_1fr_340px]'
               : 'grid-cols-[480px_1fr]'
@@ -525,20 +519,22 @@ export default function InboxPage() {
           </div>
 
           {/* === THREAD PANEL (center) === */}
-          <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0">
+          <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0 max-h-full">
             {selectedConversation ? (
               <>
-                <ConversationHeader
-                  conversation={selectedConversation}
-                  onStatusChange={handleStatusChange}
-                  onAssign={handleAssign}
-                  onAddLabel={handleAddLabel}
-                  onRemoveLabel={handleRemoveLabel}
-                  onSnooze={handleSnooze}
-                  labels={labels}
-                />
+                <div className="flex-shrink-0">
+                  <ConversationHeader
+                    conversation={selectedConversation}
+                    onStatusChange={handleStatusChange}
+                    onAssign={handleAssign}
+                    onAddLabel={handleAddLabel}
+                    onRemoveLabel={handleRemoveLabel}
+                    onSnooze={handleSnooze}
+                    labels={labels}
+                  />
+                </div>
 
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <ConversationThread
                     messages={messages}
                     isLoading={messagesLoading}
@@ -547,12 +543,14 @@ export default function InboxPage() {
                   />
                 </div>
 
-                <AISuggestionsPanel
-                  conversation={selectedConversation}
-                  onInsertReply={handleInsertReply}
-                />
+                <div className="flex-shrink-0">
+                  <AISuggestionsPanel
+                    conversation={selectedConversation}
+                    onInsertReply={handleInsertReply}
+                  />
+                </div>
 
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <CannedReplyPicker
                     open={showCannedPicker}
                     onClose={() => setShowCannedPicker(false)}
@@ -592,52 +590,84 @@ export default function InboxPage() {
           </div>
 
           {/* === DRAWER PANEL (right, conditional) === */}
-          {drawerOpen && selectedConversation && (
+          {drawerOpen && (
             <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0">
-              {/* Drawer tabs */}
-              <div className="flex border-b">
-                <button
-                  onClick={() => setDrawerTab('contact')}
-                  className={cn(
-                    'flex-1 py-3 text-center text-[12.5px] font-semibold border-b-[2.5px] transition-colors',
-                    drawerTab === 'contact'
-                      ? 'text-primary border-primary'
-                      : 'text-muted-foreground border-transparent hover:text-foreground/70'
-                  )}
-                >
-                  Contact
-                </button>
-                <button
-                  onClick={() => setDrawerTab('post')}
-                  className={cn(
-                    'flex-1 py-3 text-center text-[12.5px] font-semibold border-b-[2.5px] transition-colors',
-                    drawerTab === 'post'
-                      ? 'text-primary border-primary'
-                      : 'text-muted-foreground border-transparent hover:text-foreground/70'
-                  )}
-                >
-                  Social Post
-                </button>
-              </div>
+              {selectedConversation ? (
+                <>
+                  {/* Drawer tabs */}
+                  <div className="flex border-b">
+                    <button
+                      onClick={() => setDrawerTab('contact')}
+                      className={cn(
+                        'flex-1 py-3 text-center text-[12.5px] font-semibold border-b-[2.5px] transition-colors',
+                        drawerTab === 'contact'
+                          ? 'text-primary border-primary'
+                          : 'text-muted-foreground border-transparent hover:text-foreground/70'
+                      )}
+                    >
+                      Contact
+                    </button>
+                    <button
+                      onClick={() => setDrawerTab('post')}
+                      className={cn(
+                        'flex-1 py-3 text-center text-[12.5px] font-semibold border-b-[2.5px] transition-colors',
+                        drawerTab === 'post'
+                          ? 'text-primary border-primary'
+                          : 'text-muted-foreground border-transparent hover:text-foreground/70'
+                      )}
+                    >
+                      Social Post
+                    </button>
+                  </div>
 
-              <div className="flex-1 overflow-y-auto">
-                {drawerTab === 'contact' ? (
-                  <ContactDetailPanel
-                    conversation={selectedConversation}
-                    labels={labels}
-                    onAssign={handleAssign}
-                    onAddLabel={handleAddLabel}
-                    onRemoveLabel={handleRemoveLabel}
-                  />
-                ) : (
-                  <SocialPostTab conversation={selectedConversation} />
-                )}
-              </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {drawerTab === 'contact' ? (
+                      <ContactDetailPanel
+                        conversation={selectedConversation}
+                        labels={labels}
+                        onAssign={handleAssign}
+                        onAddLabel={handleAddLabel}
+                        onRemoveLabel={handleRemoveLabel}
+                      />
+                    ) : (
+                      <SocialPostTab conversation={selectedConversation} />
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-3">
+                    <PanelRight className="h-5 w-5 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">No conversation selected</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1 max-w-[200px]">
+                    Select a conversation to view contact details and post info
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
     </DashboardLayout>
+    </GlossaryProvider>
+  );
+}
+
+// ─── Syncing Indicator (needs GlossaryProvider context) ───────
+
+function SyncingIndicator() {
+  const glossary = useGlossary();
+  return (
+    <Tip label="Real-time sync with connected platforms" onLabelClick={() => glossary.open('Syncing')}>
+      <div className="flex items-center gap-1.5 ml-auto text-xs font-semibold text-emerald-600 cursor-help">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+        </span>
+        Syncing
+      </div>
+    </Tip>
   );
 }
 

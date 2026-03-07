@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles, Brain, FileText, Tag, X } from 'lucide-react';
+import { Loader2, Sparkles, FileText, RotateCcw, X } from 'lucide-react';
 import { ClassificationBadge } from './ClassificationBadge';
 import { SignalScoreBadge } from './SignalScoreBadge';
-import { SentimentBadge } from './SentimentBadge';
-import { useAnalyzeSentiment, useSuggestReplyV2, useSummarizeThread, useClassifyConversation, useTranslateMessage } from '@/hooks/useInboxAI';
+import { useSuggestReplyV2, useSummarizeThread } from '@/hooks/useInboxAI';
 import type { InboxConversation } from '@/lib/api/inbox';
 
 interface AISuggestionsPanelProps {
@@ -14,11 +12,8 @@ interface AISuggestionsPanelProps {
 }
 
 export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestionsPanelProps) {
-  const analyzeSentiment = useAnalyzeSentiment();
   const suggestReplyV2 = useSuggestReplyV2();
   const summarizeThread = useSummarizeThread();
-  const classifyConversation = useClassifyConversation();
-  const translateMessage = useTranslateMessage();
 
   const [replyData, setReplyData] = useState<{
     recommended: { content: string; label: string; reasoning: string };
@@ -27,36 +22,67 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
     fused_from_canned: boolean;
   } | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
-  const [sentimentResult, setSentimentResult] = useState<{ sentiment: string; confidence: number; topics: string[] } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [activeAltIndex, setActiveAltIndex] = useState<number | null>(null);
+  const lastRequestedId = useRef<string | null>(null);
 
-  // Reset AI state when conversation changes
+  // Auto-generate reply suggestion when conversation changes
   useEffect(() => {
     setReplyData(null);
     setSummary(null);
-    setSentimentResult(null);
+    setActiveAltIndex(null);
+    lastRequestedId.current = conversation.id;
+
+    // Auto-fire reply suggestion
+    suggestReplyV2.mutateAsync(conversation.id)
+      .then((result) => {
+        // Only apply if we're still on the same conversation
+        if (lastRequestedId.current !== conversation.id) return;
+        setReplyData(result);
+        // Auto-fill the composer with the recommended reply
+        if (result.recommended?.content) {
+          onInsertReply(result.recommended.content);
+        }
+      })
+      .catch(() => {
+        // Silently fail — user can still type manually
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id]);
 
-  const handleAnalyze = async () => {
-    const result = await analyzeSentiment.mutateAsync(conversation.id);
-    setSentimentResult(result.analysis);
-  };
-
-  const handleSuggest = async () => {
-    const result = await suggestReplyV2.mutateAsync(conversation.id);
-    setReplyData(result);
+  const handleRegenerate = async () => {
+    setReplyData(null);
+    setActiveAltIndex(null);
+    try {
+      const result = await suggestReplyV2.mutateAsync(conversation.id);
+      setReplyData(result);
+      if (result.recommended?.content) {
+        onInsertReply(result.recommended.content);
+      }
+    } catch {
+      // silently fail
+    }
   };
 
   const handleSummarize = async () => {
-    const result = await summarizeThread.mutateAsync(conversation.id);
-    setSummary(result.summary);
+    try {
+      const result = await summarizeThread.mutateAsync(conversation.id);
+      setSummary(result.summary);
+    } catch {
+      // silently fail
+    }
   };
 
-  const handleClassify = async () => {
-    await classifyConversation.mutateAsync(conversation.id);
+  const handleSelectAlternative = (content: string, index: number) => {
+    setActiveAltIndex(index);
+    onInsertReply(content);
   };
 
-  const isLoading = analyzeSentiment.isPending || suggestReplyV2.isPending || summarizeThread.isPending || classifyConversation.isPending || translateMessage.isPending;
+  const handleSelectRecommended = () => {
+    if (!replyData?.recommended?.content) return;
+    setActiveAltIndex(null);
+    onInsertReply(replyData.recommended.content);
+  };
 
   if (collapsed) {
     return (
@@ -70,15 +96,15 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
   }
 
   return (
-    <div className="border-b bg-gradient-to-r from-violet-50/50 to-violet-50/30 dark:from-violet-500/5 dark:to-transparent">
+    <div className="border-t border-b border-violet-200 dark:border-violet-500/20 bg-gradient-to-r from-violet-50/50 to-violet-50/30 dark:from-violet-500/5 dark:to-transparent">
       {/* Header row */}
-      <div className="flex items-center gap-2 px-4 pt-2.5 pb-1.5">
+      <div className="flex items-center gap-2 px-6 pt-3 pb-2">
         <Sparkles className="h-3.5 w-3.5 text-violet-600" />
-        <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600">AI Assistant</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600">AI Draft</span>
 
         {/* Classification display */}
         {conversation.message_type && (
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 ml-1">
             <ClassificationBadge category={conversation.message_type} />
             <SignalScoreBadge score={conversation.editorial_value} />
             {conversation.detected_language && conversation.detected_language !== 'en' && (
@@ -89,109 +115,88 @@ export function AISuggestionsPanel({ conversation, onInsertReply }: AISuggestion
           </div>
         )}
 
-        <button
-          onClick={() => setCollapsed(true)}
-          className="ml-auto text-violet-400 hover:text-violet-600 transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          {/* Summarize (optional) */}
+          <button
+            onClick={handleSummarize}
+            disabled={summarizeThread.isPending}
+            className="text-[10px] font-semibold text-violet-500 hover:text-violet-700 transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-violet-100/50 dark:hover:bg-violet-500/10 disabled:opacity-50"
+          >
+            {summarizeThread.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+            Summarize
+          </button>
+
+          {/* Regenerate */}
+          <button
+            onClick={handleRegenerate}
+            disabled={suggestReplyV2.isPending}
+            className="text-[10px] font-semibold text-violet-500 hover:text-violet-700 transition-colors flex items-center gap-1 px-2 py-1 rounded hover:bg-violet-100/50 dark:hover:bg-violet-500/10 disabled:opacity-50"
+          >
+            {suggestReplyV2.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+            Regenerate
+          </button>
+
+          <button
+            onClick={() => setCollapsed(true)}
+            className="text-violet-400 hover:text-violet-600 transition-colors p-1"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-1 px-4 pb-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={handleClassify}
-          disabled={isLoading}
-        >
-          {classifyConversation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Tag className="h-3 w-3" />}
-          Classify
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={handleAnalyze}
-          disabled={isLoading}
-        >
-          {analyzeSentiment.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Brain className="h-3 w-3" />}
-          Analyze
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={handleSuggest}
-          disabled={isLoading}
-        >
-          {suggestReplyV2.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          Suggest
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-[10px] gap-1 px-2"
-          onClick={handleSummarize}
-          disabled={isLoading}
-        >
-          {summarizeThread.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
-          Summarize
-        </Button>
-      </div>
-
-      {/* Sentiment result */}
-      {sentimentResult && (
-        <div className="flex items-center gap-2 px-4 pb-2">
-          <SentimentBadge sentiment={sentimentResult.sentiment as any} />
-          <span className="text-[10px] text-muted-foreground">
-            {Math.round(sentimentResult.confidence * 100)}% confidence
-          </span>
-          {sentimentResult.topics?.map((topic, i) => (
-            <Badge key={i} variant="outline" className="text-[10px] px-1.5">
-              {topic}
-            </Badge>
-          ))}
+      {/* Loading state */}
+      {suggestReplyV2.isPending && !replyData && (
+        <div className="flex items-center gap-2 px-6 pb-3 text-[11px] text-violet-600">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span className="font-medium">Drafting a reply...</span>
         </div>
       )}
 
       {/* Summary */}
       {summary && (
-        <div className="mx-4 mb-2 text-xs text-muted-foreground bg-background/80 rounded-md p-2 border">
+        <div className="mx-6 mb-2 text-xs text-muted-foreground bg-background/80 rounded-md p-2.5 border">
           {summary}
         </div>
       )}
 
-      {/* Suggested replies (V2 format) */}
-      {replyData?.recommended?.content && (
-        <div className="px-4 pb-2.5">
-          <div className="p-3 rounded-lg bg-background border border-violet-200 dark:border-violet-500/20 border-l-[3px] border-l-violet-500 mb-1.5">
-            <p className="text-[13px] leading-relaxed">{replyData.recommended.content}</p>
-            {replyData.recommended.reasoning && (
-              <p className="text-[10px] text-muted-foreground mt-1 italic">{replyData.recommended.reasoning}</p>
-            )}
-          </div>
-          {replyData.fused_from_canned && (
-            <p className="text-[10px] text-violet-500 mb-1.5 px-0.5">Adapted from canned reply</p>
-          )}
-          <div className="flex gap-1.5 flex-wrap">
+      {/* Alternative tone chips — shown once reply is generated */}
+      {replyData && replyData.alternatives.length > 0 && (
+        <div className="flex items-center gap-1.5 px-6 pb-2.5 flex-wrap">
+          <span className="text-[10px] text-muted-foreground mr-0.5">Tone:</span>
+          <button
+            onClick={handleSelectRecommended}
+            className={`px-2.5 py-1 rounded-full text-[10.5px] font-semibold transition-colors ${
+              activeAltIndex === null
+                ? 'bg-violet-600 text-white'
+                : 'border border-violet-200 dark:border-violet-500/30 text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-500/10'
+            }`}
+          >
+            {replyData.recommended.label}
+          </button>
+          {replyData.alternatives.map((alt, i) => (
             <button
-              onClick={() => onInsertReply(replyData.recommended.content)}
-              className="px-3 py-1.5 rounded-full bg-violet-600 text-white text-[11.5px] font-semibold hover:bg-violet-700 transition-colors flex items-center gap-1.5"
+              key={i}
+              onClick={() => handleSelectAlternative(alt.content, i)}
+              className={`px-2.5 py-1 rounded-full text-[10.5px] font-semibold transition-colors ${
+                activeAltIndex === i
+                  ? 'bg-violet-600 text-white'
+                  : 'border border-violet-200 dark:border-violet-500/30 text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-500/10'
+              }`}
             >
-              Use: {replyData.recommended.label}
+              {alt.label}
             </button>
-            {replyData.alternatives.map((alt, i) => (
-              <button
-                key={i}
-                onClick={() => onInsertReply(alt.content)}
-                className="px-3 py-1.5 rounded-full border border-violet-200 dark:border-violet-500/30 text-violet-600 text-[11.5px] font-semibold hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors"
-              >
-                {alt.label}
-              </button>
-            ))}
-          </div>
+          ))}
+          {replyData.fused_from_canned && (
+            <span className="text-[10px] text-violet-400 ml-1">from canned reply</span>
+          )}
+        </div>
+      )}
+
+      {/* Reasoning (subtle) */}
+      {replyData?.recommended?.reasoning && (
+        <div className="px-6 pb-2.5">
+          <p className="text-[10px] text-muted-foreground italic">{replyData.recommended.reasoning}</p>
         </div>
       )}
     </div>

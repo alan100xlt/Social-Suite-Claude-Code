@@ -8,6 +8,7 @@ import { FaInstagram, FaTwitter, FaFacebook, FaLinkedin, FaTiktok, FaYoutube } f
 import { SiBluesky, SiThreads } from 'react-icons/si';
 import { format, isToday, isYesterday } from 'date-fns';
 import { Tip } from '@/components/ui/tooltip';
+import { useGlossary } from '@/components/inbox/GlossaryDialog';
 import type { InboxConversation, ConversationType, Sentiment } from '@/lib/api/inbox';
 
 const platformIcons: Record<string, React.ElementType> = {
@@ -108,6 +109,7 @@ export function ConversationList({
   onToggleFlag,
 }: ConversationListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const glossary = useGlossary();
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!conversations.length) return;
@@ -254,7 +256,7 @@ export function ConversationList({
                 {/* Chips row */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {categoryLabel && conv.message_type && (
-                    <Tip label={`AI-classified category: ${categoryLabel}`}>
+                    <Tip label={`AI-classified category: ${categoryLabel}`} onLabelClick={() => glossary.open('Category')}>
                       <span className={cn(
                         'text-[11px] font-semibold px-2.5 py-0.5 rounded-full cursor-help',
                         categoryChipStyles[conv.message_type] || categoryChipStyles.general
@@ -265,7 +267,7 @@ export function ConversationList({
                   )}
 
                   {sentimentLabel && conv.sentiment && (
-                    <Tip label={`AI-detected sentiment: ${sentimentLabel}`}>
+                    <Tip label={`AI-detected sentiment: ${sentimentLabel}`} onLabelClick={() => glossary.open('Sentiment')}>
                       <span className={cn(
                         'text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 cursor-help',
                         sentimentChipStyles[conv.sentiment] || sentimentChipStyles.neutral
@@ -278,7 +280,7 @@ export function ConversationList({
 
                   {/* Signal score star */}
                   {conv.editorial_value && conv.editorial_value >= 3 && (
-                    <Tip label={`Editorial value: ${conv.editorial_value}/5 — AI-scored relevance for your brand`}>
+                    <Tip label={`Editorial value: ${conv.editorial_value}/5 — AI-scored relevance for your brand`} onLabelClick={() => glossary.open('Editorial Value')}>
                       <span className={cn(
                         'text-[11px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 cursor-help',
                         conv.editorial_value >= 4
@@ -294,7 +296,7 @@ export function ConversationList({
 
                   {/* Message count */}
                   {(conv.message_count || 0) > 0 && (
-                    <Tip label={`${conv.message_count} message${conv.message_count !== 1 ? 's' : ''} in thread`}>
+                    <Tip label={`${conv.message_count} message${conv.message_count !== 1 ? 's' : ''} in thread`} onLabelClick={() => glossary.open('Message Count')}>
                       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground cursor-help">
                         <MessageSquare className="h-3.5 w-3.5 opacity-50" />
                         {conv.message_count}

@@ -60,14 +60,21 @@ export function ContactDetailPanel({
   const availableLabels = labels.filter(l => !attachedLabelIds.has(l.id));
 
   return (
-    <div className="p-4 space-y-5">
+    <div className="p-5 space-y-5">
       {/* Contact info */}
       <div className="flex flex-col items-center text-center">
-        <Avatar className="h-14 w-14 mb-2">
-          <AvatarImage src={contact?.avatar_url || undefined} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
-        <h3 className="text-sm font-semibold">{contactName}</h3>
+        <div className="relative mb-2">
+          <Avatar className="h-14 w-14">
+            <AvatarImage src={contact?.avatar_url || undefined} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+          {conversation.sentiment && conversation.sentiment !== 'neutral' && (
+            <span className="absolute -bottom-1 -right-1 text-base leading-none" title={conversation.sentiment}>
+              {conversation.sentiment === 'negative' ? '😠' : '😊'}
+            </span>
+          )}
+        </div>
+        <h3 className="text-[15px] font-bold">{contactName}</h3>
         {contact?.username && (
           <p className="text-xs text-muted-foreground">@{contact.username}</p>
         )}
@@ -86,14 +93,14 @@ export function ContactDetailPanel({
 
       {/* Conversation details */}
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Details</h4>
+        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em]">Details</h4>
 
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 text-[11.5px]">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" /> Status
             </span>
-            <Badge variant="outline" className="capitalize text-xs">{conversation.status}</Badge>
+            <Badge variant="outline" className="capitalize text-[10px]">{conversation.status}</Badge>
           </div>
 
           <div className="flex items-center justify-between">
@@ -132,7 +139,7 @@ export function ContactDetailPanel({
         <>
           <Separator />
           <div className="space-y-3">
-            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em] flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 text-violet-500" /> AI Analysis
             </h4>
 
@@ -217,7 +224,7 @@ export function ContactDetailPanel({
 
       {/* Assignment */}
       <div className="space-y-2">
-        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em] flex items-center gap-1.5">
           <UserPlus className="h-3.5 w-3.5" /> Assignment
         </h4>
         <div className="text-sm text-muted-foreground">
@@ -243,7 +250,7 @@ export function ContactDetailPanel({
 
       {/* Labels */}
       <div className="space-y-2">
-        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em] flex items-center gap-1.5">
           <Tag className="h-3.5 w-3.5" /> Labels
         </h4>
 
@@ -289,18 +296,38 @@ export function ContactDetailPanel({
         )}
       </div>
 
-      {/* External link */}
-      {conversation.post_url && (
-        <>
-          <Separator />
-          <Button variant="outline" size="sm" className="w-full text-xs gap-1.5" asChild>
-            <a href={conversation.post_url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5" />
-              View original post
-            </a>
-          </Button>
-        </>
-      )}
+      {/* Quick Actions */}
+      <Separator />
+      <div className="space-y-2">
+        <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em]">Quick Actions</h4>
+        <div className="space-y-1.5">
+          {conversation.status === 'open' && onAssign && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-between text-xs h-9"
+              onClick={() => onAssign(conversation.assigned_to ? null : 'me')}
+            >
+              <span className="flex items-center gap-2">
+                <UserPlus className="h-3.5 w-3.5" />
+                {conversation.assigned_to ? 'Unassign' : 'Assign to me'}
+              </span>
+              <kbd className="text-[9px] font-mono bg-muted px-1.5 py-0.5 rounded">A</kbd>
+            </Button>
+          )}
+          {conversation.post_url && (
+            <Button variant="outline" size="sm" className="w-full justify-between text-xs h-9" asChild>
+              <a href={conversation.post_url} target="_blank" rel="noopener noreferrer">
+                <span className="flex items-center gap-2">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View on {conversation.platform.charAt(0).toUpperCase() + conversation.platform.slice(1)}
+                </span>
+                <kbd className="text-[9px] font-mono bg-muted px-1.5 py-0.5 rounded">O</kbd>
+              </a>
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
