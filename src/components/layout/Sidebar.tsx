@@ -6,7 +6,6 @@ import {
   Link2,
   PenSquare,
   BarChart3,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -17,7 +16,6 @@ import {
   Settings,
   ScrollText,
   Plus,
-  Zap,
   ClipboardList,
   Wrench,
   Building2,
@@ -25,7 +23,7 @@ import {
   Users,
   Shield,
   Inbox,
-  Monitor,
+  Database,
 } from "lucide-react";
 import { FaInstagram, FaTwitter, FaTiktok, FaLinkedin, FaFacebook, FaYoutube } from "react-icons/fa";
 import { SiBluesky, SiThreads } from "react-icons/si";
@@ -52,15 +50,9 @@ const mainNavigation: NavItem[] = [
   { name: "Inbox", href: "/app/inbox", icon: Inbox },
   { name: "Content", href: "/app/content", icon: Newspaper },
   { name: "Content Sources", href: "/app/content/sources", icon: Rss },
+  { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
   { name: "Connections", href: "/app/connections", icon: Link2 },
   { name: "Settings", href: "/app/settings", icon: Settings },
-];
-
-const analyticsChildren: NavItem[] = [
-  { name: "Overview", href: "/app/analytics", icon: BarChart3 },
-  { name: "Insights", href: "/app/analytics-v2", icon: Sparkles },
-  { name: "Advanced", href: "/app/analytics-v3", icon: Zap },
-  { name: "Premium", href: "/app/analytics-v4", icon: ClipboardList },
 ];
 
 const superadminChildren: NavItem[] = [
@@ -69,8 +61,8 @@ const superadminChildren: NavItem[] = [
   { name: "API Logs", href: "/app/admin/api-logs", icon: ScrollText },
   { name: "Automation Logs", href: "/app/admin/automation-logs", icon: ClipboardList },
   { name: "API Mapping", href: "/app/admin/mapping", icon: Link2 },
-  { name: "Cron Health", href: "/app/admin/cron-health", icon: HeartPulse },
-  { name: "Operations", href: "/app/admin/operations", icon: Monitor },
+  { name: "System Health", href: "/app/admin/cron-health", icon: HeartPulse },
+  { name: "Data Explorer", href: "/app/admin/data-explorer", icon: Database },
 ];
 
 // Platform icon and color mapping
@@ -167,115 +159,6 @@ function NavSection({ label, items, collapsed, location }: {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function AnalyticsAccordion({ collapsed, location }: { collapsed: boolean; location: { pathname: string } }) {
-  const isAnyActive = analyticsChildren.some(
-    (item) => location.pathname === item.href || location.pathname.startsWith(item.href)
-  );
-  const [open, setOpen] = useState(isAnyActive);
-
-  return (
-    <div className="space-y-1">
-      {!collapsed && (
-        <div className="px-3 pt-4 pb-1">
-          <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">Analytics</p>
-        </div>
-      )}
-      {collapsed && <div className="pt-2" />}
-
-      {/* Toggle button */}
-      <button
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-          isAnyActive && !open
-            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-            : "text-sidebar-foreground hover:bg-sidebar-accent"
-        )}
-      >
-        <BarChart3
-          size={20}
-          className={cn(
-            "flex-shrink-0 transition-transform group-hover:scale-110",
-            isAnyActive && !open && "drop-shadow-sm"
-          )}
-        />
-        {!collapsed && (
-          <>
-            <span className="font-medium text-sm flex-1 text-left">Analytics</span>
-            <ChevronDown
-              size={16}
-              className={cn(
-                "transition-transform duration-200",
-                open && "rotate-180"
-              )}
-            />
-          </>
-        )}
-      </button>
-
-      {/* Children — visible when expanded (or always in collapsed mode via tooltip) */}
-      {open && !collapsed && (
-        <div className="ml-3 pl-3 border-l border-sidebar-border/50 space-y-0.5">
-          {analyticsChildren.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group",
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent"
-                )}
-              >
-                <item.icon
-                  size={16}
-                  className={cn(
-                    "flex-shrink-0 transition-transform group-hover:scale-110",
-                    isActive && "drop-shadow-sm"
-                  )}
-                />
-                <span className="font-medium text-sm">{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Collapsed mode: show children in a flyout */}
-      {collapsed && open && (
-        <div className="space-y-0.5">
-          {analyticsChildren.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                title={item.name}
-                className={cn(
-                  "flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 group",
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent"
-                )}
-              >
-                <item.icon
-                  size={18}
-                  className={cn(
-                    "flex-shrink-0 transition-transform group-hover:scale-110",
-                    isActive && "drop-shadow-sm"
-                  )}
-                />
-              </Link>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -438,9 +321,6 @@ export function Sidebar() {
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {/* Main */}
         <NavSection label="Main" items={mainNavigation} collapsed={collapsed} location={location} />
-
-        {/* Analytics (accordion) */}
-        <AnalyticsAccordion collapsed={collapsed} location={location} />
 
         {/* My Channels Flyout */}
         <DropdownMenu open={channelsOpen} onOpenChange={setChannelsOpen}>

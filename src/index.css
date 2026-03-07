@@ -6,6 +6,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scroll-behavior: smooth;
+}
+
 @layer base {
   :root {
     /* Core palette - Deep navy professional */
@@ -37,6 +41,7 @@
     --destructive-foreground: 210 40% 98%;
 
     --border: 220 13% 91%;
+    --border-light: 216 18% 93%;
     --input: 220 13% 91%;
     --ring: 224 71% 25%;
 
@@ -103,6 +108,7 @@
     --destructive-foreground: 210 40% 98%;
 
     --border: 224 47% 18%;
+    --border-light: 224 47% 16%;
     --input: 224 47% 18%;
     --ring: 12 95% 62%;
 

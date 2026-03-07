@@ -26,7 +26,7 @@ const TooltipContent = React.forwardRef<
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
 /** Convenience wrapper: wraps any element with a styled tooltip */
-function Tip({ children, label, side }: { children: React.ReactNode; label: string; side?: "top" | "bottom" | "left" | "right" }) {
+function Tip({ children, label, side, onLabelClick }: { children: React.ReactNode; label: string; side?: "top" | "bottom" | "left" | "right"; onLabelClick?: () => void }) {
   return (
     <TooltipPrimitive.Provider delayDuration={300}>
       <TooltipPrimitive.Root>
@@ -36,7 +36,14 @@ function Tip({ children, label, side }: { children: React.ReactNode; label: stri
           sideOffset={4}
           className="z-50 overflow-hidden rounded-md border bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
         >
-          {label}
+          {onLabelClick ? (
+            <button onClick={onLabelClick} className="flex items-center gap-1.5 hover:text-primary transition-colors">
+              {label}
+              <span className="text-[10px] opacity-60">?</span>
+            </button>
+          ) : (
+            label
+          )}
         </TooltipPrimitive.Content>
       </TooltipPrimitive.Root>
     </TooltipPrimitive.Provider>

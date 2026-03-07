@@ -962,6 +962,42 @@ export const DEMO_PLATFORM_BREAKDOWN = [
   },
 ];
 
+// ─── Analytics by Publish Date (for consolidated analytics page) ─────
+
+export const DEMO_ANALYTICS_BY_PUBLISH_DATE = (() => {
+  const days = 30;
+  const result = [];
+  for (let i = days; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const base = 200 + Math.floor(Math.random() * 300);
+    result.push({
+      date: d.toISOString().split('T')[0],
+      impressions: base * 5,
+      reach: base * 3,
+      views: base * 2,
+      likes: Math.floor(base * 0.3),
+      comments: Math.floor(base * 0.05),
+      shares: Math.floor(base * 0.08),
+      clicks: Math.floor(base * 0.4),
+      postCount: 2 + Math.floor(Math.random() * 3),
+      engagementRate: 2.5 + Math.random() * 4,
+    });
+  }
+  return result;
+})();
+
+// ─── Content Decay (for analytics engagement tab) ─────
+
+export const DEMO_CONTENT_DECAY = [
+  { timeWindow: '1 hour', engagementPercentage: 92 },
+  { timeWindow: '6 hours', engagementPercentage: 75 },
+  { timeWindow: '24 hours', engagementPercentage: 52 },
+  { timeWindow: '3 days', engagementPercentage: 28 },
+  { timeWindow: '7 days', engagementPercentage: 12 },
+  { timeWindow: '30 days', engagementPercentage: 4 },
+];
+
 // ─── Inbox Demo Data ─────────────────────────────────────────
 
 const hoursAgo = (n: number) => new Date(Date.now() - n * 60 * 60 * 1000).toISOString();

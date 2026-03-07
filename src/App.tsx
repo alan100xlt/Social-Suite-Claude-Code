@@ -22,8 +22,6 @@ import Connections from "./pages/Connections";
 import Content from "./pages/Content";
 import ContentV2 from "./pages/ContentV2";
 import ContentSources from "./pages/ContentSources";
-import Analytics from "./pages/Analytics";
-import AnalyticsV3 from "./pages/AnalyticsV3";
 import Settings from "./pages/Settings";
 import OAuthCallback from "./pages/OAuthCallback";
 import NotFound from "./pages/NotFound";
@@ -35,6 +33,7 @@ import LandingPage from "./pages/LandingPage";
 import LandingPageV2 from "./pages/LandingPageV2";
 import LandingPageV3 from "./pages/LandingPageV3";
 import LandingPageV4 from "./pages/LandingPageV4";
+import MarketingPage from "./pages/MarketingPage";
 import { VersionSwitcher } from "./components/landing/VersionSwitcher";
 import GetStarted from "./pages/GetStarted";
 import Discover from "./pages/Discover";
@@ -43,16 +42,15 @@ import OnboardingWizard from "./pages/OnboardingWizard";
 import MediaCompanyDashboard from "./pages/MediaCompanyDashboard";
 import { MediaCompanyWorkspace } from "./pages/MediaCompanyWorkspace";
 
-// Lazy imports — admin, analytics-heavy, and showcase routes
-const AnalyticsV2 = React.lazy(() => import("./pages/AnalyticsV2"));
-const AnalyticsV4 = React.lazy(() => import("./pages/AnalyticsV4"));
-const AnalyticsShowcase = React.lazy(() => import("./pages/AnalyticsShowcase"));
+// Lazy imports — analytics, admin, and showcase routes
+const Analytics = React.lazy(() => import("./pages/Analytics"));
 const AdminUsers = React.lazy(() => import("./pages/AdminUsers"));
 const AdminPlatformConfig = React.lazy(() => import("./pages/AdminPlatformConfig"));
 const AdminDataManagement = React.lazy(() => import("./pages/AdminDataManagement"));
 const SuperadminCompanies = React.lazy(() => import("./pages/SuperadminCompanies"));
 const CronHealth = React.lazy(() => import("./pages/CronHealth"));
-const AdminAIHealth = React.lazy(() => import("./pages/AdminAIHealth"));
+const DataExplorer = React.lazy(() => import("./pages/DataExplorer"));
+// AdminAIHealth merged into CronHealth (System Health unified dashboard)
 const GetLateMapping = React.lazy(() => import("./pages/GetLateMapping"));
 const AgGridShowcase = React.lazy(() => import("./pages/AgGridShowcase"));
 const AgGridShowcaseV1 = React.lazy(() => import("./pages/AgGridShowcaseV1"));
@@ -62,7 +60,7 @@ const WizardVariations = React.lazy(() => import("./pages/WizardVariations"));
 const EmailBranding = React.lazy(() => import("./pages/EmailBranding"));
 const PlatformSettings = React.lazy(() => import("./pages/PlatformSettings"));
 const Progress = React.lazy(() => import("./pages/Progress"));
-const OperationsCenter = React.lazy(() => import("./pages/OperationsCenter"));
+// OperationsCenter merged into CronHealth (System Health unified dashboard)
 const DesignPreview = React.lazy(() => import("./pages/DesignPreview"));
 const NivoShowcase = React.lazy(() => import("./pages/NivoShowcase"));
 const SocialIntelligence = React.lazy(() => import("./pages/SocialIntelligence"));
@@ -97,6 +95,7 @@ const App = () => (
               <Route path="/v2" element={<LandingPageV2 />} />
               <Route path="/v3" element={<LandingPageV3 />} />
               <Route path="/v4" element={<LandingPageV4 />} />
+              <Route path="/marketing" element={<MarketingPage />} />
               <Route path="/get-started" element={<GetStarted />} />
               <Route path="/discover" element={<Discover />} />
 
@@ -112,7 +111,6 @@ const App = () => (
               {/* Dev-only */}
               <Route path="/design-preview" element={<DesignPreview />} />
               <Route path="/nivo-showcase" element={<NivoShowcase />} />
-              <Route path="/analytics-showcase" element={<AnalyticsShowcase />} />
 
               {/* Protected: App core */}
               <Route path="/app" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -120,9 +118,9 @@ const App = () => (
               <Route path="/app/content/sources" element={<ProtectedRoute><ContentSources /></ProtectedRoute>} />
               <Route path="/app/content-legacy" element={<ProtectedRoute><Content /></ProtectedRoute>} />
               <Route path="/app/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-              <Route path="/app/analytics-v2" element={<ProtectedRoute><AnalyticsV2 /></ProtectedRoute>} />
-              <Route path="/app/analytics-v3" element={<ProtectedRoute><AnalyticsV3 /></ProtectedRoute>} />
-              <Route path="/app/analytics-v4" element={<ProtectedRoute><AnalyticsV4 /></ProtectedRoute>} />
+              <Route path="/app/analytics-v2" element={<Navigate to="/app/analytics" replace />} />
+              <Route path="/app/analytics-v3" element={<Navigate to="/app/analytics" replace />} />
+              <Route path="/app/analytics-v4" element={<Navigate to="/app/analytics" replace />} />
               <Route path="/app/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/intelligence" element={<ProtectedRoute><SocialIntelligence /></ProtectedRoute>} />
@@ -143,11 +141,12 @@ const App = () => (
               <Route path="/app/admin/api-logs" element={<ProtectedRoute><SuperAdminRoute><ApiLogs /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/mapping" element={<ProtectedRoute><SuperAdminRoute><GetLateMapping /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/cron-health" element={<ProtectedRoute><SuperAdminRoute><CronHealth /></SuperAdminRoute></ProtectedRoute>} />
-              <Route path="/app/admin/ai-health" element={<ProtectedRoute><SuperAdminRoute><AdminAIHealth /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/data-explorer" element={<ProtectedRoute><SuperAdminRoute><DataExplorer /></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/ai-health" element={<Navigate to="/app/admin/cron-health" replace />} />
               <Route path="/app/admin/wizard" element={<ProtectedRoute><SuperAdminRoute><WizardVariations /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/progress" element={<ProtectedRoute><SuperAdminRoute><Progress /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/automation-logs" element={<ProtectedRoute><SuperAdminRoute><AutomationLogsPage /></SuperAdminRoute></ProtectedRoute>} />
-              <Route path="/app/admin/operations" element={<ProtectedRoute><SuperAdminRoute><Suspense fallback={<LazyFallback />}><OperationsCenter /></Suspense></SuperAdminRoute></ProtectedRoute>} />
+              <Route path="/app/admin/operations" element={<Navigate to="/app/admin/cron-health" replace />} />
               <Route path="/app/admin/ag-grid-showcase" element={<ProtectedRoute><SuperAdminRoute><AgGridShowcase /></SuperAdminRoute></ProtectedRoute>} />
               <Route path="/app/admin/ag-grid-showcase-v1" element={<ProtectedRoute><SuperAdminRoute><AgGridShowcaseV1 /></SuperAdminRoute></ProtectedRoute>} />
 

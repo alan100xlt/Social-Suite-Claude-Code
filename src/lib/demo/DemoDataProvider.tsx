@@ -19,6 +19,8 @@ import {
   DEMO_SPARKLINE_DATA,
   DEMO_POSTS_WITH_ANALYTICS,
   DEMO_PLATFORM_BREAKDOWN,
+  DEMO_ANALYTICS_BY_PUBLISH_DATE,
+  DEMO_CONTENT_DECAY,
   DEMO_INBOX_CONVERSATIONS,
   DEMO_INBOX_MESSAGES,
   DEMO_INBOX_LABELS,
@@ -183,6 +185,14 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     queryClient.setQueryData(['platform-breakdown', DEMO_COMPANY_ID, { startDate: thirtyAgo, endDate: today }], DEMO_PLATFORM_BREAKDOWN);
     queryClient.setQueryData(['platform-breakdown', DEMO_COMPANY_ID, { startDate: sevenAgo, endDate: today }], DEMO_PLATFORM_BREAKDOWN);
     queryClient.setQueryData(['platform-breakdown', DEMO_COMPANY_ID, { startDate: ninetyAgo, endDate: today }], DEMO_PLATFORM_BREAKDOWN);
+
+    // Analytics by publish date (for consolidated analytics page)
+    queryClient.setQueryData(['analytics-by-publish-date', DEMO_COMPANY_ID, { startDate: thirtyAgo, endDate: today }], DEMO_ANALYTICS_BY_PUBLISH_DATE);
+    queryClient.setQueryData(['analytics-by-publish-date', DEMO_COMPANY_ID, { startDate: sevenAgo, endDate: today }], DEMO_ANALYTICS_BY_PUBLISH_DATE.slice(-7));
+    queryClient.setQueryData(['analytics-by-publish-date', DEMO_COMPANY_ID, { startDate: ninetyAgo, endDate: today }], DEMO_ANALYTICS_BY_PUBLISH_DATE);
+
+    // Content decay (for analytics engagement tab)
+    queryClient.setQueryData(['content-decay', DEMO_COMPANY_ID, {}], DEMO_CONTENT_DECAY);
 
     // Last sync time (prevent sync indicator from showing stale state)
     queryClient.setQueryData(['last-sync-time', DEMO_COMPANY_ID], new Date().toISOString());
