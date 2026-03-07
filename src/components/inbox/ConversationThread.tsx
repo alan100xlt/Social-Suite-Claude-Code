@@ -4,16 +4,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Bot, Check, Paperclip, ExternalLink, Languages } from 'lucide-react';
+import { MessageReactions, ReactionPicker } from './MessageReactions';
 import type { InboxMessage, InboxConversation } from '@/lib/api/inbox';
+import type { ReactionSummary } from '@/hooks/useMessageReactions';
 
 interface ConversationThreadProps {
   messages: InboxMessage[];
   isLoading?: boolean;
   onReplyToMessage?: (message: InboxMessage) => void;
   conversation?: InboxConversation | null;
+  reactions?: Record<string, ReactionSummary[]>;
+  onToggleReaction?: (messageId: string, emoji: string, hasReacted: boolean) => void;
 }
 
-export function ConversationThread({ messages, isLoading, onReplyToMessage, conversation }: ConversationThreadProps) {
+export function ConversationThread({ messages, isLoading, onReplyToMessage, conversation, reactions = {}, onToggleReaction }: ConversationThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,19 +99,19 @@ export function ConversationThread({ messages, isLoading, onReplyToMessage, conv
           <div key={group.date}>
             {/* Date separator */}
             <div className="flex items-center gap-4 my-4">
-              <div className="flex-1 h-px bg-border" />
+              <div className="flex-1 h-px bg-border-light" />
               <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap px-4 py-1.5 bg-card rounded-full border border-border-light">
                 {format(new Date(group.date), 'MMMM d, yyyy')}
               </span>
-              <div className="flex-1 h-px bg-border" />
+              <div className="flex-1 h-px bg-border-light" />
             </div>
 
             {/* Messages */}
             <div className="space-y-5">
               {group.messages.map((msg) => (
                 isCommentThread
-                  ? <CommentBubble key={msg.id} message={msg} onReply={onReplyToMessage} />
-                  : <DMBubble key={msg.id} message={msg} onReply={onReplyToMessage} />
+                  ? <CommentBubble key={msg.id} message={msg} onReply={onReplyToMessage} reactions={reactions[msg.id] || []} onToggleReaction={onToggleReaction} />
+                  : <DMBubble key={msg.id} message={msg} onReply={onReplyToMessage} reactions={reactions[msg.id] || []} onToggleReaction={onToggleReaction} />
               ))}
             </div>
           </div>
@@ -120,7 +124,7 @@ export function ConversationThread({ messages, isLoading, onReplyToMessage, conv
 
 // ─── DM Bubble (chat-style) ─────────────────────────────────
 
-function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: InboxMessage) => void }) {
+function DMBubble({ message, onReply, reactions, onToggleReaction }: { message: InboxMessage; onReply?: (m: InboxMessage) => void; reactions: ReactionSummary[]; onToggleReaction?: (messageId: string, emoji: string, hasReacted: boolean) => void }) {
   const isAgent = message.sender_type === 'agent';
   const isBot = message.sender_type === 'bot';
   const isNote = message.is_internal_note;
@@ -189,7 +193,7 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
             ? 'bg-primary text-primary-foreground rounded-[18px_18px_4px_18px]'
             : isBot
               ? 'bg-violet-50 dark:bg-violet-500/10 border-[1.5px] border-dashed border-violet-300 dark:border-violet-500/30 rounded-[18px_18px_4px_18px] text-foreground'
-              : 'bg-card border border-border rounded-[18px_18px_18px_4px]'
+              : 'bg-card border border-border-light rounded-[18px_18px_18px_4px]'
         )}>
           {isBot && (
             <div className="flex items-center gap-1 mb-1.5">
@@ -235,7 +239,17 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
           >
             <Languages className="h-3 w-3" />
           </button>
+          {onToggleReaction && (
+            <ReactionPicker messageId={message.id} onSelect={(emoji) => onToggleReaction(message.id, emoji, false)} />
+          )}
         </div>
+
+        {/* Reactions */}
+        {onToggleReaction && (
+          <div className="px-1">
+            <MessageReactions messageId={message.id} reactions={reactions} onToggle={onToggleReaction} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -243,7 +257,7 @@ function DMBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: I
 
 // ─── Comment Bubble (Facebook-style) ────────────────────────
 
-function CommentBubble({ message, onReply }: { message: InboxMessage; onReply?: (m: InboxMessage) => void }) {
+function CommentBubble({ message, onReply, reactions, onToggleReaction }: { message: InboxMessage; onReply?: (m: InboxMessage) => void; reactions: ReactionSummary[]; onToggleReaction?: (messageId: string, emoji: string, hasReacted: boolean) => void }) {
   const isAgent = message.sender_type === 'agent';
   const isBot = message.sender_type === 'bot';
   const isPageResponse = isAgent || isBot;
@@ -290,11 +304,21 @@ function CommentBubble({ message, onReply }: { message: InboxMessage; onReply?: 
           {onReply && (
             <button className="hover:underline hover:text-foreground transition-colors" onClick={() => onReply(message)}>Reply</button>
           )}
+          {onToggleReaction && (
+            <ReactionPicker messageId={message.id} onSelect={(emoji) => onToggleReaction(message.id, emoji, false)} />
+          )}
           {isPageResponse && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">PAGE</span>
           )}
           <span>{format(new Date(message.created_at), 'h:mm a')}</span>
         </div>
+
+        {/* Reactions */}
+        {onToggleReaction && (
+          <div className="px-3.5 mt-0.5">
+            <MessageReactions messageId={message.id} reactions={reactions} onToggle={onToggleReaction} />
+          </div>
+        )}
       </div>
     </div>
   );

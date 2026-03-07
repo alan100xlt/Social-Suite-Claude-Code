@@ -9,7 +9,9 @@ import { SiBluesky, SiThreads } from 'react-icons/si';
 import { format, isToday, isYesterday } from 'date-fns';
 import { Tip } from '@/components/ui/tooltip';
 import { useGlossary } from '@/components/inbox/GlossaryDialog';
+import { ReadReceiptAvatars } from './ReadReceiptAvatars';
 import type { InboxConversation, ConversationType, Sentiment } from '@/lib/api/inbox';
+import type { ReadReceipt } from '@/hooks/useReadReceipts';
 
 const platformIcons: Record<string, React.ElementType> = {
   instagram: FaInstagram,
@@ -97,6 +99,7 @@ interface ConversationListProps {
   onToggleSelect?: (id: string) => void;
   onSelectAll?: () => void;
   onToggleFlag?: (id: string) => void;
+  readReceipts?: Record<string, ReadReceipt[]>;
 }
 
 export function ConversationList({
@@ -107,6 +110,7 @@ export function ConversationList({
   selectedIds,
   onToggleSelect,
   onToggleFlag,
+  readReceipts = {},
 }: ConversationListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const glossary = useGlossary();
@@ -240,9 +244,12 @@ export function ConversationList({
                     </div>
                   </div>
 
-                  <span className="text-xs text-muted-foreground font-medium whitespace-nowrap flex-shrink-0">
-                    {formatTimestamp(conv.last_message_at)}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <ReadReceiptAvatars receipts={readReceipts[conv.id] || []} maxVisible={2} />
+                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                      {formatTimestamp(conv.last_message_at)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Preview text */}

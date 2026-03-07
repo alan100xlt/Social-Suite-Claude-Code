@@ -49,6 +49,8 @@ import { useMessageReactions, useToggleReaction } from '@/hooks/useMessageReacti
 import { useReadReceipts } from '@/hooks/useReadReceipts';
 import { useConversationPresence } from '@/hooks/useConversationPresence';
 import { PresenceBanner } from '@/components/inbox/PresenceBanner';
+import { useConversationCorrection, useCreateCorrection } from '@/hooks/useCorrections';
+import { CorrectionsPanel } from '@/components/inbox/CorrectionsPanel';
 import type { ConversationStatus, ConversationType, ConversationPriority, Sentiment, MessageCategory, InboxConversation, InboxMessage } from '@/lib/api/inbox';
 
 const platformTabIcons: { key: string; icon: React.ElementType; color: string }[] = [
@@ -131,6 +133,10 @@ export default function InboxPage() {
   const toggleReaction = useToggleReaction();
   const conversationIds = useMemo(() => conversations.map((c: InboxConversation) => c.id), [conversations]);
   const { data: readReceipts = {} } = useReadReceipts(conversationIds);
+
+  // Corrections
+  const correction = useConversationCorrection(selectedConversationId);
+  const createCorrection = useCreateCorrection();
 
   // Surface reply errors to the user
   useEffect(() => {
@@ -264,6 +270,11 @@ export default function InboxPage() {
   const handleToggleReaction = useCallback((messageId: string, emoji: string, hasReacted: boolean) => {
     toggleReaction.mutate({ messageId, emoji, hasReacted });
   }, [toggleReaction]);
+
+  const handleFlagCorrection = useCallback(() => {
+    if (!selectedConversationId) return;
+    createCorrection.mutate({ conversationId: selectedConversationId });
+  }, [selectedConversationId, createCorrection]);
 
   const handleInsertReply = useCallback((content: string) => {
     setComposerContent(content);
@@ -620,6 +631,8 @@ export default function InboxPage() {
                     companyMembers={companyMembers}
                     currentUserId={user?.id}
                     readReceipts={readReceipts[selectedConversation.id] || []}
+                    correction={correction}
+                    onFlagCorrection={handleFlagCorrection}
                   />
                 </div>
 
@@ -716,6 +729,11 @@ export default function InboxPage() {
                   </div>
 
                   <div className="flex-1 overflow-y-auto">
+                    {correction && (
+                      <div className="p-3">
+                        <CorrectionsPanel correction={correction} />
+                      </div>
+                    )}
                     {drawerTab === 'contact' ? (
                       <ContactDetailPanel
                         conversation={selectedConversation}

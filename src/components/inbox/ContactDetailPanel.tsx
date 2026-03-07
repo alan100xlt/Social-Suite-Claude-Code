@@ -26,7 +26,9 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { ClassificationBadge } from './ClassificationBadge';
 import { SignalScoreBadge } from './SignalScoreBadge';
 import { CorrectionStatusDropdown } from './CorrectionStatusDropdown';
+import { MemberPicker } from './MemberPicker';
 import type { InboxConversation, InboxLabel } from '@/lib/api/inbox';
+import type { CompanyMember } from '@/hooks/useCompany';
 
 interface ContactDetailPanelProps {
   conversation: InboxConversation;
@@ -34,6 +36,8 @@ interface ContactDetailPanelProps {
   onAssign?: (assigneeId: string | null) => void;
   onAddLabel?: (labelId: string) => void;
   onRemoveLabel?: (labelId: string) => void;
+  companyMembers?: CompanyMember[];
+  currentUserId?: string;
 }
 
 const typeLabels = {
@@ -49,6 +53,8 @@ export function ContactDetailPanel({
   onAssign,
   onAddLabel,
   onRemoveLabel,
+  companyMembers = [],
+  currentUserId,
 }: ContactDetailPanelProps) {
   const contact = conversation.contact;
   const contactName = contact?.display_name || contact?.username || 'Unknown';
@@ -227,23 +233,19 @@ export function ContactDetailPanel({
         <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em] flex items-center gap-1.5">
           <UserPlus className="h-3.5 w-3.5" /> Assignment
         </h4>
-        <div className="text-sm text-muted-foreground">
-          {conversation.assigned_to ? (
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5" />
-                <span>Assigned</span>
-              </span>
-              {onAssign && (
-                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onAssign(null)}>
-                  Unassign
-                </Button>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs">Unassigned</p>
-          )}
-        </div>
+        {onAssign && companyMembers.length > 0 ? (
+          <MemberPicker
+            members={companyMembers}
+            currentUserId={currentUserId}
+            assignedTo={conversation.assigned_to}
+            onAssign={onAssign}
+            compact
+          />
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {conversation.assigned_to ? 'Assigned' : 'Unassigned'}
+          </p>
+        )}
       </div>
 
       <Separator />
@@ -301,12 +303,12 @@ export function ContactDetailPanel({
       <div className="space-y-2">
         <h4 className="text-[9px] font-bold text-muted-foreground uppercase tracking-[.1em]">Quick Actions</h4>
         <div className="space-y-1.5">
-          {conversation.status === 'open' && onAssign && (
+          {conversation.status === 'open' && onAssign && currentUserId && (
             <Button
               variant="outline"
               size="sm"
               className="w-full justify-between text-xs h-9"
-              onClick={() => onAssign(conversation.assigned_to ? null : 'me')}
+              onClick={() => onAssign(conversation.assigned_to ? null : currentUserId)}
             >
               <span className="flex items-center gap-2">
                 <UserPlus className="h-3.5 w-3.5" />
