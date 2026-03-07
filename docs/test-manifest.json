@@ -1,0 +1,139 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-03-06",
+  "features": {
+    "auth": {
+      "description": "Authentication, routing guards, role-based access",
+      "L1_contract": [],
+      "L2_integration": [],
+      "L3_smoke": [],
+      "L4_unit": [
+        "src/test/auth-routing.test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "inbox": {
+      "description": "Inbox sync, conversations, messages, AI classification",
+      "L1_contract": [
+        "scripts/getlate-contract-tests.cjs"
+      ],
+      "L2_integration": [
+        "src/tests/integration/webhook-ingestion.test.ts"
+      ],
+      "L3_smoke": [
+        "src/tests/smoke/inbox.test.ts"
+      ],
+      "L4_unit": [
+        "src/test/inbox-hooks.test.ts",
+        "supabase/functions/_shared/auto-respond_test.ts",
+        "supabase/functions/_shared/classify_test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "cron-pipeline": {
+      "description": "Cron dispatcher, fan-out, health logging, job registration",
+      "L1_contract": [],
+      "L2_integration": [
+        "src/tests/integration/cron-pipeline-health.test.ts",
+        "src/tests/integration/cron-health.test.ts"
+      ],
+      "L3_smoke": [
+        "src/tests/smoke/database-health.test.ts"
+      ],
+      "L4_unit": [],
+      "L5_e2e": [
+        "src/tests/end-to-end/cron-health.test.ts"
+      ]
+    },
+    "webhook-ingestion": {
+      "description": "GetLate webhook receiver, HMAC verification, event processing",
+      "L1_contract": [],
+      "L2_integration": [
+        "src/tests/integration/webhook-ingestion.test.ts"
+      ],
+      "L3_smoke": [],
+      "L4_unit": [
+        "supabase/functions/getlate-webhook/webhook-utils_test.ts",
+        "supabase/functions/_shared/webhook_security_test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "getlate-api": {
+      "description": "GetLate API client — posts, accounts, inbox, analytics",
+      "L1_contract": [
+        "scripts/getlate-contract-tests.cjs"
+      ],
+      "L2_integration": [],
+      "L3_smoke": [],
+      "L4_unit": [],
+      "L5_e2e": []
+    },
+    "analytics": {
+      "description": "Analytics data fetching, chart hooks, local reads",
+      "L1_contract": [],
+      "L2_integration": [
+        "src/tests/integration/analytics-local-reads.test.ts"
+      ],
+      "L3_smoke": [
+        "src/tests/smoke/analytics-local-reads.test.ts"
+      ],
+      "L4_unit": [
+        "src/test/analytics-hooks.test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "multi-tenancy": {
+      "description": "RLS policies, cross-tenant isolation, company_id filtering",
+      "L1_contract": [],
+      "L2_integration": [
+        "src/tests/integration/rls-policies.test.ts",
+        "src/tests/integration/cross-tenant-isolation.test.ts"
+      ],
+      "L3_smoke": [],
+      "L4_unit": [
+        "supabase/functions/_shared/tenant_isolation_test.ts",
+        "supabase/functions/_shared/cross_tenant_data_test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "company-management": {
+      "description": "Company creation, invitations, role escalation",
+      "L1_contract": [],
+      "L2_integration": [
+        "src/tests/integration/company-creation.test.ts",
+        "src/tests/integration/media-company-access.test.ts"
+      ],
+      "L3_smoke": [],
+      "L4_unit": [
+        "src/test/company-flows.test.ts",
+        "supabase/functions/_shared/company_creation_test.ts",
+        "supabase/functions/_shared/invitation_flow_test.ts",
+        "supabase/functions/_shared/role_escalation_test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "edge-function-security": {
+      "description": "Edge function auth (anon, service_role, JWT), authorization middleware",
+      "L1_contract": [],
+      "L2_integration": [],
+      "L3_smoke": [],
+      "L4_unit": [
+        "supabase/functions/_shared/edge_function_auth_test.ts",
+        "supabase/functions/_shared/authorize_test.ts"
+      ],
+      "L5_e2e": []
+    },
+    "core-pages": {
+      "description": "Critical page loads, routing, basic rendering",
+      "L1_contract": [],
+      "L2_integration": [],
+      "L3_smoke": [],
+      "L4_unit": [
+        "src/test/example.test.ts"
+      ],
+      "L5_e2e": [
+        "src/tests/end-to-end/core-pages.test.ts"
+      ]
+    }
+  }
+}

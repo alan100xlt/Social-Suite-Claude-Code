@@ -35,6 +35,7 @@ interface Conversation {
   platform_conversation_id: string | null;
   post_id: string | null;
   contact_id: string | null;
+  metadata?: Record<string, unknown> | null;
   // AI classification fields
   message_type?: string | null;
   message_subtype?: string | null;
@@ -273,22 +274,36 @@ async function sendAutoResponse(
   getlateApiKey: string,
   profileId: string | null
 ) {
-  // Send via GetLate API
+  // Send via GetLate API — requires accountId (cached in conversation metadata during sync)
+  const accountId = conversation.metadata?.accountId as string | undefined;
+  if (!accountId) {
+    console.warn(`Auto-respond skipped: no accountId in metadata for conversation ${conversation.id}`);
+    return;
+  }
+
   if (conversation.type === 'dm' && conversation.platform_conversation_id) {
     const dmConvId = conversation.platform_conversation_id.replace(`dm-${conversation.platform}-`, '');
-    await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
+    const resp = await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({ profileId, text: content, platform: conversation.platform }),
+      body: JSON.stringify({ accountId, message: content }),
     });
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      console.error(`Auto-respond DM failed (${resp.status}): ${err.slice(0, 200)}`);
+    }
   } else if (conversation.type === 'comment') {
-    await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
+    const resp = await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({ profileId, postId: conversation.post_id, text: content, platform: conversation.platform }),
+      body: JSON.stringify({ accountId, postId: conversation.post_id, message: content }),
     });
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      console.error(`Auto-respond comment failed (${resp.status}): ${err.slice(0, 200)}`);
+    }
   }
 
   // Store the bot message
@@ -387,22 +402,31 @@ async function notifyEditor(
 
 async function hideComment(
   getlateApiKey: string,
-  profileId: string | null,
+  _profileId: string | null,
   message: NewMessage,
   conversation: Conversation
 ) {
+  const accountId = conversation.metadata?.accountId as string | undefined;
+  if (!accountId) {
+    console.warn(`Hide comment skipped: no accountId in metadata for conversation ${conversation.id}`);
+    return;
+  }
+
   // Hide comment via GetLate API
-  await fetch(`${GETLATE_API_URL}/inbox/comments/hide`, {
+  const resp = await fetch(`${GETLATE_API_URL}/inbox/comments/hide`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${getlateApiKey}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
-      profileId,
-      postId: conversation.post_id,
+      accountId,
       commentId: message.id,
-      platform: conversation.platform,
+      message: 'hide',
     }),
   });
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => '');
+    console.error(`Hide comment failed (${resp.status}): ${err.slice(0, 200)}`);
+  }
 }
 
 function getAcknowledgmentTemplate(language: string): string {

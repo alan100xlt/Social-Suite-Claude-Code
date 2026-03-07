@@ -1,0 +1,101 @@
+{
+  "skill_name": "tdd",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a new edge function that calls the GetLate API to fetch audience demographics for a company",
+      "expected_output": "Writes a contract test against the real GetLate API FIRST to verify endpoint path, field names, and response shape. Only after the contract test passes does it write mocked unit tests using the verified field names.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "contract-test-first",
+          "description": "Creates or extends scripts/*-contract-tests.cjs with a real API call BEFORE writing any mocked unit test"
+        },
+        {
+          "name": "no-guessed-field-names",
+          "description": "Does not invent field names from docs — uses field names confirmed by the contract test output"
+        },
+        {
+          "name": "integration-test-written",
+          "description": "Writes an L2 integration test for the DB writes the edge function performs"
+        },
+        {
+          "name": "manifest-updated",
+          "description": "Updates docs/test-manifest.json with the new test files"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The analytics-sync cron job is timing out after 45 seconds. Fix it.",
+      "expected_output": "Tests the cron dispatch path (not just manual invocation). Writes an integration test that verifies the function completes within the 45s deadline via the dispatcher, checks health log lifecycle, and verifies AbortSignal.timeout is set on fetch calls.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "tests-cron-path",
+          "description": "Tests via the cron dispatcher path, not just a direct HTTP call to the edge function"
+        },
+        {
+          "name": "checks-health-logs",
+          "description": "Verifies health log transitions from 'running' to 'completed' or 'failed' (no orphaned entries)"
+        },
+        {
+          "name": "checks-abort-signal",
+          "description": "Verifies that external fetch calls have AbortSignal.timeout set"
+        },
+        {
+          "name": "no-deploy-before-test",
+          "description": "Does not deploy the fix before writing and running the test"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create a new migration that adds an inbox_attachments table with RLS policies",
+      "expected_output": "Writes an RLS isolation test BEFORE applying the migration. Test uses two different users from two different companies, verifies cross-tenant reads are blocked, and checks the table/policy exists after migration.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "rls-test-before-migration",
+          "description": "Writes the RLS isolation test before or alongside the migration, not after deploying"
+        },
+        {
+          "name": "two-tenant-test",
+          "description": "Test uses two users from different companies to verify cross-tenant isolation"
+        },
+        {
+          "name": "policy-existence-check",
+          "description": "Test asserts that the RLS policy exists on the new table"
+        },
+        {
+          "name": "manifest-updated",
+          "description": "Updates docs/test-manifest.json with the new test file"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "The inbox-sync function works when I trigger it manually from the Supabase dashboard but fails silently when run via pg_cron. No errors in logs.",
+      "expected_output": "Identifies the 'works manually but not via cron' anti-pattern. Investigates auth path differences (manual = dashboard JWT, cron = service_role via dispatcher). Writes integration test that invokes via the cron dispatcher path. Checks vault secrets are not NULL and URL construction is correct.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "identifies-anti-pattern",
+          "description": "Explicitly calls out the 'works manually but not via cron' anti-pattern from the skill"
+        },
+        {
+          "name": "tests-dispatcher-path",
+          "description": "Writes or runs a test that invokes the function via the cron-dispatcher, not direct HTTP"
+        },
+        {
+          "name": "checks-auth-difference",
+          "description": "Investigates the auth path difference between manual trigger and cron dispatch"
+        },
+        {
+          "name": "checks-vault-secrets",
+          "description": "Verifies vault secrets (URL, service role key) are not NULL"
+        }
+      ]
+    }
+  ]
+}

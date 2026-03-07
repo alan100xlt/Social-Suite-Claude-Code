@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ConversationList } from '@/components/inbox/ConversationList';
 import { ConversationThread } from '@/components/inbox/ConversationThread';
@@ -100,6 +101,14 @@ export default function InboxPage() {
   const addLabel = useAddConversationLabel();
   const removeLabel = useRemoveConversationLabel();
   const translateMessage = useTranslateMessage();
+
+  // Surface reply errors to the user
+  useEffect(() => {
+    if (replyDM.error) toast.error(`Failed to send DM: ${replyDM.error.message}`);
+  }, [replyDM.error]);
+  useEffect(() => {
+    if (replyComment.error) toast.error(`Failed to send reply: ${replyComment.error.message}`);
+  }, [replyComment.error]);
 
   // Filter by search locally
   const filteredConversations = useMemo(() => {

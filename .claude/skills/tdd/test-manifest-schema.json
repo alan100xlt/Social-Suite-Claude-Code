@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Test Manifest",
+  "description": "Maps features to their test files across all 5 test layers. Empty arrays indicate visible coverage gaps.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version (semver)"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date",
+      "description": "Last update date (YYYY-MM-DD)"
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/feature"
+      },
+      "description": "Map of feature name to test coverage"
+    }
+  },
+  "required": ["version", "updated", "features"],
+  "$defs": {
+    "feature": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "L1_contract": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Contract test files (real API shape verification)"
+        },
+        "L2_integration": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Integration test files (real DB, data flows, RLS)"
+        },
+        "L3_smoke": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Smoke test files (health probes, connectivity)"
+        },
+        "L4_unit": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Unit test files (pure logic, parsing, HMAC)"
+        },
+        "L5_e2e": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "E2E test files (browser user journeys)"
+        }
+      },
+      "required": ["description", "L1_contract", "L2_integration", "L3_smoke", "L4_unit", "L5_e2e"],
+      "additionalProperties": false
+    }
+  }
+}

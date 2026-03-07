@@ -251,12 +251,34 @@ async function replyToComment(
   // Get conversation to find platform info — verify it belongs to this company
   const { data: conv } = await supabase
     .from('inbox_conversations')
-    .select('platform, platform_conversation_id, post_id')
+    .select('platform, platform_conversation_id, post_id, metadata')
     .eq('id', params.conversationId)
     .eq('company_id', companyId)
     .single();
 
   if (!conv) throw new Error('Conversation not found or does not belong to this company');
+
+  // Resolve the GetLate accountId — check stored metadata first, then fetch from API
+  let accountId = (conv.metadata as Record<string, unknown>)?.accountId as string | undefined;
+  if (!accountId) {
+    const lookupResp = await fetch(
+      `${GETLATE_API_URL}/inbox/comments?profile=${profileId}&limit=100`,
+      { headers: { 'Authorization': `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10_000) }
+    );
+    if (lookupResp.ok) {
+      const lookupData = await lookupResp.json();
+      const posts = lookupData.posts || lookupData.data || [];
+      const match = posts.find((p: Record<string, unknown>) => p.id === conv.post_id || p.postId === conv.post_id);
+      if (match?.accountId) {
+        accountId = match.accountId as string;
+        await supabase.from('inbox_conversations').update({
+          metadata: { ...(conv.metadata as Record<string, unknown> || {}), accountId },
+        }).eq('id', params.conversationId);
+      }
+    }
+  }
+
+  if (!accountId) throw new Error('Could not resolve GetLate accountId for this comment thread');
 
   // Send reply via GetLate API
   const response = await fetch(`${GETLATE_API_URL}/inbox/comments/reply`, {
@@ -264,15 +286,25 @@ async function replyToComment(
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
-      profileId,
+      accountId,
       postId: conv.post_id,
-      text: params.content,
-      parentCommentId: params.parentCommentId,
-      platform: conv.platform,
+      message: params.content,
+      ...(params.parentCommentId ? { parentCommentId: params.parentCommentId } : {}),
     }),
   });
 
-  const apiResult = await response.json();
+  let apiResult: Record<string, unknown>;
+  try {
+    apiResult = await response.json();
+  } catch {
+    throw new Error(`GetLate API returned non-JSON response (status ${response.status})`);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `GetLate comment reply failed (${response.status}): ${apiResult.message || apiResult.error || JSON.stringify(apiResult)}`
+    );
+  }
 
   // Store the reply in our messages table
   const { data: message, error } = await supabase
@@ -280,7 +312,7 @@ async function replyToComment(
     .insert({
       conversation_id: params.conversationId,
       company_id: companyId,
-      platform_message_id: apiResult.commentId || apiResult.id,
+      platform_message_id: (apiResult.data as Record<string, unknown>)?.commentId || apiResult.commentId || apiResult.id,
       sender_type: 'agent',
       content: params.content,
       content_type: 'text',
@@ -314,7 +346,7 @@ async function replyToDM(
   // Verify conversation belongs to this company
   const { data: conv } = await supabase
     .from('inbox_conversations')
-    .select('platform, platform_conversation_id')
+    .select('platform, platform_conversation_id, metadata')
     .eq('id', params.conversationId)
     .eq('company_id', companyId)
     .single();
@@ -323,27 +355,59 @@ async function replyToDM(
 
   const dmConvId = conv.platform_conversation_id?.replace(`dm-${conv.platform}-`, '');
 
+  // Resolve the GetLate accountId — check stored metadata first, then fetch from API
+  let accountId = (conv.metadata as Record<string, unknown>)?.accountId as string | undefined;
+  if (!accountId) {
+    const lookupResp = await fetch(
+      `${GETLATE_API_URL}/inbox/conversations?profileId=${profileId}&limit=100`,
+      { headers: { 'Authorization': `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10_000) }
+    );
+    if (lookupResp.ok) {
+      const lookupData = await lookupResp.json();
+      const conversations = lookupData.conversations || lookupData.data || [];
+      const match = conversations.find((c: Record<string, unknown>) => c.id === dmConvId);
+      if (match?.accountId) {
+        accountId = match.accountId as string;
+        // Cache for future use
+        await supabase.from('inbox_conversations').update({
+          metadata: { ...(conv.metadata as Record<string, unknown> || {}), accountId },
+        }).eq('id', params.conversationId);
+      }
+    }
+  }
+
+  if (!accountId) throw new Error('Could not resolve GetLate accountId for this conversation');
+
   const response = await fetch(`${GETLATE_API_URL}/inbox/conversations/${dmConvId}/messages`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
-      profileId,
-      conversationId: dmConvId,
-      text: params.content,
-      mediaUrl: params.mediaUrl,
-      platform: conv.platform,
+      accountId,
+      message: params.content,
+      ...(params.mediaUrl ? { attachment: params.mediaUrl } : {}),
     }),
   });
 
-  const apiResult = await response.json();
+  let apiResult: Record<string, unknown>;
+  try {
+    apiResult = await response.json();
+  } catch {
+    throw new Error(`GetLate API returned non-JSON response (status ${response.status})`);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `GetLate DM reply failed (${response.status}): ${apiResult.message || apiResult.error || JSON.stringify(apiResult)}`
+    );
+  }
 
   const { data: message, error } = await supabase
     .from('inbox_messages')
     .insert({
       conversation_id: params.conversationId,
       company_id: companyId,
-      platform_message_id: apiResult.messageId || apiResult.id,
+      platform_message_id: (apiResult.data as Record<string, unknown>)?.messageId || apiResult.messageId || apiResult.id,
       sender_type: 'agent',
       content: params.content,
       content_type: params.mediaUrl ? 'image' : 'text',
@@ -371,20 +435,28 @@ async function replyToDM(
 async function likeComment(
   profileId: string | null,
   apiKey: string,
-  params: { commentId: string; platform: string; unlike?: boolean }
+  params: { commentId: string; platform: string; unlike?: boolean; accountId?: string }
 ) {
-  const url = params.unlike
-    ? `${GETLATE_API_URL}/inbox/comments/${params.commentId}/unlike`
-    : `${GETLATE_API_URL}/inbox/comments/${params.commentId}/like`;
-  const method = params.unlike ? 'DELETE' : 'POST';
+  const action = params.unlike ? 'unlike' : 'like';
+  const url = `${GETLATE_API_URL}/inbox/comments/${action}`;
   const response = await fetch(url, {
-    method,
+    method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(15_000),
-    body: JSON.stringify({ profileId, commentId: params.commentId, platform: params.platform }),
+    body: JSON.stringify({
+      accountId: params.accountId,
+      commentId: params.commentId,
+      message: action,
+    }),
   });
 
-  return await response.json();
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      `GetLate ${action} failed (${response.status}): ${result.message || result.error || JSON.stringify(result)}`
+    );
+  }
+  return result;
 }
 
 async function updateConversationStatus(

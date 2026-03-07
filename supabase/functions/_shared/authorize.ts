@@ -58,8 +58,6 @@ export async function authorize(
       ? authHeader.slice(7).trim()
       : authHeader.trim();
 
-    // Check if token matches service_role key exactly (constant-time comparison not needed
-    // since supabaseServiceKey is a secret and the comparison short-circuits on mismatch)
     if (supabaseServiceKey && token === supabaseServiceKey) {
       return {
         userId: "service_role",
@@ -67,8 +65,6 @@ export async function authorize(
         isSuperAdmin: false,
       };
     }
-    // Do NOT parse JWT payload to check role — unsigned JWT payloads can be forged.
-    // Only the direct key comparison above is safe for service role verification.
   }
 
   // --- JWT validation ---

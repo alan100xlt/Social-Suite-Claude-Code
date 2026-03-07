@@ -136,6 +136,10 @@ Do NOT use `next-themes` — it's in package.json but unused.
 `@import` for Google Fonts must come BEFORE `@tailwind` directives in index.css.
 Use `import.meta.env.*` not `process.env.*` — this is Vite, not CRA.
 
+## Bug-Fixing Discipline
+
+When fixing a bug, always ask **"why does this failure mode exist?"** before writing a fix. If the answer is "because we designed it with unnecessary complexity," simplify the design rather than patching the symptom. Treat the root cause, not the surface error. A band-aid that makes tests pass is not a fix — it's tech debt with a green checkmark.
+
 ## Known Issues / Watch Out For
 
 - **No lazy loading** — all pages bundled eagerly. Large bundle (~4MB after Nivo additions). Add `React.lazy()` for admin/analytics routes.
@@ -218,6 +222,12 @@ npm run deploy:prod      # Vercel production deployment
 **Supabase edge function tests** — `supabase/functions/_shared/*_test.ts`:
 - Security and authorization tests for shared modules
 
+**Contract tests** — `scripts/*-contract-tests.cjs`:
+- Real API request/response shape verification (run BEFORE writing mocked unit tests)
+
+**Test manifest** — `docs/test-manifest.json`:
+- Maps every feature to test files across all 5 layers (contract, integration, smoke, unit, E2E)
+
 ## CI/CD
 
 - `.github/workflows/supabase-deploy.yml` — deploys migrations + edge functions on push to `main`
@@ -278,6 +288,7 @@ Do not lecture. Offer to continue. Use the `session-hygiene` skill for full guid
 - `/supabase-migration <description>` — scaffold and apply a new DB migration with RLS
 - `/analytics-widget <description>` — scaffold a new chart widget (Recharts or Nivo)
 - `/review-pr [number|url]` — review a PR: summarize changes, run security checks, post findings to Slack
+- `/tdd` — project test strategy: test pyramid, what to test per component type, deployment gates
 
 ## Linear Issue Generation (required before starting work)
 

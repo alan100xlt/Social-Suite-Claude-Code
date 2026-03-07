@@ -361,6 +361,12 @@ async function syncComments(
                   lastMessageAt: comment.createdAt || new Date().toISOString(),
                   lastMessagePreview: (comment.text || '').slice(0, 200),
                 });
+              // Cache GetLate accountId in metadata for reply operations
+                if (post.accountId) {
+                  await supabase.from('inbox_conversations').update({
+                    metadata: { accountId: post.accountId },
+                  }).eq('id', convResult.id);
+                }
               } catch (convErr) {
                 result.errors.push(`Conv insert: ${String(convErr)}`);
                 continue;
@@ -401,6 +407,7 @@ async function syncComments(
                       platform_conversation_id: convKey,
                       post_id: post.postId,
                       contact_id: contactId,
+                      metadata: { accountId: post.accountId },
                     }, apiKey, company.getlate_profile_id);
                   } catch (autoErr) {
                     console.error('Auto-respond error:', autoErr);
@@ -494,6 +501,12 @@ async function syncDMs(
               lastMessagePreview: (conv.lastMessage || '').slice(0, 200),
               unreadCount: conv.unreadCount || 0,
             });
+            // Cache GetLate accountId in metadata for reply operations
+            if (conv.accountId) {
+              await supabase.from('inbox_conversations').update({
+                metadata: { accountId: conv.accountId },
+              }).eq('id', convResult.id);
+            }
           } catch (convErr) {
             result.errors.push(`DM conv insert: ${String(convErr)}`);
             continue;
@@ -541,6 +554,7 @@ async function syncDMs(
                     platform_conversation_id: convKey,
                     post_id: null,
                     contact_id: contactId,
+                    metadata: { accountId: conv.accountId },
                   }, apiKey, company.getlate_profile_id);
                 } catch (autoErr) {
                   console.error('Auto-respond DM error:', autoErr);

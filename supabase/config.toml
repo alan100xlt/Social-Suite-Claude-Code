@@ -81,5 +81,8 @@ verify_jwt = false
 [functions.inbox-historical-sync]
 verify_jwt = false
 
+[functions.cron-dispatcher]
+verify_jwt = false
+
 [functions.inbox-backfill]
 verify_jwt = false

@@ -370,7 +370,7 @@ Deno.serve(async (req) => {
     if (action === 'update') {
       const { postId, text, scheduledFor } = body;
       const response = await fetch(`${GETLATE_API_URL}/posts/${postId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
