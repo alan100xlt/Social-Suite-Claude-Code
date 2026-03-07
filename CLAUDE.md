@@ -35,6 +35,8 @@ Secrets live in **one canonical place**. Never duplicate across stores.
 | `RESEND_API_KEY` | Supabase Secrets only | Edge functions (prod only) |
 | `FIRECRAWL_API_KEY` | Supabase Secrets only | Edge functions (prod only) |
 | `COURIER_AUTH_TOKEN` | Supabase Secrets only | Edge functions (prod only) |
+| `GOOGLE_CLIENT_ID` | Supabase Secrets only | Edge functions (prod only) — GA4 OAuth |
+| `GOOGLE_CLIENT_SECRET` | Supabase Secrets only | Edge functions (prod only) — GA4 OAuth |
 | `SLACK_BOT_TOKEN` etc. | `.env.local` | Slack agent (deactivated) |
 
 **Rules:**
@@ -106,6 +108,7 @@ Key routes:
 - `/app/analytics` — Recharts analytics
 - `/app/analytics-v2` — Nivo analytics (premium widgets)
 - `/app/analytics-v3` `/app/analytics-v4` — Experimental analytics views
+- `/app/analytics/content-journey` — Content Journey (GA4 + social post correlation)
 - `/app/connections` — OAuth platform connections
 - `/app/settings` — Profile, Company, BrandVoice, Notifications
 - `/app/media-company/:id` — Media company dashboard
@@ -175,6 +178,7 @@ Exception: `account_analytics_snapshots` correctly uses `snapshot_date` (tracks 
 - **`securityContextService.ts`** (lowercase, different file) also imports ioredis via the security service — same warning.
 - **HMR overlay** is enabled (`vite.config.ts`) — runtime errors show as red overlay in browser, not silent white screen.
 - **Slack webhook** was hardcoded in `.windsurf/workflows/autonomous-development.md` — redacted. Rotate the webhook at https://api.slack.com/apps if it was ever committed to git history.
+- **Google Analytics tables** — `google_analytics_connections` (OAuth tokens), `ga_page_snapshots` (hourly pageviews), `ga_referral_snapshots` (traffic sources), `post_page_correlations` (post-to-page URL matches). Edge functions: `google-analytics-auth` (OAuth), `ga-analytics-sync` (hourly sync via cron dispatcher).
 
 ## Connected Integrations (MCP)
 

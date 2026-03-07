@@ -134,6 +134,22 @@
       "L5_e2e": [
         "src/tests/end-to-end/core-pages.test.ts"
       ]
+    },
+    "google-analytics": {
+      "description": "GA4 OAuth connection, hourly page metrics sync, traffic source attribution, post-to-page URL correlation, content journey analytics page",
+      "L1_contract": [
+        "scripts/ga4-contract-tests.cjs"
+      ],
+      "L2_integration": [
+        "src/tests/integration/google-analytics-rls.test.ts"
+      ],
+      "L3_smoke": [
+        "src/tests/smoke/google-analytics.test.ts"
+      ],
+      "L4_unit": [
+        "src/test/google-analytics-hooks.test.ts"
+      ],
+      "L5_e2e": []
     }
   }
 }
