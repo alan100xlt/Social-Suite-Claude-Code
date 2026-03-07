@@ -49,10 +49,15 @@ export function StatSparklineWidget({
       ? `${isPositive ? "+" : ""}${change.toFixed(1)}${changeSuffix}`
       : null;
 
-  const lineData =
-    sparklineData.length > 0 ? [{ id: "spark", data: sparklineData }] : [];
+  // Nivo needs at least 2 points to draw a line; duplicate single points to show a flat line
+  const normalizedData = sparklineData.length === 1
+    ? [sparklineData[0], { ...sparklineData[0], x: sparklineData[0].x + " " }]
+    : sparklineData;
 
-  const barData = sparklineData.map((d, i) => ({
+  const lineData =
+    normalizedData.length > 0 ? [{ id: "spark", data: normalizedData }] : [];
+
+  const barData = normalizedData.map((d, i) => ({
     x: i.toString(),
     value: d.y,
   }));
