@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { isDemoCompany } from '@/lib/demo/demo-constants';
 import { inboxApi } from '@/lib/api/inbox';
+import { supabase } from '@/integrations/supabase/client';
 
 export function useInboxLabels() {
   const { selectedCompanyId } = useSelectedCompany();
@@ -71,6 +73,7 @@ export function useCreateCannedReply() {
 
 export function useAddConversationLabel() {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -78,14 +81,25 @@ export function useAddConversationLabel() {
       if (!selectedCompanyId) throw new Error('No company selected');
       return inboxApi.conversations.addLabel(selectedCompanyId, conversationId, labelId);
     },
-    onSuccess: () => {
+    onSuccess: (_, { conversationId, labelId }) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'labeled',
+          conversation_id: conversationId,
+          metadata: { label_id: labelId, operation: 'add', user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
+      }
     },
   });
 }
 
 export function useRemoveConversationLabel() {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -93,8 +107,18 @@ export function useRemoveConversationLabel() {
       if (!selectedCompanyId) throw new Error('No company selected');
       return inboxApi.conversations.removeLabel(selectedCompanyId, conversationId, labelId);
     },
-    onSuccess: () => {
+    onSuccess: (_, { conversationId, labelId }) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'labeled',
+          conversation_id: conversationId,
+          metadata: { label_id: labelId, operation: 'remove', user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
+      }
     },
   });
 }

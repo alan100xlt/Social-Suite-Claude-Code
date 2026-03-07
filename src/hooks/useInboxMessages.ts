@@ -6,6 +6,7 @@ import { inboxApi } from '@/lib/api/inbox';
 import { sendNotification } from '@/lib/api/notifications';
 import { parseMentions } from '@/lib/mentions';
 import { useCompanyMembers } from '@/hooks/useCompany';
+import { supabase } from '@/integrations/supabase/client';
 
 export function useInboxMessages(conversationId: string | null) {
   const { selectedCompanyId } = useSelectedCompany();
@@ -26,6 +27,7 @@ export function useInboxMessages(conversationId: string | null) {
 
 export function useReplyToComment() {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -42,12 +44,24 @@ export function useReplyToComment() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-messages', selectedCompanyId, variables.conversationId] });
       queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+
+      // Log activity (fire-and-forget)
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'replied',
+          conversation_id: variables.conversationId,
+          metadata: { reply_type: 'comment', user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
+      }
     },
   });
 }
 
 export function useReplyToDM() {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -64,6 +78,17 @@ export function useReplyToDM() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-messages', selectedCompanyId, variables.conversationId] });
       queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+
+      // Log activity (fire-and-forget)
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'replied',
+          conversation_id: variables.conversationId,
+          metadata: { reply_type: 'dm', user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
+      }
     },
   });
 }
@@ -82,6 +107,17 @@ export function useAddInternalNote(companyMembers?: ReturnType<typeof useCompany
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-messages', selectedCompanyId, variables.conversationId] });
+
+      // Log activity (fire-and-forget)
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'noted',
+          conversation_id: variables.conversationId,
+          metadata: { user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
+      }
 
       // Notify @mentioned users
       if (companyMembers?.length) {
