@@ -1,3 +1,12 @@
+/**
+ * GetLate Changelog Monitor
+ *
+ * Runs daily via cron-dispatcher. Fetches the GetLate full docs (llms-full.txt),
+ * extracts changelog entries, diffs against last-seen entries, and uses Claude
+ * to analyze impact on our codebase. Posts to Slack if significant.
+ *
+ * Results stored in `getlate_changelog_checks` table.
+ */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authorize, corsHeaders } from '../_shared/authorize.ts';
 import { CronMonitor } from '../_shared/cron-monitor.ts';
@@ -5,64 +14,82 @@ import { CronMonitor } from '../_shared/cron-monitor.ts';
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface ChangelogEntry {
-  id: string;          // e.g. "2026-02-15" — used as unique key
-  date: string;
-  title: string;
-  content: string;     // raw text of the entry
+  id: string;          // YYYY-MM-DD (or YYYY-MM-DD-N for multiple same-day entries)
+  date: string;        // e.g. "March 6, 2026"
+  type: string;        // "New Feature", "Improvement", "Breaking Change", "Minor"
+  title: string;       // first meaningful line
+  content: string;     // full text of the entry
 }
 
 interface AiAnalysis {
   impact_score: 'high' | 'medium' | 'low' | 'none';
-  impact_summary: string;         // 2-3 sentences: what changed in the API
-  code_changes_needed: string[];  // list of specific files/actions to update
-  business_value: string;         // is it worth implementing? why?
+  impact_summary: string;
+  code_changes_needed: string[];
+  business_value: string;
 }
 
-// ── Changelog scraper ──────────────────────────────────────────────────────
+// ── Changelog parser (from llms-full.txt) ─────────────────────────────────
 
 async function fetchChangelog(): Promise<ChangelogEntry[]> {
-  const response = await fetch('https://docs.getlate.dev/changelog', {
-    headers: { 'User-Agent': 'Longtale-ChangelogMonitor/1.0' },
+  const response = await fetch('https://docs.getlate.dev/llms-full.txt', {
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch changelog: ${response.status}`);
+    throw new Error(`Failed to fetch llms-full.txt: ${response.status}`);
   }
 
-  const html = await response.text();
-  return parseChangelogHtml(html);
+  const fullText = await response.text();
+  return parseChangelog(fullText);
 }
 
-function parseChangelogHtml(html: string): ChangelogEntry[] {
-  const entries: ChangelogEntry[] = [];
+function parseChangelog(fullText: string): ChangelogEntry[] {
+  // Extract changelog section
+  const changelogStart = fullText.indexOf('# Changelog');
+  if (changelogStart === -1) return [];
 
-  // GetLate's docs.getlate.dev/changelog uses a standard docs pattern.
-  // Each entry is wrapped in an <article> or a heading + content block.
-  // We extract by finding date-stamped headings (h2/h3 with dates like "February 15, 2026").
+  // Find the end of changelog (next top-level heading after changelog content)
+  const afterChangelog = fullText.slice(changelogStart + 12);
+  const nextSectionMatch = afterChangelog.match(/\n---\n\n# (?!Changelog)/);
+  const changelogText = nextSectionMatch
+    ? afterChangelog.slice(0, nextSectionMatch.index)
+    : afterChangelog.slice(0, 5000); // safety cap
 
-  // Strategy: split on heading tags, extract date + content pairs.
-  // Regex to find section headings that contain a date (Month DD, YYYY or YYYY-MM-DD)
-  const sectionPattern = /<h[23][^>]*>([\s\S]*?)<\/h[23]>([\s\S]*?)(?=<h[23]|$)/gi;
-  const datePattern = /(\w+ \d{1,2},?\s*\d{4}|\d{4}-\d{2}-\d{2})/i;
-
+  // Parse individual entries by date pattern
+  const datePattern = /^((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4})/gm;
+  const datePositions: { date: string; index: number }[] = [];
   let match;
-  while ((match = sectionPattern.exec(html)) !== null) {
-    const headingRaw = match[1].replace(/<[^>]+>/g, '').trim();
-    const bodyRaw = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  while ((match = datePattern.exec(changelogText)) !== null) {
+    datePositions.push({ date: match[1], index: match.index });
+  }
 
-    const dateMatch = datePattern.exec(headingRaw);
-    if (!dateMatch) continue;
+  const entries: ChangelogEntry[] = [];
+  const dateCounters: Record<string, number> = {};
 
-    const dateStr = dateMatch[1];
-    // Normalise to YYYY-MM-DD for use as entry ID
+  for (let i = 0; i < datePositions.length; i++) {
+    const start = datePositions[i].index;
+    const end = i + 1 < datePositions.length ? datePositions[i + 1].index : changelogText.length;
+    const content = changelogText.slice(start, end).trim();
+    const dateStr = datePositions[i].date;
+
+    // Extract type tag
+    const typeMatch = content.match(/(?:New Feature|Improvement|Breaking Change|Minor)/);
+    const type = typeMatch ? typeMatch[0] : 'Unknown';
+
+    // Extract first meaningful line as title (after date + type)
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    const titleLine = lines.length > 1 ? lines[1] : dateStr;
+
+    // Generate unique ID (YYYY-MM-DD or YYYY-MM-DD-2 for duplicates)
     const parsedDate = new Date(dateStr);
-    const id = isNaN(parsedDate.getTime())
+    const baseId = isNaN(parsedDate.getTime())
       ? dateStr.toLowerCase().replace(/[^a-z0-9]/g, '-')
       : parsedDate.toISOString().split('T')[0];
 
-    const title = headingRaw.replace(datePattern, '').trim() || dateStr;
+    dateCounters[baseId] = (dateCounters[baseId] || 0) + 1;
+    const id = dateCounters[baseId] === 1 ? baseId : `${baseId}-${dateCounters[baseId]}`;
 
-    entries.push({ id, date: dateStr, title, content: bodyRaw.substring(0, 2000) });
+    entries.push({ id, date: dateStr, type, title: titleLine, content: content.slice(0, 2000) });
   }
 
   return entries;
@@ -71,16 +98,21 @@ function parseChangelogHtml(html: string): ChangelogEntry[] {
 // ── Claude analysis ────────────────────────────────────────────────────────
 
 const CODEBASE_CONTEXT = `
-We use GetLate as our social media scheduling backend. Our integration consists of 4 Supabase edge functions:
+We use GetLate (formerly Ayrshare) as our social media backend. Our integration:
 
-1. getlate-posts: create, list, get, update, delete posts via /posts endpoints
-2. getlate-analytics: get analytics, sync, youtube-daily, overview, best-time, content-decay, posting-frequency via /analytics endpoints
-3. getlate-accounts: list, get, disconnect, follower-stats via /accounts endpoints
-4. getlate-connect: OAuth connection flow, profile management via /profiles and /connect endpoints
+Edge functions:
+- inbox-sync: syncs DMs, comments, and reviews from /inbox/* endpoints (runs every 15 min)
+- getlate-inbox: CRUD proxy for reply, archive, label operations
+- getlate-webhook: handles real-time comment.received and message.received webhooks
+- analytics-sync: syncs post analytics from /analytics endpoints
+- getlate-posts: create/list/update/delete posts
+- getlate-accounts: manage connected social accounts
 
-We are a multi-tenant social media management SaaS (Longtale.ai) for media companies.
-Our customers manage multiple social media accounts across platforms (LinkedIn, Twitter/X, Facebook, Instagram, YouTube).
-Key business goals: increase engagement, save time on scheduling, provide analytics insights.
+Key tables: inbox_conversations, inbox_messages, inbox_contacts, inbox_labels, post_analytics_snapshots
+
+We are a multi-tenant social media SaaS (Longtale.ai) for media companies.
+Platforms in active use: Facebook, YouTube, Instagram, Twitter/X, LinkedIn.
+Key priorities: unified inbox (DMs, comments, reviews), analytics, content scheduling.
 `.trim();
 
 async function analyzeWithClaude(
@@ -88,7 +120,7 @@ async function analyzeWithClaude(
   anthropicApiKey: string
 ): Promise<AiAnalysis> {
   const entriesText = entries
-    .map(e => `## ${e.title} (${e.date})\n${e.content}`)
+    .map(e => `## ${e.type}: ${e.title} (${e.date})\n${e.content}`)
     .join('\n\n---\n\n');
 
   const prompt = `You are analyzing GetLate API changelog entries for a social media management SaaS.
@@ -102,15 +134,15 @@ ${entriesText}
 Analyze these changes and respond with a JSON object (no markdown fences) with exactly these fields:
 {
   "impact_score": "high" | "medium" | "low" | "none",
-  "impact_summary": "2-3 sentences describing what changed in the API and how it affects our integration",
-  "code_changes_needed": ["list of specific action items, e.g. 'Add action youtube-shorts to getlate-posts/index.ts'"],
-  "business_value": "1-2 sentences on whether implementing this new feature would benefit our customers and business, and why"
+  "impact_summary": "2-3 sentences describing what changed and how it affects our integration",
+  "code_changes_needed": ["list of specific action items"],
+  "business_value": "1-2 sentences on whether implementing benefits our customers"
 }
 
-Impact scoring guide:
+Impact scoring:
 - high: breaks existing functionality OR adds a major feature our customers would directly benefit from
 - medium: new endpoint/feature that's useful but not critical
-- low: minor improvement, bug fix, or feature unlikely to affect our use case
+- low: minor improvement or feature unlikely to affect our use case
 - none: internal changes, unrelated platforms, or docs-only updates`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -125,6 +157,7 @@ Impact scoring guide:
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
@@ -138,7 +171,7 @@ Impact scoring guide:
   try {
     return JSON.parse(text) as AiAnalysis;
   } catch {
-    throw new Error(`Failed to parse Claude response as JSON: ${text.substring(0, 300)}`);
+    throw new Error(`Failed to parse Claude response: ${text.substring(0, 300)}`);
   }
 }
 
@@ -154,11 +187,10 @@ const IMPACT_EMOJI: Record<string, string> = {
 async function postSlackMessage(
   entries: ChangelogEntry[],
   analysis: AiAnalysis,
-  checkId: string,
   slackWebhookUrl: string
 ): Promise<void> {
   const emoji = IMPACT_EMOJI[analysis.impact_score] ?? '⚪';
-  const entryTitles = entries.map(e => `• ${e.title} (${e.date})`).join('\n');
+  const entryTitles = entries.map(e => `• *${e.type}*: ${e.title} (${e.date})`).join('\n');
   const codeChanges = analysis.code_changes_needed.length > 0
     ? analysis.code_changes_needed.map(c => `• ${c}`).join('\n')
     : '• No code changes needed';
@@ -166,58 +198,39 @@ async function postSlackMessage(
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `${emoji} GetLate Changelog Update Detected`, emoji: true },
+      text: { type: 'plain_text', text: `${emoji} GetLate API Update`, emoji: true },
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Impact:* ${emoji} ${analysis.impact_score.toUpperCase()}\n\n*What changed:*\n${entryTitles}`,
+        text: `*Impact:* ${emoji} ${analysis.impact_score.toUpperCase()}\n\n${entryTitles}`,
       },
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*Summary:*\n${analysis.impact_summary}` },
+      text: { type: 'mrkdwn', text: `*Summary:* ${analysis.impact_summary}` },
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*Business Value:*\n${analysis.business_value}` },
+      text: { type: 'mrkdwn', text: `*Business Value:* ${analysis.business_value}` },
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*Code Changes Needed:*\n${codeChanges}` },
+      text: { type: 'mrkdwn', text: `*Code Changes:*\n${codeChanges}` },
     },
-    { type: 'divider' },
     {
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: { type: 'plain_text', text: 'Create Linear Issue', emoji: true },
-          style: 'primary',
-          action_id: 'create_linear_issue',
-          value: checkId,  // passed back to getlate-changelog-action
-        },
-        {
-          type: 'button',
-          text: { type: 'plain_text', text: 'View Changelog', emoji: true },
-          url: 'https://docs.getlate.dev/changelog',
-          action_id: 'view_changelog',
-        },
-      ],
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: '<https://docs.getlate.dev/changelog|View Full Changelog>' }],
     },
   ];
 
-  const response = await fetch(slackWebhookUrl, {
+  await fetch(slackWebhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: `GetLate changelog update (${analysis.impact_score} impact)`, blocks }),
+    signal: AbortSignal.timeout(10_000),
   });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Slack post failed: ${response.status} — ${err}`);
-  }
 }
 
 // ── Main handler ───────────────────────────────────────────────────────────
@@ -229,7 +242,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   const monitor = new CronMonitor('getlate-changelog-monitor', supabase);
   await monitor.start();
 
@@ -243,34 +258,19 @@ Deno.serve(async (req) => {
   const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
   const slackWebhookUrl = Deno.env.get('SLACK_WEBHOOK_URL');
 
-  if (!anthropicApiKey) {
-    await monitor.error('ANTHROPIC_API_KEY not configured');
-    return new Response(
-      JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY not configured' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  if (!slackWebhookUrl) {
-    await monitor.error('SLACK_WEBHOOK_URL not configured');
-    return new Response(
-      JSON.stringify({ success: false, error: 'SLACK_WEBHOOK_URL not configured' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
   try {
-    // 1. Get last processed entry ID
+    // 1. Get last seen entry ID
     const { data: lastCheck } = await supabase
       .from('getlate_changelog_checks')
       .select('last_seen_entry_id')
       .eq('status', 'analyzed')
       .order('checked_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const lastSeenId = lastCheck?.last_seen_entry_id ?? null;
 
-    // 2. Fetch and parse changelog
+    // 2. Fetch and parse changelog from llms-full.txt
     const allEntries = await fetchChangelog();
 
     if (allEntries.length === 0) {
@@ -281,19 +281,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 3. Filter to only new entries (newer than lastSeenId)
+    // 3. Filter to new entries
     const newEntries = lastSeenId
-      ? allEntries.filter(e => e.id > lastSeenId)   // lexicographic: YYYY-MM-DD sorts correctly
-      : allEntries.slice(0, 1);                      // first run: only process the latest entry
+      ? allEntries.filter(e => e.id > lastSeenId)
+      : allEntries.slice(0, 3); // first run: last 3 entries
 
     if (newEntries.length === 0) {
-      await supabase
-        .from('getlate_changelog_checks')
-        .insert({
-          last_seen_entry_id: lastSeenId,
-          entries_found: 0,
-          status: 'no_new',
-        });
+      // Log the no-new check
+      await supabase.from('getlate_changelog_checks').insert({
+        last_seen_entry_id: lastSeenId,
+        entries_found: 0,
+        status: 'no_new',
+      });
 
       await monitor.success({ message: 'No new entries', lastSeenId });
       return new Response(
@@ -302,40 +301,47 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 4. AI analysis
-    const analysis = await analyzeWithClaude(newEntries, anthropicApiKey);
+    // 4. AI analysis (if API key available)
+    let analysis: AiAnalysis | null = null;
+    if (anthropicApiKey) {
+      try {
+        analysis = await analyzeWithClaude(newEntries, anthropicApiKey);
+      } catch (aiErr) {
+        console.error('AI analysis failed (non-fatal):', aiErr);
+      }
+    }
 
     // 5. Store check record
-    const newLastSeenId = newEntries[0].id;  // entries are newest-first
-    const { data: checkRecord } = await supabase
-      .from('getlate_changelog_checks')
-      .insert({
-        last_seen_entry_id: newLastSeenId,
-        entries_found: newEntries.length,
-        new_entries: newEntries,
-        ai_analysis: analysis,
-        status: 'analyzed',
-      })
-      .select()
-      .single();
+    const newLastSeenId = newEntries[0].id;
+    await supabase.from('getlate_changelog_checks').insert({
+      last_seen_entry_id: newLastSeenId,
+      entries_found: newEntries.length,
+      new_entries: newEntries,
+      ai_analysis: analysis,
+      status: 'analyzed',
+    });
 
-    // 6. Post to Slack (only if impact is not 'none')
-    if (analysis.impact_score !== 'none') {
-      await postSlackMessage(newEntries, analysis, checkRecord.id, slackWebhookUrl);
+    // 6. Post to Slack (only if impact is medium+ and webhook configured)
+    if (analysis && slackWebhookUrl && analysis.impact_score !== 'none' && analysis.impact_score !== 'low') {
+      try {
+        await postSlackMessage(newEntries, analysis, slackWebhookUrl);
+      } catch (slackErr) {
+        console.error('Slack notification failed (non-fatal):', slackErr);
+      }
     }
 
     const result = {
       newEntries: newEntries.length,
-      impactScore: analysis.impact_score,
+      impactScore: analysis?.impact_score ?? 'unknown',
       lastSeenId: newLastSeenId,
+      entries: newEntries.map(e => ({ id: e.id, date: e.date, type: e.type, title: e.title })),
     };
     await monitor.success(result);
 
     return new Response(
-      JSON.stringify({ success: true, ...result }),
+      JSON.stringify({ success: true, ...result, analysis }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
     console.error('Changelog monitor error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);

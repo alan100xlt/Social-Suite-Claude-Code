@@ -137,6 +137,14 @@ Deno.serve(async (req) => {
       logApiCall(supabase, 'sync-dms', targetCompany, dmResult, Date.now() - dmStart);
     }
 
+    // Sync Reviews
+    if (!pastDeadline()) {
+      const reviewStart = Date.now();
+      const reviewResult = await syncReviews(supabase, targetCompany, getlateApiKey, pastDeadline);
+      results.push(reviewResult);
+      logApiCall(supabase, 'sync-reviews', targetCompany, reviewResult, Date.now() - reviewStart);
+    }
+
     // ── Phase 1: Auto-classify unclassified conversations (R1, R11) ──
     let classificationsAttempted = 0;
     let classificationsSucceeded = 0;
@@ -288,7 +296,7 @@ async function syncComments(
     const postsWithComments: Array<{ postId: string; accountId: string; platform: string; platformPostUrl?: string; content?: string }> = [];
 
     while (hasMore && !pastDeadline()) {
-      const params = new URLSearchParams({ profile: company.getlate_profile_id, limit: '50' });
+      const params = new URLSearchParams({ profileId: company.getlate_profile_id, limit: '100' });
       if (cursor) params.set('cursor', cursor);
 
       const response = await fetchWithRetry(`${GETLATE_API_URL}/inbox/comments?${params}`, {
@@ -532,56 +540,68 @@ async function syncDMs(
 
           if (pastDeadline()) break;
 
-          const messagesResponse = await fetchWithRetry(
-            `${GETLATE_API_URL}/inbox/conversations/${conv.id}/messages?accountId=${conv.accountId}`,
-            { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
-            pastDeadline,
-          );
+          // Paginate through all messages in this conversation
+          let msgCursor: string | null = null;
+          let msgHasMore = true;
 
-          if (!messagesResponse.ok) {
-            result.errors.push(`DM messages ${conv.id}: ${messagesResponse.status}`);
-            continue;
-          }
+          while (msgHasMore && !pastDeadline()) {
+            const msgParams = new URLSearchParams({ accountId: conv.accountId });
+            if (msgCursor) msgParams.set('cursor', msgCursor);
 
-          const messagesData = await messagesResponse.json();
-          const messages = messagesData.data || messagesData.messages || [];
+            const messagesResponse = await fetchWithRetry(
+              `${GETLATE_API_URL}/inbox/conversations/${conv.id}/messages?${msgParams}`,
+              { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
+              pastDeadline,
+            );
 
-          for (const msg of messages) {
-            const platformMsgId = msg.id || msg._id || `${conv.id}-${msg.createdAt}`;
-            const isFromUs = msg.isFromBrand || msg.direction === 'outbound' || msg.isOwn === true;
+            if (!messagesResponse.ok) {
+              result.errors.push(`DM messages ${conv.id}: ${messagesResponse.status}`);
+              break;
+            }
 
-            // Extract attachment URL: API returns attachments: [{ id, url, type }]
-            const attachmentUrl = msg.attachments?.[0]?.url || msg.mediaUrl || null;
+            const messagesData = await messagesResponse.json();
+            const messages = messagesData.data || messagesData.messages || [];
 
-            const msgResult = await insertMessageIfNew(supabase, company.id, convResult.id, {
-              platformMessageId: platformMsgId,
-              contactId: isFromUs ? null : contactId,
-              senderType: isFromUs ? 'agent' : 'contact',
-              content: msg.text || msg.content || msg.message || '',
-              contentType: attachmentUrl ? 'image' : 'text',
-              mediaUrl: attachmentUrl,
-              metadata: { raw: msg },
-              createdAt: msg.createdAt || msg.timestamp || new Date().toISOString(),
-            });
+            for (const msg of messages) {
+              const platformMsgId = msg.id || msg._id || `${conv.id}-${msg.createdAt}`;
+              const isFromUs = msg.isFromBrand || msg.direction === 'outbound' || msg.isOwn === true;
 
-            if (msgResult.inserted) {
-              result.new_items++;
-              if (msgResult.message && !isFromUs) {
-                try {
-                  await checkAndAutoRespond(supabase, msgResult.message, {
-                    id: convResult.id,
-                    platform: conv.platform || 'unknown',
-                    type: 'dm' as const,
-                    platform_conversation_id: convKey,
-                    post_id: null,
-                    contact_id: contactId,
-                    metadata: { accountId: conv.accountId },
-                  }, apiKey, company.getlate_profile_id);
-                } catch (autoErr) {
-                  console.error('Auto-respond DM error:', autoErr);
+              // Extract attachment URL: API returns attachments: [{ id, url, type }]
+              const attachmentUrl = msg.attachments?.[0]?.url || msg.mediaUrl || null;
+
+              const msgResult = await insertMessageIfNew(supabase, company.id, convResult.id, {
+                platformMessageId: platformMsgId,
+                contactId: isFromUs ? null : contactId,
+                senderType: isFromUs ? 'agent' : 'contact',
+                content: msg.text || msg.content || msg.message || '',
+                contentType: attachmentUrl ? 'image' : 'text',
+                mediaUrl: attachmentUrl,
+                metadata: { raw: msg },
+                createdAt: msg.createdAt || msg.timestamp || new Date().toISOString(),
+              });
+
+              if (msgResult.inserted) {
+                result.new_items++;
+                if (msgResult.message && !isFromUs) {
+                  try {
+                    await checkAndAutoRespond(supabase, msgResult.message, {
+                      id: convResult.id,
+                      platform: conv.platform || 'unknown',
+                      type: 'dm' as const,
+                      platform_conversation_id: convKey,
+                      post_id: null,
+                      contact_id: contactId,
+                      metadata: { accountId: conv.accountId },
+                    }, apiKey, company.getlate_profile_id);
+                  } catch (autoErr) {
+                    console.error('Auto-respond DM error:', autoErr);
+                  }
                 }
               }
             }
+
+            msgCursor = messagesData.pagination?.nextCursor || null;
+            msgHasMore = messagesData.pagination?.hasMore === true && !!msgCursor;
           }
         } catch (err) {
           result.errors.push(`DM ${conv.id}: ${String(err)}`);
@@ -599,6 +619,122 @@ async function syncDMs(
       last_synced_at: new Date().toISOString(),
       cursor: cursor,
     });
+  } catch (err) {
+    result.errors.push(String(err));
+  }
+
+  return result;
+}
+
+// ─── Reviews Sync ────────────────────────────────────────────
+
+async function syncReviews(
+  supabase: ReturnType<typeof createClient>,
+  company: { id: string; getlate_profile_id: string },
+  apiKey: string,
+  pastDeadline: () => boolean
+): Promise<SyncResult> {
+  const result: SyncResult = {
+    company_id: company.id,
+    platform: 'all',
+    sync_type: 'reviews',
+    new_items: 0,
+    errors: [],
+  };
+
+  try {
+    let cursor: string | null = null;
+    let hasMore = true;
+
+    while (hasMore && !pastDeadline()) {
+      const params = new URLSearchParams({ profileId: company.getlate_profile_id, limit: '50' });
+      if (cursor) params.set('cursor', cursor);
+
+      const response = await fetchWithRetry(`${GETLATE_API_URL}/inbox/reviews?${params}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      }, pastDeadline);
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        // 403 = inbox addon not enabled, not an error
+        if (response.status === 403) {
+          console.log('[inbox-sync] Reviews addon not enabled, skipping');
+          return result;
+        }
+        result.errors.push(`list-inbox-reviews returned ${response.status}: ${errText.slice(0, 200)}`);
+        return result;
+      }
+
+      const data = await response.json();
+      const reviews = data.data || [];
+
+      for (const review of reviews) {
+        if (pastDeadline()) break;
+
+        try {
+          const contactId = await upsertContact(supabase, company.id, {
+            platform: review.platform || 'unknown',
+            platformUserId: review.reviewer?.id || `reviewer-${review.id}`,
+            username: undefined,
+            displayName: review.reviewer?.name,
+            avatarUrl: review.reviewer?.profileImage || undefined,
+          });
+
+          const convKey = `review-${review.platform}-${review.id}`;
+          let convResult;
+          try {
+            convResult = await upsertConversation(supabase, company.id, {
+              platform: review.platform || 'unknown',
+              platformConversationId: convKey,
+              type: 'review',
+              subject: `Review by ${review.reviewer?.name || 'Unknown'} (${review.rating}/5)`,
+              contactId,
+              postUrl: review.reviewUrl || undefined,
+              lastMessageAt: review.created || new Date().toISOString(),
+              lastMessagePreview: (review.text || '').slice(0, 200),
+            });
+            // Cache accountId in metadata
+            if (review.accountId) {
+              await supabase.from('inbox_conversations').update({
+                metadata: { accountId: review.accountId, isReview: true, rating: review.rating },
+              }).eq('id', convResult.id);
+            }
+          } catch (convErr) {
+            result.errors.push(`Review conv insert: ${String(convErr)}`);
+            continue;
+          }
+
+          // Insert the review text as a message
+          const msgResult = await insertMessageIfNew(supabase, company.id, convResult.id, {
+            platformMessageId: `review-${review.id}`,
+            contactId,
+            senderType: 'contact',
+            content: review.text || '',
+            metadata: { rating: review.rating, isReview: true },
+            createdAt: review.created || new Date().toISOString(),
+          });
+
+          if (msgResult.inserted) result.new_items++;
+
+          // If there's a reply, insert it too
+          if (review.hasReply && review.reply) {
+            await insertMessageIfNew(supabase, company.id, convResult.id, {
+              platformMessageId: `review-reply-${review.reply.id || review.id}`,
+              contactId: null,
+              senderType: 'agent',
+              content: review.reply.text || '',
+              metadata: { isReviewReply: true },
+              createdAt: review.reply.created || new Date().toISOString(),
+            });
+          }
+        } catch (err) {
+          result.errors.push(`Review ${review.id}: ${String(err)}`);
+        }
+      }
+
+      cursor = data.pagination?.nextCursor || null;
+      hasMore = data.pagination?.hasMore === true && !!cursor;
+    }
   } catch (err) {
     result.errors.push(String(err));
   }

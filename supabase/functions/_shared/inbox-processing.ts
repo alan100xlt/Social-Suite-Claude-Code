@@ -59,7 +59,7 @@ export async function upsertContact(
 export interface ConversationData {
   platform: string;
   platformConversationId: string;
-  type: 'dm' | 'comment';
+  type: 'dm' | 'comment' | 'review';
   subject?: string;
   contactId: string;
   postId?: string | null;
