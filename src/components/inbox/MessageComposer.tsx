@@ -27,6 +27,7 @@ interface MessageComposerProps {
   onTranslate?: (content: string) => void;
   detectedLanguage?: string;
   companyMembers?: CompanyMember[];
+  onTypingChange?: (isTyping: boolean) => void;
 }
 
 export function MessageComposer({
@@ -42,6 +43,7 @@ export function MessageComposer({
   onTranslate,
   detectedLanguage,
   companyMembers,
+  onTypingChange,
 }: MessageComposerProps) {
   const glossary = useGlossary();
   const [content, setContent] = useState('');
@@ -51,6 +53,7 @@ export function MessageComposer({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filteredMembers = useMemo(() => {
     if (mentionQuery === null || !companyMembers) return [];
@@ -63,6 +66,13 @@ export function MessageComposer({
 
   useEffect(() => {
     textareaRef.current?.focus();
+  }, []);
+
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
   }, []);
 
   // Pre-fill from AI suggestions or external source
@@ -145,6 +155,13 @@ export function MessageComposer({
     const value = e.target.value;
     setContent(value);
 
+    // Broadcast typing presence
+    if (onTypingChange) {
+      onTypingChange(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => onTypingChange(false), 2000);
+    }
+
     // Trigger canned reply picker on "/" at start of input or after a space
     if (onSlashTrigger && value.endsWith('/') && (value.length === 1 || value.charAt(value.length - 2) === ' ')) {
       onSlashTrigger();
@@ -225,7 +242,7 @@ export function MessageComposer({
 
       {/* @mention autocomplete dropdown */}
       {mentionQuery !== null && filteredMembers.length > 0 && (
-        <div className="bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-48">
+        <div className="bg-popover border border-border-light rounded-lg shadow-lg overflow-hidden max-h-48">
           {filteredMembers.map((member, i) => (
             <button
               key={member.id}

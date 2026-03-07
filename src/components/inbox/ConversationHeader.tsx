@@ -27,11 +27,18 @@ import {
   Tag,
   ExternalLink,
   AlarmClock,
+  AlertTriangle,
   X,
 } from 'lucide-react';
 import { Tip } from '@/components/ui/tooltip';
 import { useGlossary } from '@/components/inbox/GlossaryDialog';
+import { MemberPicker } from './MemberPicker';
+import { ReadReceiptAvatars } from './ReadReceiptAvatars';
 import type { InboxConversation, InboxLabel, ConversationStatus } from '@/lib/api/inbox';
+import type { CompanyMember } from '@/hooks/useCompany';
+import type { ReadReceipt } from '@/hooks/useReadReceipts';
+import type { Correction } from '@/hooks/useCorrections';
+import { CorrectionBadge } from './CorrectionBadge';
 
 interface ConversationHeaderProps {
   conversation: InboxConversation;
@@ -41,6 +48,11 @@ interface ConversationHeaderProps {
   onRemoveLabel?: (labelId: string) => void;
   onSnooze?: (until: Date) => void;
   labels?: InboxLabel[];
+  companyMembers?: CompanyMember[];
+  currentUserId?: string;
+  readReceipts?: ReadReceipt[];
+  correction?: Correction | null;
+  onFlagCorrection?: () => void;
 }
 
 export function ConversationHeader({
@@ -51,6 +63,11 @@ export function ConversationHeader({
   onRemoveLabel,
   onSnooze,
   labels = [],
+  companyMembers = [],
+  currentUserId,
+  readReceipts = [],
+  correction,
+  onFlagCorrection,
 }: ConversationHeaderProps) {
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const glossary = useGlossary();
@@ -98,6 +115,9 @@ export function ConversationHeader({
           <Badge variant="secondary" className="text-[10px] px-1.5 capitalize">
             {conversation.platform}
           </Badge>
+          {correction && (
+            <CorrectionBadge status={correction.status as any} />
+          )}
           {conversation.sentiment && (
             <Badge
               variant="outline"
@@ -114,6 +134,19 @@ export function ConversationHeader({
         {conversation.contact?.username && (
           <p className="text-xs text-muted-foreground">@{conversation.contact.username}</p>
         )}
+      </div>
+
+      {/* Assignment + Read receipts */}
+      <div className="flex items-center gap-2 mr-1">
+        {onAssign && companyMembers.length > 0 && (
+          <MemberPicker
+            members={companyMembers}
+            currentUserId={currentUserId}
+            assignedTo={conversation.assigned_to}
+            onAssign={onAssign}
+          />
+        )}
+        <ReadReceiptAvatars receipts={readReceipts} />
       </div>
 
       {/* Status actions */}
@@ -175,8 +208,8 @@ export function ConversationHeader({
             <DropdownMenuSeparator />
 
             {/* Assign */}
-            {onAssign && (
-              <DropdownMenuItem onClick={() => onAssign(conversation.assigned_to ? null : 'me')}>
+            {onAssign && currentUserId && (
+              <DropdownMenuItem onClick={() => onAssign(conversation.assigned_to ? null : currentUserId)}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 {conversation.assigned_to ? 'Unassign' : 'Assign to me'}
               </DropdownMenuItem>
@@ -198,6 +231,17 @@ export function ConversationHeader({
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+            )}
+
+            {/* Flag as correction */}
+            {onFlagCorrection && !correction && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onFlagCorrection} className="text-orange-600">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Flag as Correction
+                </DropdownMenuItem>
+              </>
             )}
 
             {/* Remove labels */}

@@ -1580,3 +1580,58 @@ export const DEMO_PERMISSIONS = {
     respond_inbox: true,
   },
 };
+
+// ─── Teamwork Features ──────────────────────────────────────
+
+export const DEMO_ACTIVITY_FEED = [
+  { id: 'act-1', company_id: DEMO_COMPANY_ID, user_id: 'demo-user', action: 'assigned', conversation_id: 'demo-conv-1', metadata: { user_name: 'Demo User', assignee_id: 'demo-user' }, created_at: daysAgo(0) },
+  { id: 'act-2', company_id: DEMO_COMPANY_ID, user_id: 'demo-user', action: 'replied', conversation_id: 'demo-conv-2', metadata: { user_name: 'Demo User' }, created_at: daysAgo(0) },
+  { id: 'act-3', company_id: DEMO_COMPANY_ID, user_id: 'demo-user-2', action: 'status_changed', conversation_id: 'demo-conv-3', metadata: { user_name: 'Sarah Chen', new_status: 'resolved' }, created_at: daysAgo(0) },
+  { id: 'act-4', company_id: DEMO_COMPANY_ID, user_id: 'demo-user-2', action: 'labeled', conversation_id: 'demo-conv-1', metadata: { user_name: 'Sarah Chen', label: 'urgent' }, created_at: daysAgo(1) },
+  { id: 'act-5', company_id: DEMO_COMPANY_ID, user_id: 'demo-user', action: 'noted', conversation_id: 'demo-conv-4', metadata: { user_name: 'Demo User' }, created_at: daysAgo(1) },
+  { id: 'act-6', company_id: DEMO_COMPANY_ID, user_id: 'demo-user-3', action: 'correction_created', conversation_id: 'demo-conv-5', metadata: { user_name: 'Mike Torres' }, created_at: daysAgo(2) },
+  { id: 'act-7', company_id: DEMO_COMPANY_ID, user_id: 'demo-user', action: 'escalated', conversation_id: 'demo-conv-2', metadata: { user_name: 'Demo User' }, created_at: daysAgo(2) },
+  { id: 'act-8', company_id: DEMO_COMPANY_ID, user_id: 'demo-user-2', action: 'assigned', conversation_id: 'demo-conv-6', metadata: { user_name: 'Sarah Chen', assignee_id: 'demo-user-3' }, created_at: daysAgo(3) },
+  { id: 'act-9', company_id: DEMO_COMPANY_ID, user_id: 'demo-user-3', action: 'correction_resolved', conversation_id: 'demo-conv-5', metadata: { user_name: 'Mike Torres' }, created_at: daysAgo(3) },
+  { id: 'act-10', company_id: DEMO_COMPANY_ID, user_id: 'demo-user', action: 'replied', conversation_id: 'demo-conv-1', metadata: { user_name: 'Demo User' }, created_at: daysAgo(4) },
+];
+
+export const DEMO_CORRECTIONS = [
+  { id: 'corr-1', company_id: DEMO_COMPANY_ID, conversation_id: 'demo-conv-5', status: 'open', assigned_to: 'demo-user-3', reporter_contact_ids: [], notes: 'Reader reported factual error in article date', resolution_summary: null, created_by: 'demo-user', created_at: daysAgo(2), updated_at: daysAgo(2), resolved_at: null },
+  { id: 'corr-2', company_id: DEMO_COMPANY_ID, conversation_id: 'demo-conv-3', status: 'resolved', assigned_to: 'demo-user-2', reporter_contact_ids: [], notes: 'Name spelling correction requested', resolution_summary: 'Updated article with correct spelling', created_by: 'demo-user-2', created_at: daysAgo(5), updated_at: daysAgo(3), resolved_at: daysAgo(3) },
+];
+
+export const DEMO_NOTIFICATION_PREFERENCES = [
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'assignment', in_app: true, email: false },
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'mention', in_app: true, email: true },
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'reply', in_app: true, email: false },
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'status_change', in_app: true, email: false },
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'correction', in_app: true, email: true },
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'escalation', in_app: true, email: true },
+  { user_id: 'demo-user', company_id: DEMO_COMPANY_ID, event_type: 'sla_breach', in_app: true, email: true },
+];
+
+export const DEMO_ROUTING_RULES = [
+  { id: 'route-1', company_id: DEMO_COMPANY_ID, category: 'complaint', subcategory: null, assigned_to: 'demo-user', desk_name: 'Support', priority_override: 'high', enabled: true, created_at: daysAgo(30) },
+  { id: 'route-2', company_id: DEMO_COMPANY_ID, category: 'question', subcategory: 'billing', assigned_to: 'demo-user-2', desk_name: 'Finance', priority_override: 'normal', enabled: true, created_at: daysAgo(30) },
+  { id: 'route-3', company_id: DEMO_COMPANY_ID, category: 'praise', subcategory: null, assigned_to: null, desk_name: 'Community', priority_override: 'low', enabled: true, created_at: daysAgo(30) },
+];
+
+export const DEMO_TEAM_WORKLOAD = [
+  { userId: 'demo-user', fullName: 'Demo User', email: 'demo@longtale.ai', avatarUrl: null, assignedCount: 8, resolvedToday: 2, openCount: 5 },
+  { userId: 'demo-user-2', fullName: 'Sarah Chen', email: 'sarah@longtale.ai', avatarUrl: null, assignedCount: 5, resolvedToday: 3, openCount: 2 },
+  { userId: 'demo-user-3', fullName: 'Mike Torres', email: 'mike@longtale.ai', avatarUrl: null, assignedCount: 3, resolvedToday: 1, openCount: 2 },
+];
+
+export const DEMO_TEAM_METRICS = {
+  totalConversations: 45,
+  avgResponseTimeMinutes: 23,
+  resolvedCount: 32,
+  openCount: 13,
+  sentimentDistribution: { positive: 18, neutral: 15, negative: 8, mixed: 4 },
+  perMember: [
+    { userId: 'demo-user', name: 'Demo User', assigned: 18, resolved: 12, avgResponseMinutes: 15 },
+    { userId: 'demo-user-2', name: 'Sarah Chen', assigned: 15, resolved: 12, avgResponseMinutes: 28 },
+    { userId: 'demo-user-3', name: 'Mike Torres', assigned: 12, resolved: 8, avgResponseMinutes: 35 },
+  ],
+};

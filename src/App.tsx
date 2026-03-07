@@ -64,6 +64,7 @@ const Progress = React.lazy(() => import("./pages/Progress"));
 const DesignPreview = React.lazy(() => import("./pages/DesignPreview"));
 const NivoShowcase = React.lazy(() => import("./pages/NivoShowcase"));
 const SocialIntelligence = React.lazy(() => import("./pages/SocialIntelligence"));
+const TeamWorkload = React.lazy(() => import("./pages/TeamWorkload"));
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-screen">
@@ -122,6 +123,7 @@ const App = () => (
               <Route path="/app/analytics-v3" element={<Navigate to="/app/analytics" replace />} />
               <Route path="/app/analytics-v4" element={<Navigate to="/app/analytics" replace />} />
               <Route path="/app/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+              <Route path="/app/inbox/team" element={<ProtectedRoute><TeamWorkload /></ProtectedRoute>} />
               <Route path="/app/connections" element={<ProtectedRoute><Connections /></ProtectedRoute>} />
               <Route path="/app/intelligence" element={<ProtectedRoute><SocialIntelligence /></ProtectedRoute>} />
               <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

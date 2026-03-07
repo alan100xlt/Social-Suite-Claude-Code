@@ -49,6 +49,7 @@ type NavItem = { name: string; href: string; icon: React.ElementType; addAction?
 const mainNavigation: NavItem[] = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard },
   { name: "Inbox", href: "/app/inbox", icon: Inbox },
+  { name: "Team", href: "/app/inbox/team", icon: Users },
   { name: "Content", href: "/app/content", icon: Newspaper },
   { name: "Content Sources", href: "/app/content/sources", icon: Rss },
   { name: "Analytics", href: "/app/analytics", icon: BarChart3 },

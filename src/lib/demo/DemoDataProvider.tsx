@@ -35,6 +35,12 @@ import {
   DEMO_EVERGREEN_QUEUE,
   DEMO_FEATURE_CONFIG,
   DEMO_PERMISSIONS,
+  DEMO_ACTIVITY_FEED,
+  DEMO_CORRECTIONS,
+  DEMO_NOTIFICATION_PREFERENCES,
+  DEMO_ROUTING_RULES,
+  DEMO_TEAM_WORKLOAD,
+  DEMO_TEAM_METRICS,
 } from './demo-data';
 
 interface DemoContextValue {
@@ -282,6 +288,31 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
 
     // Cross-outlet analytics (Phase 11 — empty for demo, no media company)
     queryClient.setQueryData(['cross-outlet-analytics', undefined], []);
+
+    // ─── Teamwork Features ───
+
+    // Activity feed
+    queryClient.setQueryData(['activity-feed', DEMO_COMPANY_ID, 50], DEMO_ACTIVITY_FEED);
+
+    // Corrections
+    queryClient.setQueryData(['corrections', DEMO_COMPANY_ID], DEMO_CORRECTIONS);
+
+    // Notification preferences
+    queryClient.setQueryData(['notification-preferences', 'demo-user', DEMO_COMPANY_ID], DEMO_NOTIFICATION_PREFERENCES);
+
+    // Routing rules
+    queryClient.setQueryData(['routing-rules', DEMO_COMPANY_ID], DEMO_ROUTING_RULES);
+
+    // Team workload
+    queryClient.setQueryData(['team-workload', DEMO_COMPANY_ID], DEMO_TEAM_WORKLOAD);
+
+    // Team metrics (multiple time ranges)
+    queryClient.setQueryData(['team-metrics', DEMO_COMPANY_ID, 7], DEMO_TEAM_METRICS);
+    queryClient.setQueryData(['team-metrics', DEMO_COMPANY_ID, 30], DEMO_TEAM_METRICS);
+    queryClient.setQueryData(['team-metrics', DEMO_COMPANY_ID, 90], DEMO_TEAM_METRICS);
+
+    // Cross-outlet members (empty for demo — no media company hierarchy)
+    queryClient.setQueryData(['cross-outlet-members', DEMO_COMPANY_ID], []);
   }, [isDemo, queryClient]);
 
   const value = useMemo(() => ({ isDemo }), [isDemo]);

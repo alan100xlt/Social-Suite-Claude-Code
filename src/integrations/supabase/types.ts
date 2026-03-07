@@ -751,6 +751,66 @@ export type Database = {
           },
         ]
       }
+      corrections: {
+        Row: {
+          assigned_to: string | null
+          company_id: string
+          conversation_id: string
+          created_at: string | null
+          created_by: string
+          id: string
+          notes: string | null
+          reporter_contact_ids: string[] | null
+          resolution_summary: string | null
+          resolved_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id: string
+          conversation_id: string
+          created_at?: string | null
+          created_by: string
+          id?: string
+          notes?: string | null
+          reporter_contact_ids?: string[] | null
+          resolution_summary?: string | null
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string
+          conversation_id?: string
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          notes?: string | null
+          reporter_contact_ids?: string[] | null
+          resolution_summary?: string | null
+          resolved_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corrections_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_health_logs: {
         Row: {
           completed_at: string | null
@@ -1046,6 +1106,51 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      inbox_activity_log: {
+        Row: {
+          action: string
+          company_id: string
+          conversation_id: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_activity_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbox_activity_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inbox_ai_feedback: {
         Row: {
@@ -1470,6 +1575,7 @@ export type Database = {
           contact_id: string | null
           correction_status: string | null
           created_at: string | null
+          cross_outlet_source: string | null
           detected_language: string | null
           editorial_value: number | null
           id: string
@@ -1500,6 +1606,7 @@ export type Database = {
           contact_id?: string | null
           correction_status?: string | null
           created_at?: string | null
+          cross_outlet_source?: string | null
           detected_language?: string | null
           editorial_value?: number | null
           id?: string
@@ -1530,6 +1637,7 @@ export type Database = {
           contact_id?: string | null
           correction_status?: string | null
           created_at?: string | null
+          cross_outlet_source?: string | null
           detected_language?: string | null
           editorial_value?: number | null
           id?: string
@@ -1564,6 +1672,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "inbox_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbox_conversations_cross_outlet_source_fkey"
+            columns: ["cross_outlet_source"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -2013,6 +2128,80 @@ export type Database = {
           },
         ]
       }
+      message_reactions: {
+        Row: {
+          company_id: string
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          company_id: string
+          email: boolean | null
+          event_type: string
+          in_app: boolean | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          email?: boolean | null
+          event_type: string
+          in_app?: boolean | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          email?: boolean | null
+          event_type?: string
+          in_app?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       og_company_settings: {
         Row: {
           brand_color: string | null
@@ -2410,6 +2599,50 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: []
+      }
+      routing_rules: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          company_id: string
+          created_at: string | null
+          desk_name: string | null
+          enabled: boolean | null
+          id: string
+          priority_override: string | null
+          subcategory: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          category: string
+          company_id: string
+          created_at?: string | null
+          desk_name?: string | null
+          enabled?: boolean | null
+          id?: string
+          priority_override?: string | null
+          subcategory?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string | null
+          desk_name?: string | null
+          enabled?: boolean | null
+          id?: string
+          priority_override?: string | null
+          subcategory?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rss_feed_items: {
         Row: {

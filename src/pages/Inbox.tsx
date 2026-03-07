@@ -12,14 +12,18 @@ import { CannedReplyPicker } from '@/components/inbox/CannedReplyPicker';
 import { AISuggestionsPanel } from '@/components/inbox/AISuggestionsPanel';
 import { SocialPostTab } from '@/components/inbox/SocialPostTab';
 import { CrisisAlertBanner } from '@/components/inbox/CrisisAlertBanner';
+import { AssignmentQueue } from '@/components/inbox/AssignmentQueue';
+import { Button } from '@/components/ui/button';
 import {
   Search,
   PanelRight,
   MessageSquare,
+  ListTodo,
   Mail,
   Star,
   ChevronDown,
   Loader2,
+  UserPlus,
 } from 'lucide-react';
 import { FaFacebook, FaInstagram, FaTwitter, FaLinkedin, FaTiktok, FaYoutube } from 'react-icons/fa';
 import { SiBluesky, SiThreads } from 'react-icons/si';
@@ -35,11 +39,16 @@ import {
 } from '@/hooks/useInboxConversations';
 import { useInboxMessages, useReplyToComment, useReplyToDM, useAddInternalNote } from '@/hooks/useInboxMessages';
 import { useCompanyMembers } from '@/hooks/useCompany';
+import { useAuth } from '@/contexts/AuthContext';
 import { useInboxLabels, useInboxCannedReplies, useAddConversationLabel, useRemoveConversationLabel } from '@/hooks/useInboxLabels';
 import { useInboxSearch } from '@/hooks/useInboxSearch';
 import { useInboxRealtime } from '@/hooks/useInboxRealtime';
 import { useDemo } from '@/lib/demo/DemoDataProvider';
 import { useTranslateMessage } from '@/hooks/useInboxAI';
+import { useMessageReactions, useToggleReaction } from '@/hooks/useMessageReactions';
+import { useReadReceipts } from '@/hooks/useReadReceipts';
+import { useConversationPresence } from '@/hooks/useConversationPresence';
+import { PresenceBanner } from '@/components/inbox/PresenceBanner';
 import type { ConversationStatus, ConversationType, ConversationPriority, Sentiment, MessageCategory, InboxConversation, InboxMessage } from '@/lib/api/inbox';
 
 const platformTabIcons: { key: string; icon: React.ElementType; color: string }[] = [
@@ -57,7 +66,9 @@ type TypeTab = 'all' | 'dm' | 'comment' | 'review';
 
 export default function InboxPage() {
   const { isDemo } = useDemo();
+  const { user } = useAuth();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [assignedToMe, setAssignedToMe] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [drawerTab, setDrawerTab] = useState<'contact' | 'post'>('contact');
@@ -68,6 +79,8 @@ export default function InboxPage() {
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'conversations' | 'queue'>('conversations');
+  const [queueFilter, setQueueFilter] = useState<'mine' | 'unassigned' | 'all'>('mine');
   const [filters, setFilters] = useState<{
     status?: ConversationStatus;
     platform?: string;
@@ -97,6 +110,9 @@ export default function InboxPage() {
   // Realtime
   useInboxRealtime(selectedConversationId);
 
+  // Presence (collision detection)
+  const { others: presenceOthers, broadcastTyping } = useConversationPresence(selectedConversationId);
+
   // Mutations
   const updateStatus = useUpdateConversationStatus();
   const assignConversation = useAssignConversation();
@@ -110,6 +126,12 @@ export default function InboxPage() {
   const removeLabel = useRemoveConversationLabel();
   const translateMessage = useTranslateMessage();
 
+  // Reactions + read receipts
+  const { data: reactions = {} } = useMessageReactions(selectedConversationId);
+  const toggleReaction = useToggleReaction();
+  const conversationIds = useMemo(() => conversations.map((c: InboxConversation) => c.id), [conversations]);
+  const { data: readReceipts = {} } = useReadReceipts(conversationIds);
+
   // Surface reply errors to the user
   useEffect(() => {
     if (replyDM.error) toast.error(`Failed to send DM: ${replyDM.error.message}`);
@@ -121,6 +143,9 @@ export default function InboxPage() {
   // Filter by search + client-side filters
   const filteredConversations = useMemo(() => {
     let result = conversations;
+    if (assignedToMe && user?.id) {
+      result = result.filter((c: InboxConversation) => c.assigned_to === user.id);
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter((c: InboxConversation) =>
@@ -146,7 +171,7 @@ export default function InboxPage() {
       result = result.filter((c: InboxConversation) => new Date(c.last_message_at).getTime() >= cutoff);
     }
     return result;
-  }, [conversations, searchQuery, filters.sentiment, filters.priority, filters.category, filters.dateRange]);
+  }, [conversations, searchQuery, filters.sentiment, filters.priority, filters.category, filters.dateRange, assignedToMe, user?.id]);
 
   const selectedConversation = filteredConversations.find((c: InboxConversation) => c.id === selectedConversationId) || null;
 
@@ -236,6 +261,10 @@ export default function InboxPage() {
     updateStatus.mutate({ conversationId: selectedConversationId, status: 'snoozed' });
   }, [selectedConversationId, updateStatus]);
 
+  const handleToggleReaction = useCallback((messageId: string, emoji: string, hasReacted: boolean) => {
+    toggleReaction.mutate({ messageId, emoji, hasReacted });
+  }, [toggleReaction]);
+
   const handleInsertReply = useCallback((content: string) => {
     setComposerContent(content);
   }, []);
@@ -290,6 +319,17 @@ export default function InboxPage() {
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">
               {totalCount} conversations
             </span>
+
+            {/* View mode toggle */}
+            <div className="flex items-center gap-1 border rounded-md p-0.5">
+              <Button variant={viewMode === 'conversations' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('conversations')}>
+                <MessageSquare className="h-4 w-4 mr-1" />Conversations
+              </Button>
+              <Button variant={viewMode === 'queue' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('queue')}>
+                <ListTodo className="h-4 w-4 mr-1" />My Queue
+              </Button>
+            </div>
+
             <SyncingIndicator />
           </div>
 
@@ -376,6 +416,28 @@ export default function InboxPage() {
               onChange={(v) => setFilters(f => ({ ...f, dateRange: v as 'today' | '7d' | '30d' | '90d' | undefined }))}
             />
 
+            {/* Assigned to me toggle */}
+            <button
+              onClick={() => setAssignedToMe(!assignedToMe)}
+              className={cn(
+                'flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] border-[1.5px] text-[12.5px] font-semibold whitespace-nowrap transition-all',
+                assignedToMe
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+              )}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Mine
+              {(() => {
+                const myCount = conversations.filter((c: InboxConversation) => c.assigned_to === user?.id).length;
+                return myCount > 0 ? (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                    {myCount}
+                  </span>
+                ) : null;
+              })()}
+            </button>
+
             <button
               onClick={() => setDrawerOpen(!drawerOpen)}
               className={cn(
@@ -395,6 +457,27 @@ export default function InboxPage() {
         <CrisisAlertBanner />
 
         {/* === MAIN GRID === */}
+        {viewMode === 'queue' ? (
+          <div className="flex-1 p-4 overflow-auto">
+            <div className="flex items-center gap-2 mb-3">
+              {(['mine', 'unassigned', 'all'] as const).map(f => (
+                <Button key={f} variant={queueFilter === f ? 'default' : 'outline'} size="sm" onClick={() => setQueueFilter(f)} className="capitalize">
+                  {f === 'mine' ? 'Assigned to Me' : f === 'unassigned' ? 'Unassigned' : 'All Team'}
+                </Button>
+              ))}
+            </div>
+            <AssignmentQueue
+              conversations={conversations}
+              currentUserId={user?.id}
+              onSelectConversation={(id) => {
+                setSelectedConversationId(id);
+                setViewMode('conversations');
+                markRead.mutate(id);
+              }}
+              filter={queueFilter}
+            />
+          </div>
+        ) : (
         <div
           className={cn(
             'flex-1 grid gap-3.5 p-3.5 min-h-0 overflow-hidden transition-all',
@@ -406,7 +489,7 @@ export default function InboxPage() {
           {/* === CONVERSATION PANEL (left) === */}
           <div className="bg-card rounded-[14px] border border-border-light shadow-[0_1px_4px_rgba(0,0,0,.07)] flex flex-col overflow-hidden min-h-0">
             {/* Platform icon bar */}
-            <div className="flex items-center gap-1.5 px-[18px] py-3.5 border-b">
+            <div className="flex items-center gap-1.5 px-[18px] py-3.5 border-b border-border-light">
               <button
                 onClick={() => setActivePlatform(null)}
                 className={cn(
@@ -457,7 +540,7 @@ export default function InboxPage() {
             </div>
 
             {/* Type tabs: All / DMs / Comments / Reviews */}
-            <div className="flex border-b px-[18px]">
+            <div className="flex border-b border-border-light px-[18px]">
               {([
                 { key: 'all', label: 'All', count: totalCount },
                 { key: 'dm', label: 'DMs', count: dmCount },
@@ -505,6 +588,7 @@ export default function InboxPage() {
                   selectedIds={selectedIds}
                   onToggleSelect={handleToggleSelect}
                   onToggleFlag={handleToggleFlag}
+                  readReceipts={readReceipts}
                 />
               )}
 
@@ -533,8 +617,13 @@ export default function InboxPage() {
                     onRemoveLabel={handleRemoveLabel}
                     onSnooze={handleSnooze}
                     labels={labels}
+                    companyMembers={companyMembers}
+                    currentUserId={user?.id}
+                    readReceipts={readReceipts[selectedConversation.id] || []}
                   />
                 </div>
+
+                <PresenceBanner others={presenceOthers} />
 
                 <div className="flex-1 min-h-0 overflow-hidden">
                   <ConversationThread
@@ -542,6 +631,8 @@ export default function InboxPage() {
                     isLoading={messagesLoading}
                     onReplyToMessage={setReplyTo}
                     conversation={selectedConversation}
+                    reactions={reactions}
+                    onToggleReaction={handleToggleReaction}
                   />
                 </div>
 
@@ -576,6 +667,7 @@ export default function InboxPage() {
                     onTranslate={handleTranslateComposer}
                     detectedLanguage={selectedConversation.detected_language || undefined}
                     companyMembers={companyMembers}
+                    onTypingChange={broadcastTyping}
                   />
                 </div>
               </>
@@ -598,7 +690,7 @@ export default function InboxPage() {
               {selectedConversation ? (
                 <>
                   {/* Drawer tabs */}
-                  <div className="flex border-b">
+                  <div className="flex border-b border-border-light">
                     <button
                       onClick={() => setDrawerTab('contact')}
                       className={cn(
@@ -631,6 +723,8 @@ export default function InboxPage() {
                         onAssign={handleAssign}
                         onAddLabel={handleAddLabel}
                         onRemoveLabel={handleRemoveLabel}
+                        companyMembers={companyMembers}
+                        currentUserId={user?.id}
                       />
                     ) : (
                       <SocialPostTab conversation={selectedConversation} />
@@ -651,6 +745,7 @@ export default function InboxPage() {
             </div>
           )}
         </div>
+        )}
       </div>
     </DashboardLayout>
     </GlossaryProvider>

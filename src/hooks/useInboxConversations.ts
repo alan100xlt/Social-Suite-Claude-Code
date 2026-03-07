@@ -3,8 +3,9 @@ import { useSelectedCompany } from '@/contexts/SelectedCompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { isDemoCompany } from '@/lib/demo/demo-constants';
 import { DEMO_INBOX_CONVERSATIONS } from '@/lib/demo/demo-data';
-import { inboxApi, type ConversationStatus, type ConversationType } from '@/lib/api/inbox';
+import { inboxApi, type ConversationStatus, type ConversationType, type ConversationPriority, type Sentiment, type InboxConversation } from '@/lib/api/inbox';
 import { sendNotification } from '@/lib/api/notifications';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface InboxFilters {
   status?: ConversationStatus;
@@ -24,7 +25,35 @@ export function useInboxConversations(filters?: InboxFilters) {
       if (isDemo) return DEMO_INBOX_CONVERSATIONS;
       const result = await inboxApi.conversations.list(selectedCompanyId, filters);
       if (!result.success) throw new Error(result.error);
-      return result.conversations;
+      const conversations = result.conversations || [];
+
+      // Also fetch cross-outlet conversations assigned to this company
+      const { data: crossOutlet } = await supabase
+        .from('inbox_conversations')
+        .select('*, contact:inbox_contacts(*)')
+        .eq('cross_outlet_source', selectedCompanyId)
+        .neq('company_id', selectedCompanyId)
+        .order('last_message_at', { ascending: false });
+
+      if (crossOutlet && crossOutlet.length > 0) {
+        const existingIds = new Set(conversations.map((c: InboxConversation) => c.id));
+        const mapped = crossOutlet
+          .filter(c => !existingIds.has(c.id))
+          .map(c => ({
+            ...c,
+            labels: [],
+            type: c.type as ConversationType,
+            status: c.status as ConversationStatus,
+            priority: (c.priority || 'normal') as ConversationPriority,
+            sentiment: c.sentiment as Sentiment | null,
+            metadata: (c.metadata || {}) as Record<string, unknown>,
+            unread_count: c.unread_count || 0,
+            last_message_at: c.last_message_at || c.created_at || '',
+          } as InboxConversation));
+        return [...conversations, ...mapped];
+      }
+
+      return conversations;
     },
     enabled: !!selectedCompanyId,
     staleTime: isDemo ? Infinity : 0,
@@ -50,6 +79,7 @@ export function useInboxConversation(conversationId: string | null) {
 
 export function useUpdateConversationStatus() {
   const { selectedCompanyId } = useSelectedCompany();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -59,8 +89,19 @@ export function useUpdateConversationStatus() {
       if (!result.success) throw new Error(result.error);
       return result.conversation;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { conversationId, status }) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-conversations', selectedCompanyId] });
+
+      // Log activity (fire-and-forget)
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'status_changed',
+          conversation_id: conversationId,
+          metadata: { new_status: status, user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
+      }
     },
   });
 }
@@ -90,6 +131,17 @@ export function useAssignConversation() {
           body: `${assignerName} assigned you to ${subject}`,
           actionUrl: `/app/content?tab=inbox&conversation=${conversationId}`,
         }).catch(console.error);
+      }
+
+      // Log activity (fire-and-forget)
+      if (selectedCompanyId && user?.id) {
+        supabase.from('inbox_activity_log').insert({
+          company_id: selectedCompanyId,
+          user_id: user.id,
+          action: 'assigned',
+          conversation_id: conversationId,
+          metadata: { assignee_id: assigneeId, user_name: user?.user_metadata?.full_name || user?.email },
+        }).then(() => {});
       }
     },
   });
