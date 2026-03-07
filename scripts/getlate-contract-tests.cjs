@@ -790,6 +790,49 @@ async function run() {
     console.log('');
   }
 
+  // ─── FIRST COMMENT ──────────────────────────────────────────
+  if (shouldRun('first-comment') || shouldRun('all')) {
+    console.log('── First Comment API Discovery ──');
+    console.log('  Probing for comment creation endpoints...');
+
+    // Probe 1: POST /comments (most likely endpoint)
+    const probe1 = await api('POST', '/comments', { postId: 'fake_post_id', text: '__test_comment__' });
+    probe('POST /comments', probe1.status, probe1.data);
+
+    // Probe 2: POST /posts/{id}/comments
+    const probe2 = await api('POST', '/posts/fake_post_id/comments', { text: '__test_comment__' });
+    probe('POST /posts/{id}/comments', probe2.status, probe2.data);
+
+    // Probe 3: POST /posts/{id}/comment
+    const probe3 = await api('POST', '/posts/fake_post_id/comment', { text: '__test_comment__' });
+    probe('POST /posts/{id}/comment', probe3.status, probe3.data);
+
+    // Probe 4: POST /comments/create
+    const probe4 = await api('POST', '/comments/create', { postId: 'fake_post_id', text: '__test_comment__' });
+    probe('POST /comments/create', probe4.status, probe4.data);
+
+    // Probe 5: POST /posts/comment with post ID in body
+    const probe5 = await api('POST', '/posts/comment', { postId: 'fake_post_id', message: '__test__', accountId: sampleAccount?._id });
+    probe('POST /posts/comment', probe5.status, probe5.data);
+
+    // Check if any endpoint returned something other than 404
+    const probes = [probe1, probe2, probe3, probe4, probe5];
+    const foundEndpoint = probes.some(p => p.status !== 404);
+    record('First comment API endpoint exists', foundEndpoint, {
+      statuses: probes.map(p => p.status).join(', '),
+      note: foundEndpoint ? 'At least one endpoint responded (not 404)' : 'All endpoints returned 404 — first comment not supported',
+    });
+
+    if (foundEndpoint) {
+      contracts['POST /comments (first comment)'] = {
+        note: 'First comment scheduling is supported',
+        probeResults: probes.map(p => ({ url: p.url, status: p.status })),
+      };
+    }
+
+    console.log('');
+  }
+
   // ═══ Summary ═══════════════════════════════════════════════
   console.log(`═══ Results: ${passed} passed, ${failed} failed, ${skipped} skipped ═══\n`);
 

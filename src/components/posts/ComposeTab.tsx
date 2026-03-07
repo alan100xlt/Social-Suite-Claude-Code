@@ -41,6 +41,7 @@ import { useSelectedCompany } from "@/contexts/SelectedCompanyContext";
 import { useThrottleCheck } from "@/hooks/useThrottleCheck";
 import { useQualityCheck } from "@/hooks/useQualityCheck";
 import { QualityCheckPanel } from "@/components/posts/QualityCheckPanel";
+import { MediaLibraryDialog } from "@/components/content/MediaLibraryDialog";
 
 const platformIcons: Partial<Record<Platform, React.ElementType>> = {
   instagram: FaInstagram, twitter: FaTwitter, tiktok: FaTiktok, linkedin: FaLinkedin,
@@ -1145,10 +1146,21 @@ export function ComposeTab({ draftId, onOpenDraft }: ComposeTabProps) {
           <>
             <ImageIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             <span className="text-sm text-muted-foreground">No image attached</span>
-            <Button size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-7 px-2 text-xs ml-auto">
-              {isUploading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-              Add image
-            </Button>
+            <div className="flex gap-1 ml-auto">
+              <MediaLibraryDialog
+                onSelect={(url) => setImageUrl(url)}
+                trigger={
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                    <ImageIcon className="h-3 w-3 mr-1" />
+                    Library
+                  </Button>
+                }
+              />
+              <Button size="sm" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-7 px-2 text-xs">
+                {isUploading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                Upload
+              </Button>
+            </div>
           </>
         )}
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
