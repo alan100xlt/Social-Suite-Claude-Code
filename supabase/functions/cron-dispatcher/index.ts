@@ -22,6 +22,7 @@ import { corsHeaders } from '../_shared/authorize.ts';
 const ALLOWED_FUNCTIONS = [
   'inbox-sync',
   'analytics-sync',
+  'ga-analytics-sync',
   'rss-poll',
   'getlate-changelog-monitor',
   'cron-escalation',
@@ -72,7 +73,7 @@ Deno.serve(async (req) => {
   });
 
   // Fan-out functions need per-company dispatch
-  const fanOutFunctions = ['inbox-sync', 'analytics-sync'];
+  const fanOutFunctions = ['inbox-sync', 'analytics-sync', 'ga-analytics-sync'];
 
   if (fanOutFunctions.includes(functionName)) {
     const { data: companies, error } = await supabase
