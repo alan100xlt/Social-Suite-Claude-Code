@@ -492,7 +492,7 @@ Deno.serve(async (req) => {
           const batch = postSnapshots.slice(i, i + BATCH_SIZE);
           const { error: batchError } = await supabase
             .from('post_analytics_snapshots')
-            .upsert(batch, { onConflict: 'company_id,post_id', ignoreDuplicates: false });
+            .upsert(batch, { onConflict: 'company_id,post_id,snapshot_date', ignoreDuplicates: false });
 
           if (batchError) {
             console.error(`Error upserting post snapshot batch:`, batchError);
@@ -560,7 +560,7 @@ Deno.serve(async (req) => {
                 engagement_rate: avgEngagementRate,
                 snapshot_date: today,
                 is_active: account.isActive ?? true,
-              }, { onConflict: 'company_id,account_id', ignoreDuplicates: false });
+              }, { onConflict: 'company_id,account_id,snapshot_date', ignoreDuplicates: false });
 
             if (accountUpsertError) {
               console.error(`Error upserting account snapshot for ${accountId}:`, accountUpsertError);
